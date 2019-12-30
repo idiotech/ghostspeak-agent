@@ -3,7 +3,6 @@ name := "ghostspeak-agent"
 version := "0.1"
 
 scalaVersion := "2.13.1"
-scalacOptions += "-Ypartial-unification"
 
 val akkaVersion = "2.6.1"
 val enumeratumVersion = "1.5.14"
@@ -12,6 +11,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-actor" % akkaVersion,
   "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
   "com.beachape" %% "enumeratum" % enumeratumVersion,
+  "com.chuusai" %% "shapeless" % "2.3.3",
   "org.scalatest" %% "scalatest" % "3.1.0" % Test
 )
 
