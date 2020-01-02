@@ -4,7 +4,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
 import shapeless._
 import shapeless.ops.hlist.RightFolder
-import tw.idv.idiotech.ghostspeak.agent.util.Substitution
+import tw.idv.idiotech.ghostspeak.agent.util.substitute
 
 class ShapelessTest extends AnyFlatSpec with Matchers {
 
@@ -29,8 +29,12 @@ class ShapelessTest extends AnyFlatSpec with Matchers {
       }
     }
 
-    def updateProduct[P <: Product, R<: HList, B<: HList](p: P, original: String, updated: String)(
-      implicit aux : Generic.Aux[P, R],
+    def updateProduct[P <: Product, R <: HList, B <: HList](
+      p: P,
+      original: String,
+      updated: String
+    )(
+      implicit aux: Generic.Aux[P, R],
       l: RightFolder.Aux[
         R,
         (HNil, Subst),
@@ -45,8 +49,9 @@ class ShapelessTest extends AnyFlatSpec with Matchers {
   }
 
   "test" should "work" in {
+    case class Ghostspeak(sender: String, receiver: String)
     val ghostspeak = Ghostspeak("?a", "sheila")
-    Substitution(ghostspeak, "?a", "amy") mustBe Ghostspeak("amy", "sheila")
+    substitute(ghostspeak, "?a", "amy") mustBe Ghostspeak("amy", "sheila")
   }
 
 }
