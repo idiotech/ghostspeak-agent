@@ -2,8 +2,7 @@ package tw.idv.idiotech.ghostspeak.agent.util
 
 import shapeless._
 import shapeless.ops.hlist.RightFolder
-import tw.idv.idiotech.ghostspeak.agent.util.substitute.SubstPair
-import shapeless.{Coproduct, :+:, CNil, Inl, Inr}
+import shapeless.{ :+:, CNil, Coproduct, Inl, Inr }
 
 object substitute extends Poly2 {
   case class SubstPair(oldString: String, newString: String) {
@@ -22,67 +21,62 @@ object substitute extends Poly2 {
       (obj :: values, subst)
   }
 
+  type Folder[R <: HList, B <: HList] = RightFolder.Aux[
+    R,
+    (HNil, SubstPair),
+    substitute.type,
+    (B, SubstPair)
+  ]
+
   def apply[P <: Product, R <: HList, B <: HList](p: P, original: String, updated: String)(
     implicit aux: Generic.Aux[P, R],
-    l: RightFolder.Aux[
-      R,
-      (HNil, SubstPair),
-      substitute.type,
-      (B, SubstPair)
-    ]
+    l: Folder[R, B]
   ): P =
     aux.from(
       aux.to(p).foldRight((HNil: HNil, SubstPair(original, updated)))(substitute)._1.asInstanceOf[R]
     )
 }
 
-sealed trait Action
-case class Speak(actor: String, receiver: String, content: String) extends Action
-case class Hit(actor: String, receiver: String) extends Action
-
-trait Subber[A] {
-  def subb(a: A, variable: String, instance: String): A
+trait Instantiation[A] {
+  def instantiate(a: A, variable: String, instance: String): A
 }
 
-object Subber {
-  def apply[A](implicit substitute: Subber[A]): Subber[A] = substitute
-  implicit class SubstituteOps[A: Subber](val a: A) {
-    def sub(variable: String, instance: String) = Subber[A].subb(a, variable, instance)
+object Instantiation {
+  def apply[A](implicit instantiation: Instantiation[A]): Instantiation[A] = instantiation
+
+  implicit class InstantiationOps[A: Instantiation](val a: A) {
+    def replace(variable: String, instance: String): A = Instantiation[A].instantiate(a, variable, instance)
   }
-  implicit val cnilEncoder: Subber[CNil] = (_: CNil, _: String, _: String) => throw new Exception("Inconceivable!")
-  implicit def basicSubs[P <: Product, R <: HList, B <: HList](
+  implicit val cnilEncoder: Instantiation[CNil] = (_: CNil, _: String, _: String) =>
+    throw new Exception("Inconceivable!")
+
+  implicit def instantiateProduct[P <: Product, R <: HList, B <: HList](
     implicit aux: Generic.Aux[P, R],
-    l: RightFolder.Aux[
-      R,
-      (HNil, SubstPair),
-      substitute.type,
-      (B, SubstPair)
-    ]
-  ): Subber[P] = (a: P, variable: String, instance: String) => substitute(a, variable, instance)
+    l: substitute.Folder[R, B]
+  ): Instantiation[P] = (a: P, variable: String, instance: String) => substitute(a, variable, instance)
 
-  def createSubber[A](func: (A, String, String) => A) = new Subber[A] {
-    override def subb(a: A, variable: String, instance: String): A = func(a, variable, instance)
+  private def create[A](func: (A, String, String) => A) = new Instantiation[A] {
+    override def instantiate(a: A, variable: String, instance: String): A = func(a, variable, instance)
   }
 
-  implicit def cosubs[H, T <: Coproduct](implicit
-    hSubber: Subber[H],
-    tSubber: Subber[T]
-  ): Subber[H :+: T] = createSubber[H :+: T](
-
-    (a, o, r) => a match {
-      case Inl(head) => Inl[H, T](hSubber.subb(head, o, r))
-      case Inr(tail) => Inr[H, T](tSubber.subb(tail, o, r))
-    }
+  implicit def instantiateCoproduct[H, T <: Coproduct](
+                                                        implicit
+                                                        hInst: Instantiation[H],
+                                                        tInst: Instantiation[T]
+  ): Instantiation[H :+: T] = create[H :+: T](
+    (a, o, r) =>
+      a match {
+        case Inl(head) => Inl[H, T](hInst.instantiate(head, o, r))
+        case Inr(tail) => Inr[H, T](tInst.instantiate(tail, o, r))
+      }
   )
 
-  implicit val genAction = Generic[Action]
   implicit def generalSubs[A, C <: Coproduct](
-     implicit generic: Generic.Aux[A, C],
-     subs: Lazy[Subber[C]]
-  ): Subber[A] = {
-    createSubber[A](
-      (a, o, r) =>  generic.from(subs.value.subb(generic.to(a), o, r))
+    implicit generic: Generic.Aux[A, C],
+    subs: Lazy[Instantiation[C]]
+  ): Instantiation[A] =
+    create[A](
+      (a, o, r) => generic.from(subs.value.instantiate(generic.to(a), o, r))
     )
-  }
 
 }

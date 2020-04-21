@@ -2,21 +2,21 @@ package tw.idv.idiotech.ghostspeak.agent
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
-import shapeless._
-import shapeless.ops.hlist.RightFolder
-import tw.idv.idiotech.ghostspeak.agent.util.{Action, Speak, substitute}
+import shapeless.Generic
+import tw.idv.idiotech.ghostspeak.agent.util.substitute
 
 class ShapelessTest extends AnyFlatSpec with Matchers {
 
-  import tw.idv.idiotech.ghostspeak.agent.util.Subber._
+  import tw.idv.idiotech.ghostspeak.agent.util.Instantiation._
+
+  sealed trait Action
+  case class Speak(actor: String, receiver: String, content: String) extends Action
+  case class Hit(actor: String, receiver: String) extends Action
 
   "test" should "work" in {
-    case class Ghostspeak(sender: String, receiver: String)
-    val ghostspeak = Ghostspeak("?a", "sheila")
+    implicit val genAction = Generic[Action]
     val action = Speak("?a", "vivian", "hello")
-    println(action.sub("?a", "Ellen"))
-    println(ghostspeak.sub("?a", "sheila"))
-    substitute(ghostspeak, "?a", "amy") mustBe Ghostspeak("amy", "sheila")
+    substitute(action, "?a", "amy") mustBe Speak("amy", "vivian", "hello")
   }
 
 }

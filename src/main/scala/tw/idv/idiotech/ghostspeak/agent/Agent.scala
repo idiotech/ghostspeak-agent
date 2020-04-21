@@ -36,7 +36,7 @@ class Agent(memory: Memory, beliefRevisers: List[Behavior[Message]], actuator: B
           _ <- act(action)
         }
 
-           */
+ */
           memoryActor ! message
           beliefRevisers.foreach { r =>
             {
@@ -61,4 +61,4 @@ class Agent(memory: Memory, beliefRevisers: List[Behavior[Message]], actuator: B
 
   def perceive(event: Message) = system ! event
 }
-*/
+ */

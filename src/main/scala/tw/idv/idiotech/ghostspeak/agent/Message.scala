@@ -22,7 +22,6 @@ sealed trait Performative extends EnumEntry
 
 trait Payload
 
-
 sealed trait Message
 
 trait Item extends Product with Serializable
