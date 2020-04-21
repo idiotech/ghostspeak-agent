@@ -1,13 +1,7 @@
 package tw.idv.idiotech.ghostspeak.agent
 
 import akka.actor.typed.ActorRef
-import shapeless._
-import Poly._
 import enumeratum._
-import shapeless.Generic.Aux
-import shapeless.PolyDefns.~>
-import shapeless.ops.coproduct.Folder
-import shapeless.ops.hlist.{ IsHCons, Mapper, RightFolder }
 
 sealed trait Modality extends EnumEntry
 
@@ -20,24 +14,33 @@ object Modality extends Enum[Modality] {
   case object Intend extends Modality
 }
 
-sealed trait SpeechAct extends EnumEntry
-
-object SpeechAct extends Enum[SpeechAct] {
-
-  val values = findValues
-  case object Inform extends SpeechAct
-  case object Query extends SpeechAct
-  case object Request extends SpeechAct
-  case object Accept extends SpeechAct
-}
+sealed trait Performative extends EnumEntry
 
 // sender receiver content
 
 // speech act: query, inform,
 
-case class Message(
-  sender: ActorRef[Message],
-  speechAct: SpeechAct,
-  modality: Modality,
-  payload: Fact
+trait Payload
+
+
+sealed trait Message
+
+trait Item extends Product with Serializable
+
+case class Belief(modality: Modality, item: Item) extends Payload
+
+case class InformMessage(
+  id: Int,
+  sender: ActorRef[AckMessage],
+  beliefs: List[Belief]
+)
+
+case class AckMessage(
+  id: Int,
+  beliefs: Belief
+)
+case class QueryMessage(
+  id: Int,
+  sender: ActorRef[InformMessage],
+  query: Query
 )

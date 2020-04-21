@@ -3,16 +3,22 @@ package tw.idv.idiotech.ghostspeak.agent
 import akka.actor.typed.{ ActorSystem, Behavior }
 import akka.actor.typed.scaladsl.Behaviors
 import cats.effect.IO
-import cats.syntax._
-
+/*
 class Agent(memory: Memory, beliefRevisers: List[Behavior[Message]], actuator: Behavior[Message]) {
 
   def memoryBehavior(memoryIO: IO[Memory]): Behavior[Message] =
-    Behaviors.receiveMessage[Message] { event =>
-      memoryBehavior(for {
-        mem    <- memoryIO
-        newMem <- mem.remember(event)
-      } yield newMem)
+    Behaviors.receiveMessage[Message] {
+      case InformMessage(_, beliefs) =>
+        memoryBehavior(for {
+          mem    <- memoryIO
+          newMem <- mem.remember(beliefs)
+        } yield newMem)
+      case QueryMessage(id, sender, query) =>
+        for {
+          results <- memory.query(query)
+          _ <- IO( sender ! InformMessage(id, results)  )
+        } yield results
+        Behaviors.same
     }
 
   val observer: Behavior[Message] =
@@ -39,7 +45,7 @@ class Agent(memory: Memory, beliefRevisers: List[Behavior[Message]], actuator: B
             }
           }
           message match {
-            case Message(_, SpeechAct.Request, Modality.Done, _) =>
+            case Message(_, Performative.Request, Modality.Done, _) =>
               // remember: is doing it, have done it
               val actor = context.spawn(actuator, "actuator")
               actor ! message
@@ -55,3 +61,4 @@ class Agent(memory: Memory, beliefRevisers: List[Behavior[Message]], actuator: B
 
   def perceive(event: Message) = system ! event
 }
+*/
