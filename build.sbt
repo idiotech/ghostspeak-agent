@@ -4,7 +4,7 @@ version := "0.1"
 
 scalaVersion := "2.13.1"
 
-val akkaVersion = "2.6.1"
+val akkaVersion = "2.6.4"
 val enumeratumVersion = "1.5.14"
 
 libraryDependencies ++= Seq(
@@ -14,6 +14,7 @@ libraryDependencies ++= Seq(
   "com.chuusai" %% "shapeless" % "2.3.3",
   "org.typelevel" %% "cats-core" % "2.1.0",
   "org.typelevel" %% "cats-effect" % "2.0.0",
+  "org.scala-graph" %% "graph-core" % "1.13.2",
   "org.scalatest" %% "scalatest" % "3.1.0" % Test
 )
 
@@ -24,7 +25,6 @@ def log = Seq(
   "org.apache.logging.log4j" % "log4j-api" % log4jVersion,
   "org.apache.logging.log4j" % "log4j-core" % log4jVersion,
   "com.typesafe.scala-logging" %% "scala-logging" % "3.9.2",
-  // log errors to Sentry
 )
 
 libraryDependencies ++= log

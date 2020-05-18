@@ -8,6 +8,7 @@ import tw.idv.idiotech.ghostspeak.agent.util.substitute
 class ShapelessTest extends AnyFlatSpec with Matchers {
 
   import tw.idv.idiotech.ghostspeak.agent.util.Instantiation._
+  import scala.reflect.runtime.universe._
 
   sealed trait Action
   case class Speak(actor: String, receiver: String, content: String) extends Action
@@ -15,8 +16,11 @@ class ShapelessTest extends AnyFlatSpec with Matchers {
 
   "test" should "work" in {
     implicit val genAction = Generic[Action]
-    val action = Speak("?a", "vivian", "hello")
-    substitute(action, "?a", "amy") mustBe Speak("amy", "vivian", "hello")
+    val action: Action = Speak("?a", "vivian", "hello")
+    println(action.replace("?a", "amy"))
+//    substitute(action, "?a", "amy") mustBe Speak("amy", "vivian", "hello")
+    println(action.getClass)
+    println(classOf[Speak])
   }
 
 }
