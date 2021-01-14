@@ -39,5 +39,5 @@ case class Message(
   sender: ActorRef[Message],
   speechAct: SpeechAct,
   modality: Modality,
-  payload: Fact
+  payload: String
 )
