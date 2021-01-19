@@ -1,12 +1,12 @@
 package tw.idv.idiotech.ghostspeak.agent
 
 import akka.actor.typed.scaladsl.Behaviors
-import akka.actor.typed.{ActorSystem, Behavior, PostStop}
+import akka.actor.typed.{ ActorSystem, Behavior, PostStop }
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.Http
 
 import scala.concurrent.Future
-import scala.util.{Failure, Success}
+import scala.util.{ Failure, Success }
 
 object Server {
 
@@ -16,7 +16,6 @@ object Server {
   case object Stop extends Message
 
   def apply(host: String, port: Int): Behavior[Message] = Behaviors.setup { ctx =>
-
     implicit val system = ctx.system
 
     val buildJobRepository = ctx.spawn(JobRepository(), "JobRepository")
@@ -30,18 +29,21 @@ object Server {
     }
 
     def running(binding: ServerBinding): Behavior[Message] =
-      Behaviors.receiveMessagePartial[Message] {
-        case Stop =>
-          ctx.log.info(
-            "Stopping server http://{}:{}/",
-            binding.localAddress.getHostString,
-            binding.localAddress.getPort)
-          Behaviors.stopped
-      }.receiveSignal {
-        case (_, PostStop) =>
-          binding.unbind()
-          Behaviors.same
-      }
+      Behaviors
+        .receiveMessagePartial[Message] {
+          case Stop =>
+            ctx.log.info(
+              "Stopping server http://{}:{}/",
+              binding.localAddress.getHostString,
+              binding.localAddress.getPort
+            )
+            Behaviors.stopped
+        }
+        .receiveSignal {
+          case (_, PostStop) =>
+            binding.unbind()
+            Behaviors.same
+        }
 
     def starting(wasStopped: Boolean): Behaviors.Receive[Message] =
       Behaviors.receiveMessage[Message] {
@@ -51,7 +53,8 @@ object Server {
           ctx.log.info(
             "Server online at http://{}:{}/",
             binding.localAddress.getHostString,
-            binding.localAddress.getPort)
+            binding.localAddress.getPort
+          )
           if (wasStopped) ctx.self ! Stop
           running(binding)
         case Stop =>
@@ -62,9 +65,9 @@ object Server {
 
     starting(wasStopped = false)
   }
+
   def main(args: Array[String]): Unit = {
     val system: ActorSystem[Server.Message] =
       ActorSystem(Server("localhost", 8080), "BuildJobsServer")
   }
 }
-

@@ -30,6 +30,7 @@ libraryDependencies ++= Seq(
   "com.beachape" %% "enumeratum" % enumeratumVersion,
   "com.beachape" %% "enumeratum-circe" % enumeratumVersion,
   "de.heikoseeberger" %% "akka-http-circe" % "1.31.0",
+  "com.github.idiotech.scala-jsonschema" %% "scala-jsonschema-circe-json" % "ordering-v0.6.1-g0f3353d-60",
   "com.chuusai" %% "shapeless" % "2.3.3",
   "io.circe"        %% "circe-generic"       % circeVersion,
   "io.circe"        %% "circe-generic-extras"       % circeVersion,
@@ -50,4 +51,7 @@ def log = Seq(
 
 libraryDependencies ++= log
 
-resolvers += Resolver.sonatypeRepo("releases")
+resolvers ++= List(
+  Resolver.sonatypeRepo("releases"),
+  "jitpack" at "https://jitpack.io"
+)

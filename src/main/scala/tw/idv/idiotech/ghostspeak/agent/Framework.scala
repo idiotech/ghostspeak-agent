@@ -31,8 +31,7 @@ ActorRegistry: input / output
   graph planner => internally, at new perception, activate triggers and add new triggers -> as internal state
 
   Akka persistence
-    * 
+ *
 
 
-*/
-
+ */

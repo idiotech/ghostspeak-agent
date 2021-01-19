@@ -1,6 +1,6 @@
 package tw.idv.idiotech.ghostspeak.agent
 
-import akka.actor.typed.{ActorRef, Behavior}
+import akka.actor.typed.{ ActorRef, Behavior }
 import akka.actor.typed.scaladsl.Behaviors
 import io.circe.generic.JsonCodec
 
