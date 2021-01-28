@@ -18,11 +18,11 @@ object Server {
   def apply(host: String, port: Int): Behavior[Message] = Behaviors.setup { ctx =>
     implicit val system = ctx.system
 
-    val buildJobRepository = ctx.spawn(JobRepository(), "JobRepository")
-    val routes = new JobRoutes(buildJobRepository)
+    val dummySensor = ctx.spawn(DummySensor(), "DummySensor")
+    val routes = new EventRoutes(dummySensor)
 
     val serverBinding: Future[Http.ServerBinding] =
-      Http().newServerAt(host, port).bind(routes.theJobRoutes)
+      Http().newServerAt(host, port).bind(routes.theEventRoutes)
     ctx.pipeToSelf(serverBinding) {
       case Success(binding) => Started(binding)
       case Failure(ex)      => StartFailed(ex)

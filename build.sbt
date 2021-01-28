@@ -2,9 +2,9 @@ name := "ghostspeak-agent"
 
 version := "0.1"
 
-scalaVersion := "2.13.1"
+scalaVersion := "2.13.4"
 
-val akkaVersion = "2.6.8"
+val akkaVersion = "2.6.11"
 val akkaHttpVersion = "10.2.2"
 val enumeratumVersion = "1.6.1"
 val circeVersion = "0.13.0"
@@ -27,11 +27,18 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
+  "com.typesafe.akka" %% "akka-stream" % akkaVersion,
+  "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % Test,
+  "com.typesafe.akka" %% "akka-persistence-typed" % akkaVersion,
+  "com.typesafe.akka" %% "akka-persistence-testkit" % akkaVersion % Test,
+  "com.lightbend.akka" %% "akka-stream-alpakka-google-fcm" % "2.0.2",
   "com.beachape" %% "enumeratum" % enumeratumVersion,
   "com.beachape" %% "enumeratum-circe" % enumeratumVersion,
   "de.heikoseeberger" %% "akka-http-circe" % "1.31.0",
   "com.github.idiotech.scala-jsonschema" %% "scala-jsonschema-circe-json" % "ordering-v0.6.1-g0f3353d-60",
+  "com.github.ceratech" % "fcm-scala" % "1.7",
   "com.chuusai" %% "shapeless" % "2.3.3",
+  "com.softwaremill.retry" %% "retry" % "0.3.3",
   "io.circe"        %% "circe-generic"       % circeVersion,
   "io.circe"        %% "circe-generic-extras"       % circeVersion,
   "org.typelevel" %% "cats-core" % "2.1.0",

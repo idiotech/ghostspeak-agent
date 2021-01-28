@@ -9,7 +9,6 @@ import com.github.andyglow.jsonschema.AsCirce._
 import io.circe.Printer
 import json.schema.Version._
 
-
 class ModelTest extends AnyFlatSpec with Matchers {
 
   "model" must "translate to json" in {
@@ -26,7 +25,6 @@ class ModelTest extends AnyFlatSpec with Matchers {
         Set(Destination.Notification)
       ),
       Some("chapter 1")
-
     )
     val event = Event(
       "event_id",
@@ -40,8 +38,7 @@ class ModelTest extends AnyFlatSpec with Matchers {
 //    implicit val contentSchema = Json.schema[Content]("Content")
 //    implicit val popupSchema = Json.schema[Content.Popup]("Popup")
 
-
-    val schema = Json.schema[Event]
+    val schema = Json.schema[Message]
     println(schema.asCirce(Draft04()))
     println(event.asJson)
 //    println(action.asJson)
