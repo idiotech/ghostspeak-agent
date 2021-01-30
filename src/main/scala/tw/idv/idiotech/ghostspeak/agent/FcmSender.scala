@@ -55,7 +55,7 @@ object FcmSender extends LazyLogging {
         Behaviors.same
       case OK =>
         Behaviors.stopped
-      case KO =>
+      case KO(_) =>
         Behaviors.stopped
     }
   }
