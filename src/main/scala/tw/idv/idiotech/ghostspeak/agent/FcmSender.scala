@@ -2,8 +2,6 @@ package tw.idv.idiotech.ghostspeak.agent
 
 import akka.Done
 import akka.actor.typed.ActorSystem
-import akka.actor.typed.Behavior
-import akka.actor.typed.scaladsl.Behaviors
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.LazyLogging
 
@@ -12,13 +10,13 @@ import akka.stream.alpakka.google.firebase.fcm.scaladsl.GoogleFcm
 import akka.stream.alpakka.google.firebase.fcm._
 import akka.stream.RestartSettings
 import akka.stream.alpakka.google.firebase.fcm.FcmNotificationModels.Token
-import akka.stream.scaladsl.{ RestartFlow, Sink, Source }
-import io.circe.generic.extras.{ Configuration, ConfiguredJsonCodec }
+import akka.stream.scaladsl.{RestartFlow, Sink, Source}
+import io.circe.Encoder
+import io.circe.generic.extras.{Configuration, ConfiguredJsonCodec}
 import io.circe.syntax._
 import io.circe.parser.decode
 
 import scala.concurrent.Future
-import scala.util.{ Failure, Success }
 
 object FcmSender extends LazyLogging {
   private implicit val configuration = Configuration.default.withSnakeCaseMemberNames
@@ -38,29 +36,7 @@ object FcmSender extends LazyLogging {
     randomFactor = 0.2 // adds 20% "noise" to vary the intervals slightly
   ).withMaxRestarts(20, 5.minutes)
 
-  sealed trait Command
-  case class Perform(action: Action) extends Command
-  case object OK extends Command
-  case class KO(reason: String) extends Command
-
-  def apply(): Behavior[Command] = Behaviors.setup { ctx =>
-    implicit val system: ActorSystem[Nothing] = ctx.system
-    Behaviors.receiveMessage {
-      case Perform(action) =>
-        val future = send(action)
-        ctx.pipeToSelf(future) {
-          case Success(_) => OK
-          case Failure(e) => KO(e.getMessage)
-        }
-        Behaviors.same
-      case OK =>
-        Behaviors.stopped
-      case KO(_) =>
-        Behaviors.stopped
-    }
-  }
-
-  def send(action: Action)(implicit actorSystem: ActorSystem[_]): Future[Done] =
+  def send[T](action: Action[T])(implicit actorSystem: ActorSystem[_], encoder: Encoder[Action[T]]): Future[Done] =
     Source
       .single(
         FcmNotification.empty
@@ -69,7 +45,7 @@ object FcmSender extends LazyLogging {
           )
           .withTarget(Token(action.receiver))
       )
-      .via(RestartFlow.onFailuresWithBackoff(settings)(_ => GoogleFcm.send(fcmConfig)))
+      .via(RestartFlow.onFailuresWithBackoff(settings)(() => GoogleFcm.send(fcmConfig)))
       .map {
         case res @ FcmSuccessResponse(name) =>
           println(s"Successful $name")

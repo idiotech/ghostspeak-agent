@@ -8,17 +8,17 @@ import akka.http.scaladsl.Http
 import scala.concurrent.Future
 import scala.util.{ Failure, Success }
 
-object Server {
+class Server {
 
   sealed trait Message
   private final case class StartFailed(cause: Throwable) extends Message
   private final case class Started(binding: ServerBinding) extends Message
   case object Stop extends Message
 
-  def apply(host: String, port: Int): Behavior[Message] = Behaviors.setup { ctx =>
+  def apply(scenarioManager: ScenarioManager, host: String, port: Int): Behavior[Message] = Behaviors.setup { ctx =>
     implicit val system = ctx.system
 
-    val dummySensor = ctx.spawn(DummySensor(), "DummySensor")
+    val dummySensor = ctx.spawn(Sensor(scenarioManager), "DummySensor")
     val routes = new EventRoutes(dummySensor)
 
     val serverBinding: Future[Http.ServerBinding] =
@@ -66,8 +66,8 @@ object Server {
     starting(wasStopped = false)
   }
 
-  def main(args: Array[String]): Unit = {
-    val system: ActorSystem[Server.Message] =
-      ActorSystem(Server("localhost", 8080), "BuildJobsServer")
-  }
+//  def main(args: Array[String]): Unit = {
+//    val system: ActorSystem[Message] =
+//      ActorSystem(Server("localhost", 8080), "BuildJobsServer")
+//  }
 }

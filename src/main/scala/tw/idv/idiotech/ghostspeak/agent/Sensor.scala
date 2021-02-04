@@ -4,20 +4,30 @@ import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, Behavior}
 import akka.pattern.StatusReply
 import akka.persistence.typed.PersistenceId
-import akka.persistence.typed.scaladsl.{Effect, EffectBuilder, EventSourcedBehavior, ReplyEffect}
+import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior, ReplyEffect}
 
-class Sensor(scenarioManager: ScenarioManager) {
-  import Sensor._
+object Sensor {
+  sealed trait Command
+  case class Sense(message: Message, replyTo: ActorRef[StatusReply[String]]) extends Command
+  case class Create(scenarioId: String, template: String, replyTo: ActorRef[StatusReply[String]]) extends Command
+  case class Destroy(scenarioId: String, replyTo: ActorRef[StatusReply[String]]) extends Command
+
+  sealed trait Event
+  case class Created(id: String, scenario: ActorRef[Scenario.Command]) extends Event
+  case class Destroyed(id: String) extends Event
+
+  type State = Map[String, ActorRef[Scenario.Command]]
+
   def onCommand(
-    ctx: ActorContext[Command]
+    ctx: ActorContext[Command], scenarioManager: ScenarioManager
   )(state: State, cmd: Command): ReplyEffect[Event, State] = cmd match {
     case Sense(message, replyTo) =>
       Effect.reply(replyTo){
-        state.get(message.scenarioId).fold(
+        state.get(message.scenarioId).fold[StatusReply[String]](
           StatusReply.Error("no such scenario")
         ){ scn =>
           scn ! Scenario.Sense(message)
-          StatusReply.Success("OK")
+          StatusReply.success("OK")
         }
       }
     case Create(id, template, replyTo) =>
@@ -41,28 +51,14 @@ class Sensor(scenarioManager: ScenarioManager) {
     case Created(id, scenario) => state + (id -> scenario)
   }
 
-  def apply(): Behavior[Command] =
+  def apply(scenarioManager: ScenarioManager): Behavior[Command] =
     Behaviors.setup { context: ActorContext[Command] =>
       EventSourcedBehavior.withEnforcedReplies[Command, Event, State](
         persistenceId = PersistenceId.ofUniqueId("sensor"),
         emptyState = Map.empty,
-        commandHandler = onCommand(context),
+        commandHandler = onCommand(context, scenarioManager),
         eventHandler = onEvent
       )
     }
-
-}
-object Sensor {
-
-  sealed trait Command
-  case class Sense(message: Message, replyTo: ActorRef[StatusReply[String]]) extends Command
-  case class Create(scenarioId: String, template: String, replyTo: ActorRef[StatusReply[String]]) extends Command
-  case class Destroy(scenarioId: String, replyTo: ActorRef[StatusReply[String]]) extends Command
-
-  sealed trait Event
-  case class Created(id: String, scenario: ActorRef[Scenario.Command]) extends Event
-  case class Destroyed(id: String) extends Event
-
-  type State = Map[String, ActorRef[Scenario.Command]]
 
 }
