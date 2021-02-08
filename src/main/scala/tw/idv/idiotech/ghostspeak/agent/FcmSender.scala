@@ -10,9 +10,9 @@ import akka.stream.alpakka.google.firebase.fcm.scaladsl.GoogleFcm
 import akka.stream.alpakka.google.firebase.fcm._
 import akka.stream.RestartSettings
 import akka.stream.alpakka.google.firebase.fcm.FcmNotificationModels.Token
-import akka.stream.scaladsl.{RestartFlow, Sink, Source}
+import akka.stream.scaladsl.{ RestartFlow, Sink, Source }
 import io.circe.Encoder
-import io.circe.generic.extras.{Configuration, ConfiguredJsonCodec}
+import io.circe.generic.extras.{ Configuration, ConfiguredJsonCodec }
 import io.circe.syntax._
 import io.circe.parser.decode
 
@@ -36,7 +36,9 @@ object FcmSender extends LazyLogging {
     randomFactor = 0.2 // adds 20% "noise" to vary the intervals slightly
   ).withMaxRestarts(20, 5.minutes)
 
-  def send[T](action: Action[T])(implicit actorSystem: ActorSystem[_], encoder: Encoder[Action[T]]): Future[Done] =
+  def send[T](
+    action: Action[T]
+  )(implicit actorSystem: ActorSystem[_], encoder: Encoder[Action[T]]): Future[Done] =
     Source
       .single(
         FcmNotification.empty

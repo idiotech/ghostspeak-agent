@@ -1,6 +1,6 @@
 package tw.idv.idiotech.ghostspeak.agent
 
-import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.actor.typed.{ ActorRef, ActorSystem }
 import akka.http.scaladsl.common.EntityStreamingSupport
 import akka.util.Timeout
 import akka.http.scaladsl.server.Directives._
@@ -14,15 +14,16 @@ import io.circe.Decoder
 
 import scala.concurrent.duration._
 import scala.concurrent.Future
-import scala.util.{Failure, Success}
+import scala.util.{ Failure, Success }
 
-class EventRoutes(sensor: ActorRef[Sensor.Command])(
+class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]])(
   implicit system: ActorSystem[_]
 ) extends FailFastCirceSupport {
 
   import akka.actor.typed.scaladsl.AskPattern.schedulerFromActorSystem
   import akka.actor.typed.scaladsl.AskPattern.Askable
   implicit val jsonStreamingSupport = EntityStreamingSupport.json()
+  implicit val decoder = Message.decoder[T]
 
   // asking someone requires a timeout and a scheduler, if the timeout hits without response
   // the ask is failed with a TimeoutException
@@ -35,8 +36,8 @@ class EventRoutes(sensor: ActorRef[Sensor.Command])(
         pathEnd {
           concat(
             post {
-              entity(as[Message]) { message =>
-                onComplete(sensor.askWithStatus(Sensor.Sense(message, _))) {
+              entity(as[Message[T]]) { message =>
+                onComplete(sensor.askWithStatus(Sensor.Sense[T](message, _))) {
                   case Success(msg) => complete(msg)
                   case Failure(StatusReply.ErrorMessage(reason)) =>
                     complete(StatusCodes.InternalServerError -> reason)
