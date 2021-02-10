@@ -2,7 +2,7 @@ name := "ghostspeak-agent"
 
 version := "0.1"
 
-scalaVersion := "2.13.4"
+scalaVersion in ThisBuild := "2.13.4"
 
 val akkaVersion = "2.6.11"
 val akkaHttpVersion = "10.2.2"
@@ -23,7 +23,16 @@ scalacOptions in ThisBuild ++= Seq(
   "-language:implicitConversions",
   "-language:higherKinds"
 )
-libraryDependencies ++= Seq(
+val log4jVersion = "2.13.0"
+
+def log = Seq(
+  "org.apache.logging.log4j" % "log4j-slf4j-impl" % log4jVersion,
+  "org.apache.logging.log4j" % "log4j-api" % log4jVersion,
+  "org.apache.logging.log4j" % "log4j-core" % log4jVersion,
+  "com.typesafe.scala-logging" %% "scala-logging" % "3.9.2",
+  // log errors to Sentry
+)
+libraryDependencies in ThisBuild ++= Seq(
   "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "com.typesafe.akka" %% "akka-stream-typed" % akkaVersion,
@@ -44,21 +53,18 @@ libraryDependencies ++= Seq(
   "org.typelevel" %% "cats-core" % "2.1.0",
   "org.typelevel" %% "cats-effect" % "2.0.0",
   "org.scalatest" %% "scalatest" % "3.1.0" % Test
-)
+) ++ log
 
-val log4jVersion = "2.13.0"
 
-def log = Seq(
-  "org.apache.logging.log4j" % "log4j-slf4j-impl" % log4jVersion,
-  "org.apache.logging.log4j" % "log4j-api" % log4jVersion,
-  "org.apache.logging.log4j" % "log4j-core" % log4jVersion,
-  "com.typesafe.scala-logging" %% "scala-logging" % "3.9.2",
-  // log errors to Sentry
-)
-
-libraryDependencies ++= log
-
-resolvers ++= List(
+resolvers in ThisBuild ++= List(
   Resolver.sonatypeRepo("releases"),
   "jitpack" at "https://jitpack.io"
 )
+
+def project(projectName: String) = Project(projectName, new File(projectName)).settings(
+  name := projectName,
+  version := "0.1"
+)
+
+val core = project("core")
+val example = project("example").dependsOn(core)
