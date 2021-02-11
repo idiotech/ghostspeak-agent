@@ -9,7 +9,7 @@ import io.circe.Decoder
 import scala.concurrent.Future
 import scala.util.{ Failure, Success }
 
-class Server {
+object Server {
 
   sealed trait Msg
   private final case class StartFailed(cause: Throwable) extends Msg
@@ -17,14 +17,14 @@ class Server {
   case object Stop extends Msg
 
   def apply[P: Decoder](
-    scenarioManager: Sensor.Creator[P],
+    behavior: Behavior[Sensor.Command[P]],
     host: String,
     port: Int
   ): Behavior[Msg] =
     Behaviors.setup { ctx =>
       implicit val system = ctx.system
 
-      val dummySensor = ctx.spawn(Sensor(scenarioManager), "DummySensor")
+      val dummySensor = ctx.spawn(behavior, "RootSensor")
       val routes = new EventRoutes(dummySensor)
 
       val serverBinding: Future[Http.ServerBinding] =

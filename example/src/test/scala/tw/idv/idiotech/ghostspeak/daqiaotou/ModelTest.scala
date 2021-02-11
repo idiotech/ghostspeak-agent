@@ -34,7 +34,7 @@ class ModelTest extends AnyFlatSpec with Matchers {
       "Juliet",
       "Romeo",
 //      Right(Location(25.0, 121.0)),
-      Left(SystemPayload.Ack),
+      Left(SystemPayload.Join),
       "romeo and juliet"
     )
 //    implicit val geofenceSchema = Json.schema[Condition.Geofence]("Geofence")
@@ -42,11 +42,11 @@ class ModelTest extends AnyFlatSpec with Matchers {
 //    implicit val popupSchema = Json.schema[Content.Popup]("Popup")
 
     val schema = Json.schema[Action[Content]]
-    println(schema.asCirce(Draft04()))
+//    println(schema.asCirce(Draft04()))
 //    println(event.asJson)
     implicit val contentEncoder = Action.encoder[Content]
     implicit val contentDecoder = Action.decoder[Content]
-    println(action.asJson)
+//    println(action.asJson)
 
     val messageSchema = Json.schema[Message[EventPayload]]
     implicit val messageEncoder = Message.encoder[EventPayload]

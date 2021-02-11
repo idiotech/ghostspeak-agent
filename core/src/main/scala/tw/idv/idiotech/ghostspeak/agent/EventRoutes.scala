@@ -30,24 +30,38 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]])(
   implicit val timeout: Timeout = 3.seconds
   implicit val ec = system.executionContext
 
-  lazy val theEventRoutes: Route =
-    pathPrefix("event") {
-      concat(
-        pathEnd {
-          concat(
-            post {
-              entity(as[Message[T]]) { message =>
-                onComplete(sensor.askWithStatus[String](x => Sensor.Sense[T](message, Some(x)))) {
-                  case Success(msg) => complete(msg)
-                  case Failure(StatusReply.ErrorMessage(reason)) =>
-                    complete(StatusCodes.InternalServerError -> reason)
-                  case Failure(e) =>
-                    complete(StatusCodes.InternalServerError -> e.getMessage)
+  lazy val theEventRoutes: Route = {
+    concat(
+      pathPrefix("event") {
+        concat(
+          pathEnd {
+            concat(
+              post {
+                entity(as[Message[T]]) { message =>
+                  onComplete(sensor.askWithStatus[String](x => Sensor.Sense[T](message, Some(x)))) {
+                    case Success(msg) => complete(msg)
+                    case Failure(StatusReply.ErrorMessage(reason)) =>
+                      complete(StatusCodes.InternalServerError -> reason)
+                    case Failure(e) =>
+                      complete(StatusCodes.InternalServerError -> e.getMessage)
+                  }
                 }
               }
-            }
-          )
+            )
+          }
+        )
+      },
+      pathPrefix("scenario" / Segment / Segment) { (scenarioId, template) =>
+        put {
+          onComplete(sensor.askWithStatus[String](x => Sensor.Create[T](scenarioId, template, x))) {
+            case Success(msg) => complete(msg)
+            case Failure(StatusReply.ErrorMessage(reason)) =>
+              complete(StatusCodes.InternalServerError -> reason)
+            case Failure(e) =>
+              complete(StatusCodes.InternalServerError -> e.getMessage)
+          }
         }
-      )
-    }
+      }
+    )
+  }
 }

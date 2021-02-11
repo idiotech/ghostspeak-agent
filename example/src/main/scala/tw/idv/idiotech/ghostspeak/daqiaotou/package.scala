@@ -1,9 +1,9 @@
 package tw.idv.idiotech.ghostspeak
 
 import enumeratum.EnumEntry.UpperSnakecase
-import enumeratum.{CirceEnum, Enum, EnumEntry}
-import io.circe.generic.extras.{Configuration, ConfiguredJsonCodec}
-import json.schema.{description, title, typeHint}
+import enumeratum.{ CirceEnum, Enum, EnumEntry }
+import io.circe.generic.extras.{ Configuration, ConfiguredJsonCodec }
+import json.schema.{ description, title, typeHint }
 
 import scala.collection.immutable
 
@@ -74,43 +74,43 @@ package object daqiaotou {
     @title("Popup message")
     @description("Client should show it as a notification or a popup window in the app.")
     case class Popup(
-                      @description("This is the message to be shown. Can be null.")
-                      text: Option[String],
-                      @description(
-                        "They are acceptable choices from the user. They can be shown as buttons or drop-down menu depending on client design."
-                      )
-                      choices: List[String],
-                      @description("If true, user is allowed to enter a text reply")
-                      allowTextReply: Boolean,
-                      @title("Picture URL to be shown")
-                      picture: Option[String],
-                      @title("Destinations to be shown")
-                      destinations: Set[Destination]
-                    ) extends Task
+      @description("This is the message to be shown. Can be null.")
+      text: Option[String],
+      @description(
+        "They are acceptable choices from the user. They can be shown as buttons or drop-down menu depending on client design."
+      )
+      choices: List[String],
+      @description("If true, user is allowed to enter a text reply")
+      allowTextReply: Boolean,
+      @title("Picture URL to be shown")
+      picture: Option[String],
+      @title("Destinations to be shown")
+      destinations: Set[Destination]
+    ) extends Task
 
     @title("Sound message")
     @description("Client should play the sound.")
     case class Sound(
-                      @description("URL of the sound file")
-                      url: String,
-                      @description("The length of the part of the sound file that contains speech")
-                      speechLength: Option[Int],
-                      @description("Controls whether the sound should be queued or looped")
-                      `type`: SoundType
-                    ) extends Task
+      @description("URL of the sound file")
+      url: String,
+      @description("The length of the part of the sound file that contains speech")
+      speechLength: Option[Int],
+      @description("Controls whether the sound should be queued or looped")
+      `type`: SoundType
+    ) extends Task
 
     @title("Marker message")
     @description("Client should display the marker on map.")
     case class Marker(
-                       @description("Unique ID for a marker instance.")
-                       id: String,
-                       @description("The marker should be shown at this location.")
-                       location: Location,
-                       @description("The icon image URL for the marker.")
-                       icon: String,
-                       @description("This field tells the client whether to add or delete this marker.")
-                       operation: OperationType
-                     ) extends Task
+      @description("Unique ID for a marker instance.")
+      id: String,
+      @description("The marker should be shown at this location.")
+      location: Location,
+      @description("The icon image URL for the marker.")
+      icon: String,
+      @description("This field tells the client whether to add or delete this marker.")
+      operation: OperationType
+    ) extends Task
 
   }
 
@@ -125,22 +125,22 @@ package object daqiaotou {
     @title("Geofence")
     @description("Location condition for action.")
     case class Geofence(
-                         @description("Geographic coordinates")
-                         location: Location,
-                         @description("The radius of the geofence in meters.")
-                         radius: Int
-                       ) extends Condition
+      @description("Geographic coordinates")
+      location: Location,
+      @description("The radius of the geofence in meters.")
+      radius: Int
+    ) extends Condition
 
     @title("Beacon")
     @description("Beacon condition for action")
     case class Beacon(
-                       @description("Beacon ID")
-                       id: String,
-                       @description("Threshold value for triggering")
-                       threshold: Int,
-                       @description("Whether to activate on enter or on exit")
-                       `type`: BeaconType
-                     ) extends Condition
+      @description("Beacon ID")
+      id: String,
+      @description("Threshold value for triggering")
+      threshold: Int,
+      @description("Whether to activate on enter or on exit")
+      `type`: BeaconType
+    ) extends Condition
 
   }
 

@@ -59,7 +59,9 @@ package object agent {
   object Action {
     def decoder[T](implicit decoder: Decoder[T]) = deriveConfiguredDecoder[Action[T]]
     def encoder[T](implicit encoder: Encoder[T]) = deriveConfiguredEncoder[Action[T]]
-    def apply[C](message: Message[_], id: String, content: C): Action[C] = Action[C](id, message.sender, message.receiver, content, Session(message.scenarioId, None))
+
+    def apply[C](id: String, message: Message[_], content: C): Action[C] =
+      Action[C](id, message.sender, message.receiver, content, Session(message.scenarioId, None))
   }
 
   type Payload[T] = Either[SystemPayload, T]

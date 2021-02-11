@@ -1,16 +1,19 @@
 package tw.idv.idiotech.ghostspeak.agent
 
-import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
-import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
+import akka.actor.typed.scaladsl.{ ActorContext, Behaviors }
+import akka.actor.typed.{ ActorRef, ActorSystem, Behavior }
 import tw.idv.idiotech.ghostspeak.agent.Actuator._
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Sense
 
 import scala.concurrent.Future
-import scala.util.{Failure, Success}
+import scala.util.{ Failure, Success }
 
-object Actuator{
+object Actuator {
 
-  def apply[T, P](discover: Discover[T], sensor: ActorRef[Sensor.Command[P]]): Behavior[Command[T]] = Behaviors.receive { (ctx, cmd) =>
+  def apply[T, P](
+    discover: Discover[T],
+    sensor: ActorRef[Sensor.Command[P]]
+  ): Behavior[Command[T]] = Behaviors.receive { (ctx, cmd) =>
     cmd match {
       case Perform(action) =>
         discover(ctx, action, ctx.self).foreach { a =>

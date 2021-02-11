@@ -1,12 +1,17 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
-import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
-import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
+import akka.actor.typed.{ ActorRef, ActorSystem, Behavior }
+import akka.actor.typed.scaladsl.{ ActorContext, Behaviors }
 import io.circe.Encoder
 import tw.idv.idiotech.ghostspeak.agent
 import tw.idv.idiotech.ghostspeak.agent.Actuator.Perform
-import tw.idv.idiotech.ghostspeak.agent.{Action, Actuator, FcmSender, Sensor, SystemPayload}
-import tw.idv.idiotech.ghostspeak.daqiaotou.Task.Popup
+import tw.idv.idiotech.ghostspeak.agent.{
+  Action => BaseAction,
+  Actuator,
+  FcmSender,
+  Sensor,
+  SystemPayload
+}
 
 object ScenarioCreator {
 
@@ -18,38 +23,71 @@ object ScenarioCreator {
   // 2. spawn child sensors from root
   // 3.
 
-  implicit val actionEncoder: Encoder.AsObject[agent.Action[Content]] = Action.encoder[Content]
+  implicit val actionEncoder: Encoder.AsObject[agent.Action[Content]] = BaseAction.encoder[Content]
 
-
-
-
-  def userBehavior(actuator: ActorRef[Actuator.Command[Content]]): Behavior[Command] = Behaviors.receiveMessage {
-    case Sensor.Sense(message, replyTo) =>
-      val maybeAction: Option[Action] = message.payload match {
-        case Right(value) => value match {
-          case Location(lat, lon) => None
-          case EventPayload.Text(text) => if (text == "是的")
-            Some(Action[Content]("", message, Task.Popup(Some("text"), Nil, false, None, Set(Destination.App))))
-          else None
+  def userBehavior[EventPayload](actuator: ActorRef[Actuator.Command[Content]]): Behavior[Command] =
+    Behaviors.receiveMessage[Command] {
+      case Sensor.Sense(message, replyTo) =>
+        val maybeAction: Option[Action] = message.payload match {
+          case Right(value) =>
+            value match {
+              case Location(lat, lon) => None
+              case EventPayload.Text(text) =>
+                if (text == "是的")
+                  Some(
+                    BaseAction[Content](
+                      "",
+                      message,
+                      Content(
+                        Task.Popup(Some("text"), Nil, false, None, Set(Destination.App)),
+                        Condition.Always
+                      )
+                    )
+                  )
+                else None
+            }
+          case Left(value) =>
+            value match {
+              case SystemPayload.Ack   => None
+              case SystemPayload.Start => None
+              case SystemPayload.End   => None
+              case SystemPayload.Join =>
+                Some(
+                  BaseAction[Content](
+                    "",
+                    message,
+                    Content(
+                      Task
+                        .Marker("", Location(20, 120), "http://www.google.com", OperationType.Add),
+                      Condition.Always
+                    )
+                  )
+                )
+              case SystemPayload.Leave =>
+                Some(
+                  BaseAction[Content](
+                    "",
+                    message,
+                    Content(
+                      Task.Popup(Some("bye"), Nil, false, None, Set(Destination.App)),
+                      Condition.Always
+                    )
+                  )
+                )
+              case SystemPayload.Modal(modality, time) => None
+            }
         }
-        case Left(value) => value match {
-          case SystemPayload.Ack => None
-          case SystemPayload.Start => None
-          case SystemPayload.End => None
-          case SystemPayload.Join => Some(Action[Content]("", message, Task.Marker("", Location(20, 120), "http://www.google.com", OperationType.Add)))
-          case SystemPayload.Leave => Some(Action[Content]("", message, Task.Popup(Some("bye"), Nil, false, None, Set(Destination.App))))
-          case SystemPayload.Modal(modality, time) => None
-        }
-      }
-      maybeAction.foreach(a => actuator ! Perform(a))
-      Behaviors.same
-    case Sensor.Create(scenarioId, template, replyTo) =>
-      Behaviors.same
-    case Sensor.Destroy(scenarioId, replyTo) =>
-      Behaviors.same
-  }
+        maybeAction.foreach(a => actuator ! Perform(a))
+        Behaviors.same
+      case Sensor.Create(scenarioId, template, replyTo) =>
+        Behaviors.same
+      case Sensor.Destroy(scenarioId, replyTo) =>
+        Behaviors.same
+    }
 
-  def createUserScenario(actuatorRef: ActorRef[Actuator.Command[Content]])(actorContext: ActorContext[_], scenarioId: String, userId: String): Option[ActorRef[Command]] =
+  def createUserScenario(
+    actuatorRef: ActorRef[Actuator.Command[Content]]
+  )(actorContext: ActorContext[_], scenarioId: String, userId: String): Option[ActorRef[Command]] =
     Some(actorContext.spawn(userBehavior(actuatorRef), s"$scenarioId-$userId"))
 
   val scenarioBehavior: Behavior[Command] = {
@@ -60,9 +98,7 @@ object ScenarioCreator {
         def fcm(root: ActorRef[Actuator.Command[Content]]) =
           Actuator.fromFuture[Content](FcmSender.send[Content], root)
 
-        def discover(c: ActorContext[_],
-                     a: Action,
-                     r: ActorRef[Actuator.Command[Content]]) = Some(
+        def discover(c: ActorContext[_], a: Action, r: ActorRef[Actuator.Command[Content]]) = Some(
           c.spawnAnonymous(fcm(actx.self))
         )
         Actuator(discover, sensor)

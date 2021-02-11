@@ -11,21 +11,21 @@ object Sensor {
   case class Sense[P](message: Message[P], replyTo: Option[ActorRef[StatusReply[String]]] = None)
       extends Command[P]
   case class Create[P](scenarioId: String, template: String, replyTo: ActorRef[StatusReply[String]])
-      extends Command[Nothing]
-  case class Destroy(scenarioId: String, replyTo: ActorRef[StatusReply[String]])
-      extends Command[Nothing]
+      extends Command[P]
+  case class Destroy[P](scenarioId: String, replyTo: ActorRef[StatusReply[String]])
+      extends Command[P]
 
   sealed trait Event[P]
   case class Created[P](id: String, scenario: ActorRef[Command[P]]) extends Event[P]
-  case class Destroyed(id: String) extends Event[Nothing]
+  case class Destroyed[P](id: String) extends Event[P]
 
   type State[P] = Map[String, ActorRef[Command[P]]]
 
   type Creator[P] = (
     ActorContext[_],
-      String, // scenario id
-      String  // template
-    ) => Option[ActorRef[Command[P]]]
+    String, // scenario id
+    String // template
+  ) => Option[ActorRef[Command[P]]]
 
   type GetId[P] = Message[P] => String
 
@@ -45,7 +45,7 @@ object Sensor {
         }
       replyTo.fold[ReplyEffect[Event[P], State[P]]] {
         Effect.noReply
-      }{ r =>
+      } { r =>
         Effect.reply[StatusReply[String], Event[P], State[P]](r)(reply)
       }
     case Create(id, template, replyTo) =>
@@ -64,13 +64,16 @@ object Sensor {
     case Destroy(id, replyTo) =>
       if (state.contains(id))
         Effect
-          .persist[Event[P], State[P]](Destroyed(id))
+          .persist[Event[P], State[P]](Destroyed[P](id))
           .thenReply(replyTo)(_ => StatusReply.Success("destroying"))
       else
         Effect.reply(replyTo)(StatusReply.Error("already exists"))
   }
 
-  type OnCommand[P] = (ActorContext[Command[P]], Creator[P], GetId[P]) => (State[P], Command[P]) => ReplyEffect[Event[P], State[P]]
+  type OnCommand[P] = (ActorContext[Command[P]], Creator[P], GetId[P]) => (
+    State[P],
+    Command[P]
+  ) => ReplyEffect[Event[P], State[P]]
 
   def onEvent[P](state: State[P], evt: Event[P]): State[P] = evt match {
     case Created(id, scenario) => state + (id -> scenario)
@@ -78,7 +81,11 @@ object Sensor {
 
   def getScenarioId[P] = (m: Message[P]) => m.scenarioId
 
-  def apply[P](createScenario: Creator[P], getId: GetId[P] = getScenarioId[P], handle: OnCommand[P] = onCommand[P] _): Behavior[Command[P]] =
+  def apply[P](
+    createScenario: Creator[P],
+    getId: GetId[P] = getScenarioId[P],
+    handle: OnCommand[P] = onCommand[P] _
+  ): Behavior[Command[P]] =
     Behaviors.setup { context: ActorContext[Command[P]] =>
       EventSourcedBehavior.withEnforcedReplies[Command[P], Event[P], State[P]](
         persistenceId = PersistenceId.ofUniqueId("sensor"),
@@ -89,10 +96,10 @@ object Sensor {
     }
 
   def onCommandPerUser[P](
-                    ctx: ActorContext[Command[P]],
-                    create: Creator[P],
-                    unused: GetId[P]
-                  )(state: State[P], cmd: Command[P]): ReplyEffect[Event[P], State[P]] = {
+    ctx: ActorContext[Command[P]],
+    create: Creator[P],
+    unused: GetId[P]
+  )(state: State[P], cmd: Command[P]): ReplyEffect[Event[P], State[P]] = {
     val general = onCommand[P](ctx, create, _.receiver) _
     cmd match {
       case Sense(message, _) =>
@@ -102,15 +109,13 @@ object Sensor {
         }
         scn.foreach(_ ! Sense(message))
         if (maybeScn.nonEmpty) {
-          scn.fold[ReplyEffect[Event[P], State[P]]](Effect.noReply){s =>
+          scn.fold[ReplyEffect[Event[P], State[P]]](Effect.noReply) { s =>
             Effect.persist(Created(message.receiver, s)).thenNoReply()
           }
-        }
-        else Effect.noReply
+        } else Effect.noReply
       case _ => general(state, cmd)
     }
   }
-
 
   def perUser[P](createPerUser: Creator[P]) = apply[P](
     (ctx, id, _) => Some(ctx.spawn(apply[P](createPerUser, _.receiver, onCommandPerUser[P]), id))
