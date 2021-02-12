@@ -27,7 +27,7 @@ object FcmSender extends LazyLogging {
   }
 
   val fcmConfig = decode[FcmConfig](
-    scala.io.Source.fromResource(ConfigFactory.load().getString("fcm.key-file")).mkString
+    scala.io.Source.fromFile(ConfigFactory.load().getString("fcm.key-file")).mkString
   ).fold(throw _, _.toFcmSettngs)
 
   val settings = RestartSettings(
@@ -40,13 +40,14 @@ object FcmSender extends LazyLogging {
     action: Action[T]
   )(implicit actorSystem: ActorSystem[_], encoder: Encoder[Action[T]]): Future[Done] =
     Source
-      .single(
+      .single {
+        logger.info(s"sending action: ${action.asJson.toString()} to receiver: ${action.receiver}")
         FcmNotification.empty
           .withData(
             Map("action" -> action.asJson.toString())
           )
           .withTarget(Token(action.receiver))
-      )
+      }
       .via(RestartFlow.onFailuresWithBackoff(settings)(() => GoogleFcm.send(fcmConfig)))
       .map {
         case res @ FcmSuccessResponse(name) =>

@@ -49,8 +49,8 @@ package object agent {
       Message(
         "id",
         Some(id),
-        receiver,
         sender,
+        receiver,
         SystemPayload.Modal(modality).asPayload[T],
         session.scenario
       )
@@ -137,5 +137,8 @@ package object agent {
       deriveConfiguredEncoder[Message[T]]
     }
   }
+
+  @ConfiguredJsonCodec
+  case class Scenario(id: String, engine: String, template: String)
 
 }

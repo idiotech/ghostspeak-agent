@@ -51,9 +51,13 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]])(
           }
         )
       },
-      pathPrefix("scenario" / Segment / Segment) { (scenarioId, template) =>
+      pathPrefix("scenario" / Segment / Segment / Segment) { (engine, scenarioId, template) =>
         put {
-          onComplete(sensor.askWithStatus[String](x => Sensor.Create[T](scenarioId, template, x))) {
+          onComplete(
+            sensor.askWithStatus[String](
+              x => Sensor.Create[T](Scenario(scenarioId, engine, template), x)
+            )
+          ) {
             case Success(msg) => complete(msg)
             case Failure(StatusReply.ErrorMessage(reason)) =>
               complete(StatusCodes.InternalServerError -> reason)

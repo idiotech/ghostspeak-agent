@@ -6,22 +6,17 @@ import io.circe.Encoder
 import tw.idv.idiotech.ghostspeak.agent
 import tw.idv.idiotech.ghostspeak.agent.Actuator.Perform
 import tw.idv.idiotech.ghostspeak.agent.{
-  Action => BaseAction,
   Actuator,
   FcmSender,
+  Scenario,
   Sensor,
-  SystemPayload
+  SystemPayload,
+  Action => BaseAction
 }
 
 object ScenarioCreator {
 
   type Command = Sensor.Command[EventPayload]
-
-  // should be event sourced
-  // 1. spawn root sensor
-  // 2. spawn actuator which references root sensor (with root as parameter)
-  // 2. spawn child sensors from root
-  // 3.
 
   implicit val actionEncoder: Encoder.AsObject[agent.Action[Content]] = BaseAction.encoder[Content]
 
@@ -77,9 +72,10 @@ object ScenarioCreator {
               case SystemPayload.Modal(modality, time) => None
             }
         }
+        println(s"====maybe action: $maybeAction")
         maybeAction.foreach(a => actuator ! Perform(a))
         Behaviors.same
-      case Sensor.Create(scenarioId, template, replyTo) =>
+      case Sensor.Create(scenario, replyTo) =>
         Behaviors.same
       case Sensor.Destroy(scenarioId, replyTo) =>
         Behaviors.same
@@ -87,8 +83,8 @@ object ScenarioCreator {
 
   def createUserScenario(
     actuatorRef: ActorRef[Actuator.Command[Content]]
-  )(actorContext: ActorContext[_], scenarioId: String, userId: String): Option[ActorRef[Command]] =
-    Some(actorContext.spawn(userBehavior(actuatorRef), s"$scenarioId-$userId"))
+  )(actorContext: ActorContext[_], scenario: Scenario): Option[ActorRef[Command]] =
+    Some(actorContext.spawn(userBehavior(actuatorRef), scenario.id))
 
   val scenarioBehavior: Behavior[Command] = {
     Behaviors.setup[Command] { ctx =>
@@ -98,13 +94,14 @@ object ScenarioCreator {
         def fcm(root: ActorRef[Actuator.Command[Content]]) =
           Actuator.fromFuture[Content](FcmSender.send[Content], root)
 
-        def discover(c: ActorContext[_], a: Action, r: ActorRef[Actuator.Command[Content]]) = Some(
+        def discover(c: ActorContext[_], a: Action, r: ActorRef[Actuator.Command[Content]]) = Some {
+          println("===== creating actuator")
           c.spawnAnonymous(fcm(actx.self))
-        )
+        }
         Actuator(discover, sensor)
       }
       val actuatorRef: ActorRef[Actuator.Command[Content]] = ctx.spawn(actuator, "actuator")
-      Sensor.perUser(createUserScenario(actuatorRef))
+      Sensor.perUser("root", createUserScenario(actuatorRef))
     }
   }
 

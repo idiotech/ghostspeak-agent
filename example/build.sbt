@@ -1,0 +1,1 @@
+libraryDependencies += "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8"
