@@ -41,7 +41,7 @@ object FcmSender extends LazyLogging {
   )(implicit actorSystem: ActorSystem[_], encoder: Encoder[Action[T]]): Future[Done] =
     Source
       .single {
-        logger.info(s"sending action: ${action.asJson.toString()} to receiver: ${action.receiver}")
+        println(s"sending action: ${action.asJson.toString()} to receiver: ${action.receiver}")
         FcmNotification.empty
           .withData(
             Map("action" -> action.asJson.toString())

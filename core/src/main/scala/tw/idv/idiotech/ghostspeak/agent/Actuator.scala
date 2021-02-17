@@ -16,7 +16,9 @@ object Actuator {
   ): Behavior[Command[T]] = Behaviors.receive { (ctx, cmd) =>
     cmd match {
       case Perform(action) =>
+        println("trying to perform action")
         discover(ctx, action, ctx.self).foreach { a =>
+          println("send action to child actuator")
           a ! Perform(action)
           sensor ! Sense(action.toMessage(Modality.Doing))
         }

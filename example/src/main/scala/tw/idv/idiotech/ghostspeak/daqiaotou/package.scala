@@ -4,12 +4,13 @@ import enumeratum.EnumEntry.UpperSnakecase
 import enumeratum.{ CirceEnum, Enum, EnumEntry }
 import io.circe.generic.extras.{ Configuration, ConfiguredJsonCodec }
 import json.schema.{ description, title, typeHint }
+import tw.idv.idiotech.ghostspeak.agent.{ Action, Message }
 
 import scala.collection.immutable
 
 package object daqiaotou {
 
-  private implicit val configuration = Configuration.default
+  implicit val configuration = Configuration.default
     .withDiscriminator("type")
     .copy(transformConstructorNames = _.toUpperCase())
 
@@ -96,7 +97,7 @@ package object daqiaotou {
       @description("The length of the part of the sound file that contains speech")
       speechLength: Option[Int],
       @description("Controls whether the sound should be queued or looped")
-      `type`: SoundType
+      mode: SoundType
     ) extends Task
 
     @title("Marker message")
@@ -159,4 +160,8 @@ package object daqiaotou {
 
   }
 
+  implicit lazy val contentEncoder = Action.encoder[Content]
+  implicit lazy val contentDecoder = Action.decoder[Content]
+  implicit lazy val messageEncoder = Message.encoder[EventPayload]
+  implicit lazy val messageDecoder = Message.decoder[EventPayload]
 }

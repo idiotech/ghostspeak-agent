@@ -41,18 +41,15 @@ class ModelTest extends AnyFlatSpec with Matchers {
 //    implicit val contentSchema = Json.schema[Content]("Content")
 //    implicit val popupSchema = Json.schema[Content.Popup]("Popup")
 
-    val schema = Json.schema[Action[Content]]
+//    val schema = Json.schema[Action]
 //    println(schema.asCirce(Draft04()))
 //    println(event.asJson)
-    implicit val contentEncoder = Action.encoder[Content]
-    implicit val contentDecoder = Action.decoder[Content]
 //    println(action.asJson)
 
-    val messageSchema = Json.schema[Message[EventPayload]]
-    implicit val messageEncoder = Message.encoder[EventPayload]
-    implicit val messageDecoder = Message.decoder[EventPayload]
-    println(messageSchema.asCirce(Draft04()))
-    println(message.asJson)
+//    val messageSchema = Json.schema[Message[EventPayload]]
+//    println(messageSchema.asCirce(Draft04()))
+//    println(message.asJson)
+    println(GraphScript.exampleNode("?u").replace("Emily").asJson)
 //    println(schema.asCirce(Draft04()).asJson.printWith(Printer.spaces2.copy(sortKeys = false)))
 
   }

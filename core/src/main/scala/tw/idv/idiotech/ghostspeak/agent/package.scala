@@ -123,7 +123,9 @@ package object agent {
     payload: Payload[T],
     @description("The scenario this event belongs to")
     scenarioId: String
-  )
+  ) {
+    def forComparison = copy(id = "", scenarioId = "")
+  }
 
   object Message {
 

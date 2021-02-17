@@ -33,8 +33,8 @@ object Sensor {
   }
 
   def onCommand[P](
-                    ctx: ActorContext[Command[P]],
-                    createChild: CreatorScenarioActor[P]
+    ctx: ActorContext[Command[P]],
+    createChild: CreatorScenarioActor[P]
   )(state: State[P], cmd: Command[P]): Reff[P] = cmd match {
     case Sense(message, replyTo) =>
       val reply: StatusReply[String] =
@@ -52,7 +52,7 @@ object Sensor {
         Effect.reply[StatusReply[String], Event[P], State[P]](r)(reply)
       }
     case Create(scenario, replyTo) =>
-      if (!state.contains(scenario.id)) {
+      if (!state.contains(scenario.id))
         createChild(ctx, scenario)
           .fold[Reff[P]] {
             Effect.reply(replyTo)(StatusReply.Error("no such template"))
@@ -60,10 +60,7 @@ object Sensor {
             Effect
               .persist(Created[P](scenario))
               .thenReply(replyTo)(_ => StatusReply.Success("created"))
-          }
-      } else {
-        Effect.reply(replyTo)(StatusReply.Error("already exists"))
-      }
+          } else Effect.reply(replyTo)(StatusReply.Error("already exists"))
     case Destroy(id, replyTo) =>
       if (state.contains(id))
         Effect
@@ -82,8 +79,6 @@ object Sensor {
     case c: Created[P] =>
       state + (c.scenario.id -> c)
   }
-
-  def getScenarioId[P] = (m: Message[P]) => m.scenarioId
 
   def apply[P](
     name: String,
