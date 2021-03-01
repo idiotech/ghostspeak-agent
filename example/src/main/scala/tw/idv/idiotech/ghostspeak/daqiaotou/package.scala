@@ -12,7 +12,7 @@ package object daqiaotou {
 
   implicit val configuration = Configuration.default
     .withDiscriminator("type")
-    .copy(transformConstructorNames = _.toUpperCase())
+    .withScreamingSnakeCaseConstructorNames
 
   @typeHint[String]
   sealed trait Destination extends EnumEntry
@@ -21,6 +21,8 @@ package object daqiaotou {
     val values: immutable.IndexedSeq[Destination] = findValues
 
     case object App extends Destination with UpperSnakecase
+
+    case object Intro extends Destination with UpperSnakecase
 
     case object Notification extends Destination with UpperSnakecase
 
@@ -68,6 +70,14 @@ package object daqiaotou {
   case class Location(lat: Double, lon: Double) extends EventPayload
 
   @ConfiguredJsonCodec
+  sealed trait Volume
+
+  object Volume {
+    case class StaticVolume(speechLength: Option[Int], fadeOutSeconds: Int = 10, fadeInSeconds: Int = 0) extends Volume
+    case class DynamicVolume(center: Location, radius: Int, minVolume: Double) extends Volume
+  }
+
+  @ConfiguredJsonCodec
   sealed trait Task
 
   object Task {
@@ -95,7 +105,7 @@ package object daqiaotou {
       @description("URL of the sound file")
       url: String,
       @description("The length of the part of the sound file that contains speech")
-      speechLength: Option[Int],
+      volume: Volume,
       @description("Controls whether the sound should be queued or looped")
       mode: SoundType
     ) extends Task

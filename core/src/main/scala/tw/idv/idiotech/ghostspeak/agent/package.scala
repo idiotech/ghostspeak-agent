@@ -12,7 +12,7 @@ package object agent {
 
   private implicit val configuration = Configuration.default
     .withDiscriminator("type")
-    .copy(transformConstructorNames = _.toUpperCase())
+    .withScreamingSnakeCaseConstructorNames
 
   @ConfiguredJsonCodec
   case class Session(scenario: String, chapter: Option[String])

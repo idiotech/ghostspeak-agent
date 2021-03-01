@@ -47,7 +47,7 @@ object ScenarioCreator {
   }
 
   val exampleScript: Node =
-    decode[Node](Source.fromResource("test-script.json").mkString).fold(throw _, identity)
+    decode[Node](Source.fromResource("test-script-2.json").mkString).fold(throw _, identity)
 
   def initialState(user: String) = {
     val node = exampleScript.replace(user)
