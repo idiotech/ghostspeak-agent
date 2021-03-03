@@ -18,7 +18,7 @@
       "content" : {
         "task" : {
           "url" : "http://daqiaotou-storage.floraland.tw/sounds/mandarin/yafen-ai-walk.mp3",
-          "volume" : {
+          "volumeSetting" : {
             "type": "STATIC_VOLUME",
             "fadeOutSeconds": 10,
             "fadeInSeconds": 0,
@@ -43,7 +43,7 @@
       "content" : {
         "task" : {
           "url": "http://daqiaotou-storage.floraland.tw/sounds/mandarin/yafen-ai-arrive.mp3",
-          "volume" : {
+          "volumeSetting" : {
             "type": "DYNAMIC_VOLUME",
             "radius": 14,
             "center" : {
@@ -91,7 +91,7 @@
           "content" : {
             "task" : {
               "url": "http://daqiaotou-storage.floraland.tw/sounds/mandarin/yafen-b.mp3",
-              "volume" : {
+              "volumeSetting" : {
                 "type": "STATIC_VOLUME",
                 "fadeOutSeconds": 10,
                 "fadeInSeconds": 0,

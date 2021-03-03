@@ -5,7 +5,7 @@ import tw.idv.idiotech.ghostspeak.agent.Server
 
 object ServerInstance extends App {
   ActorSystem(
-    Server[EventPayload](ScenarioCreator.scenarioBehavior, "localhost", 8080),
+    Server[EventPayload](ScenarioCreator.scenarioBehavior, "0.0.0.0", 8080),
     "BuildJobsServer"
   )
 

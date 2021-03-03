@@ -15,17 +15,17 @@ class ShapelessTest extends AnyFlatSpec with Matchers {
   object Substitutor {
 
     object substitute extends Poly2 {
+
       implicit def a[A, B <: HList]: Case.Aux[
         A,
         (B, Subst),
         (A :: B, Subst)
-      ] = at[A, (B, Subst)] {
-        case (col, (values, subst)) =>
-          val obj: A = col match {
-            case str: String => subst.work(str).asInstanceOf[A]
-            case e           => e
-          }
-          (obj :: values, subst)
+      ] = at[A, (B, Subst)] { case (col, (values, subst)) =>
+        val obj: A = col match {
+          case str: String => subst.work(str).asInstanceOf[A]
+          case e           => e
+        }
+        (obj :: values, subst)
       }
     }
 
@@ -33,8 +33,8 @@ class ShapelessTest extends AnyFlatSpec with Matchers {
       p: P,
       original: String,
       updated: String
-    )(
-      implicit aux: Generic.Aux[P, R],
+    )(implicit
+      aux: Generic.Aux[P, R],
       l: RightFolder.Aux[
         R,
         (HNil, Subst),

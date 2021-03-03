@@ -8,10 +8,13 @@ import akka.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior, ReplyEffe
 
 object Sensor {
   sealed trait Command[P]
+
   case class Sense[P](message: Message[P], replyTo: Option[ActorRef[StatusReply[String]]] = None)
       extends Command[P]
+
   case class Create[P](scenario: Scenario, replyTo: ActorRef[StatusReply[String]])
       extends Command[P]
+
   case class Destroy[P](scenarioId: String, replyTo: ActorRef[StatusReply[String]])
       extends Command[P]
 
@@ -60,7 +63,8 @@ object Sensor {
             Effect
               .persist(Created[P](scenario))
               .thenReply(replyTo)(_ => StatusReply.Success("created"))
-          } else Effect.reply(replyTo)(StatusReply.Error("already exists"))
+          }
+      else Effect.reply(replyTo)(StatusReply.Error("already exists"))
     case Destroy(id, replyTo) =>
       if (state.contains(id))
         Effect
@@ -93,11 +97,10 @@ object Sensor {
           commandHandler = handle(context, createScenario),
           eventHandler = onEvent
         )
-        .receiveSignal {
-          case (state, RecoveryCompleted) =>
-            val scns = state.values.map(s => createScenario(context, s.scenario))
-            println(s"====== recovery complete!")
-            scns.foreach(println)
+        .receiveSignal { case (state, RecoveryCompleted) =>
+          val scns = state.values.map(s => createScenario(context, s.scenario))
+          println(s"====== recovery complete!")
+          scns.foreach(println)
 
         }
     }
@@ -125,9 +128,12 @@ object Sensor {
   }
 
   def perUser[P](name: String, createScenarioPerUser: CreatorScenarioActor[P]) =
-    apply[P](name, { (ctx, scn) =>
-      val actor = apply[P](scn.id, createScenarioPerUser, onCommandPerUser[P])
-      Some(ctx.spawn(actor, scn.id))
-    })
+    apply[P](
+      name,
+      { (ctx, scn) =>
+        val actor = apply[P](scn.id, createScenarioPerUser, onCommandPerUser[P])
+        Some(ctx.spawn(actor, scn.id))
+      }
+    )
 
 }

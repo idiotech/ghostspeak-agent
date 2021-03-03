@@ -36,19 +36,17 @@ object Server {
 
       def running(binding: ServerBinding): Behavior[Msg] =
         Behaviors
-          .receiveMessagePartial[Msg] {
-            case Stop =>
-              ctx.log.info(
-                "Stopping server http://{}:{}/",
-                binding.localAddress.getHostString,
-                binding.localAddress.getPort
-              )
-              Behaviors.stopped
+          .receiveMessagePartial[Msg] { case Stop =>
+            ctx.log.info(
+              "Stopping server http://{}:{}/",
+              binding.localAddress.getHostString,
+              binding.localAddress.getPort
+            )
+            Behaviors.stopped
           }
-          .receiveSignal {
-            case (_, PostStop) =>
-              binding.unbind()
-              Behaviors.same
+          .receiveSignal { case (_, PostStop) =>
+            binding.unbind()
+            Behaviors.same
           }
 
       def starting(wasStopped: Boolean): Behaviors.Receive[Msg] =

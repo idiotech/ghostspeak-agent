@@ -16,8 +16,8 @@ import scala.concurrent.duration._
 import scala.concurrent.Future
 import scala.util.{ Failure, Success }
 
-class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]])(
-  implicit system: ActorSystem[_]
+class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]])(implicit
+  system: ActorSystem[_]
 ) extends FailFastCirceSupport {
 
   import akka.actor.typed.scaladsl.AskPattern.schedulerFromActorSystem
@@ -30,7 +30,7 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]])(
   implicit val timeout: Timeout = 3.seconds
   implicit val ec = system.executionContext
 
-  lazy val theEventRoutes: Route = {
+  lazy val theEventRoutes: Route =
     concat(
       pathPrefix("event") {
         concat(
@@ -54,8 +54,8 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]])(
       pathPrefix("scenario" / Segment / Segment / Segment) { (engine, scenarioId, template) =>
         put {
           onComplete(
-            sensor.askWithStatus[String](
-              x => Sensor.Create[T](Scenario(scenarioId, engine, template), x)
+            sensor.askWithStatus[String](x =>
+              Sensor.Create[T](Scenario(scenarioId, engine, template), x)
             )
           ) {
             case Success(msg) => complete(msg)
@@ -67,5 +67,4 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]])(
         }
       }
     )
-  }
 }

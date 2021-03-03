@@ -75,6 +75,7 @@ package object agent {
     }
 
     def e[T](implicit b: Encoder[T]): Encoder[Payload[T]] = new Encoder[Payload[T]] {
+
       override def apply(a: Payload[T]): Json =
         a.fold(l => implicitly[Encoder[SystemPayload]].apply(l), r => b(r))
     }

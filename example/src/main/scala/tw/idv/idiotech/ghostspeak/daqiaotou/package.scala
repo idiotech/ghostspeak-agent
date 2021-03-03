@@ -73,7 +73,12 @@ package object daqiaotou {
   sealed trait Volume
 
   object Volume {
-    case class StaticVolume(speechLength: Option[Int], fadeOutSeconds: Int = 10, fadeInSeconds: Int = 0) extends Volume
+
+    case class StaticVolume(
+      speechLength: Option[Int],
+      fadeOutSeconds: Int = 10,
+      fadeInSeconds: Int = 0
+    ) extends Volume
     case class DynamicVolume(center: Location, radius: Int, minVolume: Double) extends Volume
   }
 
@@ -105,7 +110,7 @@ package object daqiaotou {
       @description("URL of the sound file")
       url: String,
       @description("The length of the part of the sound file that contains speech")
-      volume: Volume,
+      volumeSetting: Volume,
       @description("Controls whether the sound should be queued or looped")
       mode: SoundType
     ) extends Task

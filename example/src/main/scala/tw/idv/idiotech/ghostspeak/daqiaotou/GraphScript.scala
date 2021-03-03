@@ -2,7 +2,16 @@ package tw.idv.idiotech.ghostspeak.daqiaotou
 
 import io.circe.generic.extras.ConfiguredJsonCodec
 import tw.idv.idiotech.ghostspeak.agent
-import tw.idv.idiotech.ghostspeak.agent.{Actuator, FcmSender, Scenario, Sensor, Session, SystemPayload, Action => BaseAction, Message => BaseMessage}
+import tw.idv.idiotech.ghostspeak.agent.{
+  Actuator,
+  FcmSender,
+  Scenario,
+  Sensor,
+  Session,
+  SystemPayload,
+  Action => BaseAction,
+  Message => BaseMessage
+}
 import tw.idv.idiotech.ghostspeak.agent.util.substitute
 import tw.idv.idiotech.ghostspeak.daqiaotou.Volume.StaticVolume
 
@@ -102,7 +111,11 @@ object GraphScript {
     user,
     "ghost",
     Content(
-      Task.Sound("http://daqiaotou-storage.floraland.tw/sounds/reply.mp3", StaticVolume(None) , SoundType.Main),
+      Task.Sound(
+        "http://daqiaotou-storage.floraland.tw/sounds/reply.mp3",
+        StaticVolume(None),
+        SoundType.Main
+      ),
       Condition.Geofence(Location(24.0, 120.0), 100)
     ),
     Session("scenario1", Some(""))
