@@ -36,7 +36,7 @@ object ScenarioCreator {
     actuator: ActorRef[Actuator.Command[Content]]
   )(state: State, command: Command): Effect[Node, State] = command match {
     case Sensor.Sense(message, replyTo) =>
-      println(state.keys.head)
+      println(state.keys.headOption)
       println(message.forComparison)
       val node = state.get(message.forComparison)
       val actions = node.map(_.actions).getOrElse(Nil)

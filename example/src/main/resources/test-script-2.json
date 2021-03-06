@@ -79,7 +79,7 @@
         "receiver" : "ghost",
         "sender" : "?u",
         "payload" : {
-          "type" : "START"
+          "type" : "END"
         },
         "scenarioId" : ""
       },
