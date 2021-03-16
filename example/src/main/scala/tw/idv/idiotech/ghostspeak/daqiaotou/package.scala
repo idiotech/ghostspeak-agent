@@ -24,6 +24,8 @@ package object daqiaotou {
 
     case object Intro extends Destination with UpperSnakecase
 
+    case object Welcome extends Destination with UpperSnakecase
+
     case object Notification extends Destination with UpperSnakecase
 
   }

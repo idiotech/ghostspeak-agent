@@ -1,0 +1,276 @@
+{
+  "name" : "team",
+  "trigger" : {
+    "id" : "",
+    "actionId" : null,
+    "receiver" : "ghost",
+    "sender" : "?u",
+    "payload" : {
+      "type" : "JOIN"
+    },
+    "scenarioId" : ""
+  },
+  "actions" : [
+    {
+      "id" : "chooseTeam",
+      "receiver" : "?u",
+      "sender" : "ghost",
+      "content" : {
+        "task" : {
+          "text": "歡迎來到《大橋一九八八》，首先選擇您的組別",
+          "choices" : ["張正雄", "陳雅芬"],
+          "allowTextReply" : false,
+          "picture" : null,
+          "destinations" : [
+            "INTRO"
+          ],
+          "type" : "POPUP"
+        },
+        "condition" : {
+          "type" : "ALWAYS"
+        }
+      },
+      "session" : {
+        "scenario" : "",
+        "chapter" : ""
+      }
+    }
+  ],
+  "children" : [
+    {
+      "name" : "prologue",
+      "trigger" : {
+        "id" : "",
+        "actionId" : null,
+        "receiver" : "ghost",
+        "sender" : "?u",
+        "payload" : {
+          "text" : "陳雅芬",
+          "type" : "TEXT"
+        },
+        "scenarioId" : ""
+      },
+      "actions" : [
+        {
+          "id" : "prologue",
+          "receiver" : "?u",
+          "sender" : "ghost",
+          "content" : {
+            "task" : {
+              "text": "歡迎來到《大橋一九八八》，我們將用一個故事，帶領著你們穿梭在這個街區之中，去體驗這個街區的不同樣貌。在那之前，請先閱讀手上所抽到的詩籤以及注意事項，並且仔細觀察這個附近的人們，以及街區內的風景。一分鐘之後，這個故事將會正式開始。",
+              "choices" : [],
+              "allowTextReply" : false,
+              "picture" : null,
+              "destinations" : [
+                "WELCOME"
+              ],
+              "type" : "POPUP"
+            },
+            "condition" : {
+              "type" : "ALWAYS"
+            }
+          },
+          "session" : {
+            "scenario" : "",
+            "chapter" : ""
+          }
+        }
+      ],
+      "children" : [
+        {
+          "name" : "intro",
+          "trigger" : {
+            "id" : "",
+            "actionId" : "prologue",
+            "receiver" : "ghost",
+            "sender" : "?u",
+            "payload" : {
+              "type" : "END"
+            },
+            "scenarioId" : ""
+          },
+          "actions" : [
+            {
+              "id" : "intro-sound",
+              "receiver" : "?u",
+              "sender" : "ghost",
+              "content" : {
+                "task" : {
+                  "url": "http://daqiaotou-storage.floraland.tw/sounds/mandarin/yafen-ai-intro.mp3",
+                  "volumeSetting" : {
+                    "type": "STATIC_VOLUME",
+                    "fadeOutSeconds": 10,
+                    "fadeInSeconds": 0,
+                    "speechLength": 173
+                  },
+                  "mode" : "MAIN",
+                  "type" : "SOUND"
+                },
+                "condition" : {
+                  "location" : {
+                    "lat" : 25.065567,
+                    "lon" : 121.510084
+                  },
+                  "radius" : 14,
+                  "type" : "GEOFENCE"
+                }
+              },
+              "session" : {
+                "scenario" : "",
+                "chapter" : ""
+              }
+            },
+            {
+              "id" : "intro-text",
+              "receiver" : "?u",
+              "sender" : "ghost",
+              "content" : {
+                "task" : {
+                  "text": "          我來跟你說一個故事，那是在1988年的大橋頭，有一個人失蹤了。\\n          那年是台灣動盪的一年，股市飆漲，房地產也跟著漲起，前一年的1987年才剛解嚴，兩岸開放探親。在1988年的一月，蔣經國離世，蔣氏政權正式告別台灣，台灣走向新的紀元。\\n          在這樣大環境的變動中，當時的人們以為自己終於可以成為中產階級，所以也更害怕變成了被丟下的那一個，因此，人們像是集體中邪般地迷上股票、房地產，以及大家樂。的確也有人從中獲利，但更多的人卻面臨了家破人亡。\\n          在這個街區也發生了一樣的事，也像我們當時常常聽到的故事一樣，有人因此消失在這個世界上，人間蒸發。而這些事情，連著被人漸漸遺忘的大橋頭街區，一起被世人遺忘。當再也沒人能夠回憶起這些事情的時候，那個人就再也不存在了。\\n          但遊蕩在這個街區的鬼魂，他們可以告訴你那一個消失的人的故事，他們雖然不知道事件的全貌，但可以帶你回到那個人生命中最關鍵一天。故事的背後，總還有故事，但從不同鬼魂所看到的故事，總可以拼湊起一些事情的樣子。\\n          等等我會跟你說你即將要去的地點，在那裡你會見到第一個鬼魂。他將跟你說他所知道的那個消失的人的故事。\\n          那個人，是陳雅芬。",
+                  "choices" : [],
+                  "allowTextReply" : false,
+                  "picture" : null,
+                  "destinations" : [
+                    "INTRO"
+                  ],
+                  "type" : "POPUP"
+                },
+                "condition" : {
+                  "type" : "ALWAYS"
+                }
+              },
+              "session" : {
+                "scenario" : "",
+                "chapter" : ""
+              }
+            }
+          ],
+          "children" : [
+            {
+              "name" : "intro-walk",
+              "trigger" : {
+                "id" : "",
+                "actionId" : "intro-sound",
+                "receiver" : "ghost",
+                "sender" : "?u",
+                "payload" : {
+                  "type" : "END"
+                },
+                "scenarioId" : ""
+              },
+              "actions" : [
+                {
+                  "id" : "yafen-ai-walk",
+                  "receiver" : "?u",
+                  "sender" : "ghost",
+                  "content" : {
+                    "task" : {
+                      "url" : "http://daqiaotou-storage.floraland.tw/sounds/mandarin/yafen-ai-walk.mp3",
+                      "volumeSetting" : {
+                        "type": "STATIC_VOLUME",
+                        "fadeOutSeconds": 10,
+                        "fadeInSeconds": 0,
+                        "speechLength": 234
+                      },
+                      "mode" : "MAIN",
+                      "type" : "SOUND"
+                    },
+                    "condition" : {
+                      "type" : "ALWAYS"
+                    }
+                  },
+                  "session" : {
+                    "scenario" : "",
+                    "chapter" : ""
+                  }
+                },
+                {
+                  "id" : "yafen-ai-arrive",
+                  "receiver" : "?u",
+                  "sender" : "ghost",
+                  "content" : {
+                    "task" : {
+                      "url": "http://daqiaotou-storage.floraland.tw/sounds/mandarin/yafen-ai-arrive.mp3",
+                      "volumeSetting" : {
+                        "type": "DYNAMIC_VOLUME",
+                        "radius": 14,
+                        "center" : {
+                          "lat" : 25.065567,
+                          "lon" : 121.510084
+                        },
+                        "minVolume": 0.3
+                      },
+                      "mode" : "MAIN",
+                      "type" : "SOUND"
+                    },
+                    "condition" : {
+                      "location" : {
+                        "lat" : 25.065567,
+                        "lon" : 121.510084
+                      },
+                      "radius" : 14,
+                      "type" : "GEOFENCE"
+                    }
+                  },
+                  "session" : {
+                    "scenario" : "",
+                    "chapter" : ""
+                  }
+                }
+              ],
+              "children" : [
+                {
+                  "name" : "node2",
+                  "trigger" : {
+                    "id" : "",
+                    "actionId" : "yafen-ai-arrive",
+                    "receiver" : "ghost",
+                    "sender" : "?u",
+                    "payload" : {
+                      "type" : "START"
+                    },
+                    "scenarioId" : ""
+                  },
+                  "actions" : [
+                    {
+                      "id" : "yafen-b",
+                      "receiver" : "?u",
+                      "sender" : "ghost",
+                      "content" : {
+                        "task" : {
+                          "url": "http://daqiaotou-storage.floraland.tw/sounds/mandarin/yafen-b.mp3",
+                          "volumeSetting" : {
+                            "type": "STATIC_VOLUME",
+                            "fadeOutSeconds": 10,
+                            "fadeInSeconds": 0,
+                            "speechLength": 173
+                          },
+                          "mode" : "MAIN",
+                          "type" : "SOUND"
+                        },
+                        "condition" : {
+                          "location" : {
+                            "lat" : 25.065567,
+                            "lon" : 121.510084
+                          },
+                          "radius" : 14,
+                          "type" : "GEOFENCE"
+                        }
+                      },
+                      "session" : {
+                        "scenario" : "",
+                        "chapter" : ""
+                      }
+                    }
+                  ],
+                  "children" : [
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
