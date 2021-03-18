@@ -101,7 +101,7 @@ package object daqiaotou {
       @description("If true, user is allowed to enter a text reply")
       allowTextReply: Boolean,
       @title("Picture URL to be shown")
-      picture: Option[String],
+      pictures: List[String],
       @title("Destinations to be shown")
       destinations: Set[Destination]
     ) extends Task

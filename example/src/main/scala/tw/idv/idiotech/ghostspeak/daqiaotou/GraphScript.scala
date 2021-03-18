@@ -39,7 +39,7 @@ object GraphScript {
     user,
     "ghost",
     Content(
-      Task.Popup(Some("你有聽見我說話嗎？"), List("請說", "(離開吧，對你比較好)"), false, None, Set(Destination.App)),
+      Task.Popup(Some("你有聽見我說話嗎？"), List("請說", "(離開吧，對你比較好)"), false, Nil, Set(Destination.App)),
       Condition.Always
     ),
     Session("scenario1", Some(""))
@@ -50,7 +50,7 @@ object GraphScript {
     user,
     "ghost",
     Content(
-      Task.Popup(Some("沒有人聽見我說話，到底什麼時候信才能送到她手上呢？"), Nil, false, None, Set(Destination.App)),
+      Task.Popup(Some("沒有人聽見我說話，到底什麼時候信才能送到她手上呢？"), Nil, false, Nil, Set(Destination.App)),
       Condition.Always
     ),
     Session("scenario1", Some(""))
@@ -65,7 +65,7 @@ object GraphScript {
         Some("幫我把這封信交給她吧，時間不多，返航的船笛已經在響了。"),
         Nil,
         false,
-        Some("http://daqiaotou-storage.floraland.tw/images/letter.png"),
+        List("http://daqiaotou-storage.floraland.tw/images/letter.png"),
         Set(Destination.App)
       ),
       Condition.Always
@@ -78,7 +78,7 @@ object GraphScript {
     user,
     "ghost",
     Content(
-      Task.Popup(Some("之後一定會再跟你聯絡的。"), Nil, false, None, Set(Destination.App)),
+      Task.Popup(Some("之後一定會再跟你聯絡的。"), Nil, false, Nil, Set(Destination.App)),
       Condition.Always
     ),
     Session("scenario1", Some(""))
