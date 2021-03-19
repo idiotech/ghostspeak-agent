@@ -40,7 +40,7 @@ object ScenarioCreator {
       println(message.forComparison)
       val node = state.get(message.forComparison)
       val actions = node.map(_.actions).getOrElse(Nil)
-      actions.foreach(a => actuator ! Perform(a))
+      actions.foreach(a => actuator ! Perform(a.copy(session = Session(message.scenarioId, None))))
       node.fold[Effect[Node, State]](Effect.none)(n => Effect.persist(n))
     case Sensor.Create(scenario, replyTo)    => Effect.none
     case Sensor.Destroy(scenarioId, replyTo) => Effect.none
