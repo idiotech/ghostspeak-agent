@@ -89,7 +89,7 @@ object GraphScript {
     user,
     "ghost",
     Content(
-      Task.Marker("marker1", Location(24.0, 120.0), "", OperationType.Add),
+      Task.Marker(Location(24.0, 120.0), "", ""),
       Condition.Always
     ),
     Session("scenario1", Some(""))
@@ -100,7 +100,7 @@ object GraphScript {
     user,
     "ghost",
     Content(
-      Task.Marker("marker1", Location(24.0, 120.0), "", OperationType.Delete),
+      Task.MarkerRemoval("action 4"),
       Condition.Geofence(Location(24.0, 120.0), 100)
     ),
     Session("scenario1", Some(""))

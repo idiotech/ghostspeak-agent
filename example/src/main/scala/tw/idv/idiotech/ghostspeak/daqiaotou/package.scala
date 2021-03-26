@@ -45,18 +45,6 @@ package object daqiaotou {
   }
 
   @typeHint[String]
-  sealed trait OperationType extends EnumEntry
-
-  object OperationType extends Enum[OperationType] with CirceEnum[OperationType] {
-    val values: immutable.IndexedSeq[OperationType] = findValues
-
-    case object Add extends OperationType with UpperSnakecase
-
-    case object Delete extends OperationType with UpperSnakecase
-
-  }
-
-  @typeHint[String]
   sealed trait BeaconType extends EnumEntry
 
   object BeaconType extends Enum[BeaconType] with CirceEnum[BeaconType] {
@@ -120,14 +108,19 @@ package object daqiaotou {
     @title("Marker message")
     @description("Client should display the marker on map.")
     case class Marker(
-      @description("Unique ID for a marker instance.")
-      id: String,
       @description("The marker should be shown at this location.")
       location: Location,
       @description("The icon image URL for the marker.")
       icon: String,
-      @description("This field tells the client whether to add or delete this marker.")
-      operation: OperationType
+      @description("The marker title.")
+      title: String
+    ) extends Task
+
+    @title("Marker removal")
+    @description("Client should remove the marker from map.")
+    case class MarkerRemoval(
+      @description("The marker to delete; should be the action id that adds the marker.")
+      id: String
     ) extends Task
 
   }
