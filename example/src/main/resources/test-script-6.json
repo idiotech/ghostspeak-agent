@@ -1,0 +1,164 @@
+{
+  "name" : "node1",
+  "trigger" : {
+    "id" : "",
+    "actionId" : null,
+    "receiver" : "ghost",
+    "sender" : "?u",
+    "payload" : {
+      "type" : "JOIN"
+    },
+    "scenarioId" : ""
+  },
+  "actions" : [
+    {
+      "id" : "yafen-ai-walk",
+      "receiver" : "?u",
+      "sender" : "ghost",
+      "content" : {
+        "task" : {
+          "url" : "http://daqiaotou-storage.floraland.tw/sounds/mandarin/yafen-ai-walk.mp3",
+          "volumeSetting" : {
+            "type": "STATIC_VOLUME",
+            "fadeOutSeconds": 10,
+            "fadeInSeconds": 0,
+            "speechLength": 234
+          },
+          "mode" : "MAIN",
+          "type" : "SOUND"
+        },
+        "condition" : {
+          "type" : "ALWAYS"
+        }
+      },
+      "session" : {
+        "scenario" : "",
+        "chapter" : ""
+      }
+    },
+    {
+      "id" : "chenghsiung-home-appear",
+      "receiver" : "?u",
+      "sender" : "ghost",
+      "content" : {
+        "task" : {
+          "id": "chenghsiung-home",
+          "location" : {
+            "lat" : 25.065567,
+            "lon" : 121.510084
+          },
+          "icon": "local:pin_active",
+          "title": "正雄的家",
+          "type" : "MARKER"
+        },
+        "condition" : {
+          "type" : "ALWAYS"
+        }
+      },
+      "session" : {
+        "scenario" : "",
+        "chapter" : ""
+      }
+    },
+    {
+      "id" : "yafen-ai-arrive",
+      "receiver" : "?u",
+      "sender" : "ghost",
+      "content" : {
+        "task" : {
+          "url": "http://daqiaotou-storage.floraland.tw/sounds/mandarin/yafen-ai-arrive.mp3",
+          "volumeSetting" : {
+            "type": "DYNAMIC_VOLUME",
+            "radius": 14,
+            "center" : {
+              "lat" : 25.065567,
+              "lon" : 121.510084
+            },
+            "minVolume": 0.3
+          },
+          "mode" : "MAIN",
+          "type" : "SOUND"
+        },
+        "condition" : {
+          "location" : {
+            "lat" : 25.065567,
+            "lon" : 121.510084
+          },
+          "radius" : 14,
+          "type" : "GEOFENCE"
+        }
+      },
+      "session" : {
+        "scenario" : "",
+        "chapter" : ""
+      }
+    }
+  ],
+  "children" : [
+    {
+      "name" : "node2",
+      "trigger" : {
+        "id" : "",
+        "actionId" : "yafen-ai-arrive",
+        "receiver" : "ghost",
+        "sender" : "?u",
+        "payload" : {
+          "type" : "END"
+        },
+        "scenarioId" : ""
+      },
+      "actions" : [
+        {
+          "id" : "chenghsiung-home-disappear",
+          "receiver" : "?u",
+          "sender" : "ghost",
+          "content" : {
+            "task" : {
+              "id": "chenghsiung-home",
+              "type" : "MARKER_REMOVAL"
+            },
+            "condition" : {
+              "type" : "ALWAYS"
+            }
+          },
+          "session" : {
+            "scenario" : "",
+            "chapter" : ""
+          }
+        },
+        {
+          "id" : "yafen-b",
+          "receiver" : "?u",
+          "sender" : "ghost",
+          "content" : {
+            "task" : {
+              "url": "http://daqiaotou-storage.floraland.tw/sounds/mandarin/yafen-b.mp3",
+              "volumeSetting" : {
+                "type": "STATIC_VOLUME",
+                "fadeOutSeconds": 10,
+                "fadeInSeconds": 0,
+                "speechLength": 173
+              },
+              "mode" : "MAIN",
+              "type" : "SOUND"
+            },
+            "condition" : {
+              "location" : {
+                "lat" : 25.065567,
+                "lon" : 121.510084
+              },
+              "radius" : 14,
+              "type" : "GEOFENCE"
+            }
+          },
+          "session" : {
+            "scenario" : "",
+            "chapter" : ""
+          }
+        }
+      ],
+      "children" : [
+      ]
+    }
+  ]
+}

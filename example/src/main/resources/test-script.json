@@ -1,0 +1,250 @@
+{
+  "name" : "node1",
+  "trigger" : {
+    "id" : "",
+    "actionId" : null,
+    "receiver" : "ghost",
+    "sender" : "?u",
+    "payload" : {
+      "type" : "JOIN"
+    },
+    "scenarioId" : ""
+  },
+  "actions" : [
+    {
+      "id" : "action 1",
+      "receiver" : "?u",
+      "sender" : "ghost",
+      "content" : {
+        "task" : {
+          "text" : "你有聽見我說話嗎？",
+          "choices" : [
+            "請說",
+            "(離開吧，對你比較好)"
+          ],
+          "allowTextReply" : false,
+          "picture" : null,
+          "destinations" : [
+            "APP"
+          ],
+          "type" : "POPUP"
+        },
+        "condition" : {
+          "type" : "ALWAYS"
+        }
+      },
+      "session" : {
+        "scenario" : "",
+        "chapter" : ""
+      }
+    }
+  ],
+  "children" : [
+    {
+      "name" : "node2",
+      "trigger" : {
+        "id" : "",
+        "actionId" : "action 1",
+        "receiver" : "ghost",
+        "sender" : "?u",
+        "payload" : {
+          "text" : "(離開吧，對你比較好)",
+          "type" : "TEXT"
+        },
+        "scenarioId" : ""
+      },
+      "actions" : [
+        {
+          "id" : "action 1",
+          "receiver" : "?u",
+          "sender" : "ghost",
+          "content" : {
+            "task" : {
+              "text" : "沒有人聽見我說話，到底什麼時候信才能送到她手上呢？",
+              "choices" : [
+              ],
+              "allowTextReply" : false,
+              "picture" : null,
+              "destinations" : [
+                "APP"
+              ],
+              "type" : "POPUP"
+            },
+            "condition" : {
+              "type" : "ALWAYS"
+            }
+          },
+          "session" : {
+            "scenario" : "",
+            "chapter" : ""
+          }
+        }
+      ],
+      "children" : [
+      ]
+    },
+    {
+      "name" : "node3",
+      "trigger" : {
+        "id" : "",
+        "actionId" : "action 1",
+        "receiver" : "ghost",
+        "sender" : "?u",
+        "payload" : {
+          "text" : "請說",
+          "type" : "TEXT"
+        },
+        "scenarioId" : ""
+      },
+      "actions" : [
+        {
+          "id" : "action 2",
+          "receiver" : "?u",
+          "sender" : "ghost",
+          "content" : {
+            "task" : {
+              "text" : "幫我把這封信交給她吧，時間不多，返航的船笛已經在響了。",
+              "choices" : [
+              ],
+              "allowTextReply" : false,
+              "picture" : "http://daqiaotou-storage.floraland.tw/images/letter.png",
+              "destinations" : [
+                "APP"
+              ],
+              "type" : "POPUP"
+            },
+            "condition" : {
+              "type" : "ALWAYS"
+            }
+          },
+          "session" : {
+            "scenario" : "",
+            "chapter" : ""
+          }
+        },
+        {
+          "id" : "action 4",
+          "receiver" : "?u",
+          "sender" : "ghost",
+          "content" : {
+            "task" : {
+              "id" : "marker1",
+              "location" : {
+                "lat" : 24.0,
+                "lon" : 120.0
+              },
+              "icon" : "",
+              "operation" : "ADD",
+              "type" : "MARKER"
+            },
+            "condition" : {
+              "type" : "ALWAYS"
+            }
+          },
+          "session" : {
+            "scenario" : "",
+            "chapter" : ""
+          }
+        },
+        {
+          "id" : "action 5",
+          "receiver" : "?u",
+          "sender" : "ghost",
+          "content" : {
+            "task" : {
+              "id" : "marker1",
+              "location" : {
+                "lat" : 24.0,
+                "lon" : 120.0
+              },
+              "icon" : "",
+              "operation" : "DELETE",
+              "type" : "MARKER"
+            },
+            "condition" : {
+              "location" : {
+                "lat" : 24.0,
+                "lon" : 120.0
+              },
+              "radius" : 100,
+              "type" : "GEOFENCE"
+            }
+          },
+          "session" : {
+            "scenario" : "",
+            "chapter" : ""
+          }
+        },
+        {
+          "id" : "action 6",
+          "receiver" : "?u",
+          "sender" : "ghost",
+          "content" : {
+            "task" : {
+              "url" : "http://daqiaotou-storage.floraland.tw/sounds/reply.mp3",
+              "speechLength" : null,
+              "mode" : "MAIN",
+              "type" : "SOUND"
+            },
+            "condition" : {
+              "location" : {
+                "lat" : 24.0,
+                "lon" : 120.0
+              },
+              "radius" : 100,
+              "type" : "GEOFENCE"
+            }
+          },
+          "session" : {
+            "scenario" : "",
+            "chapter" : ""
+          }
+        }
+      ],
+      "children" : [
+        {
+          "name" : "node4",
+          "trigger" : {
+            "id" : "",
+            "actionId" : "action 2",
+            "receiver" : "ghost",
+            "sender" : "?u",
+            "payload" : {
+              "type" : "END"
+            },
+            "scenarioId" : ""
+          },
+          "actions" : [
+            {
+              "id" : "action 3",
+              "receiver" : "?u",
+              "sender" : "ghost",
+              "content" : {
+                "task" : {
+                  "text" : "之後一定會再跟你聯絡的。",
+                  "choices" : [
+                  ],
+                  "allowTextReply" : false,
+                  "picture" : null,
+                  "destinations" : [
+                    "APP"
+                  ],
+                  "type" : "POPUP"
+                },
+                "condition" : {
+                  "type" : "ALWAYS"
+                }
+              },
+              "session" : {
+                "scenario" : "",
+                "chapter" : ""
+              }
+            }
+          ],
+          "children" : [
+          ]
+        }
+      ]
+    }
+  ]
+}

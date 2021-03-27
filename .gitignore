@@ -1,0 +1,30 @@
+# Simple Build Tool
+# http://www.scala-sbt.org/release/docs/Getting-Started/Directories.html#configuring-version-control
+
+dist/*
+target/
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
+.history
+.cache
+.lib/
+.idea
+.scannerwork
+.history
+.DS_Store
+test-scripts/gen-nodejs
+test-scripts/thrift
+test-scripts/node_modules
+.metals/
+.vscode/
+
+modules/connectors/*.json
+modules/.jvmopts
+modules/.sbtopts
+modules/.bloop/
+modules/.bsp/
+modules/out/
+
+modules/.run/
