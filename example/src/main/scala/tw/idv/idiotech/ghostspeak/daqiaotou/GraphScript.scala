@@ -21,6 +21,43 @@ object GraphScript {
 //  implicit val contentDecoder = BaseAction.decoder[Content]
 //  implicit val messageEncoder = BaseMessage.encoder[EventPayload]
 //  implicit val messageDecoder = BaseMessage.decoder[EventPayload]
+
+  // branching graph:
+  // nodes: no children
+  // n1 -> e1 -> n2 -> e3 -> n4
+  //    -> e2 -> n3 -> e3 -> n4
+  // and / or
+  // node = name, trigger, actions
+  // children means: only after it.
+  // children = boolean expression of nodes; trigger one and remove another
+  // initial nodes:
+
+  @ConfiguredJsonCodec
+  case class Node2(
+    name: String,
+    triggers: List[Message],
+    actions: List[Action],
+    exclusiveWith: Set[String],
+    children: List[String]
+  ) {
+
+    def replace(user: String): Node2 =
+      Node2(
+        name,
+        triggers.map(trigger => substitute(trigger, "?u", user)),
+        actions.map(substitute(_, "?u", user)),
+        exclusiveWith,
+        children
+      )
+
+    def childMap(user: String)(implicit map: Map[String, Node2]): Map[Message, Node2] =
+      children
+        .flatMap(name => map.get(name).map(_.replace(user)).map(n => n.triggers.map(_ -> n)))
+        .flatten
+        .toMap
+
+  }
+
   @ConfiguredJsonCodec
   case class Node(name: String, trigger: Message, actions: List[Action], children: List[Node]) {
 
@@ -31,7 +68,7 @@ object GraphScript {
         actions.map(substitute(_, "?u", user)),
         children.map(_.replace(user))
       )
-    def childMap() = children.map(n => n.trigger -> n).toMap
+    def childMap(): Map[Message, Node] = children.map(n => n.trigger -> n).toMap
   }
 
   def action1(user: String) = BaseAction[Content](

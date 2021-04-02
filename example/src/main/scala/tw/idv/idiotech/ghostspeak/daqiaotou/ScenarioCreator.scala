@@ -19,6 +19,7 @@ import tw.idv.idiotech.ghostspeak.agent.{
 }
 import com.github.kolotaev.ride.Id
 import io.circe.parser.decode
+import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.Node2
 
 import scala.io.Source
 
@@ -26,41 +27,47 @@ object ScenarioCreator {
 
   import GraphScript.Node
   type Command = Sensor.Command[EventPayload]
-  type State = Map[Message, Node]
+  type State = Map[Message, Node2]
 
-  def onEvent(state: State, event: Node): State =
-    (state - event.trigger) ++ event.childMap()
+  implicit val exampleScript: Map[String, Node2] =
+    decode[List[Node2]](Source.fromResource("test-script-6.json").mkString)
+      .fold(throw _, identity)
+      .map(n => n.name -> n)
+      .toMap
+
+  def onEvent(user: String)(state: State, event: Node2): State = {
+    val ret = (state -- event.triggers) ++ event.childMap(user)
+    if (event.exclusiveWith.nonEmpty) ret.filter(p => !event.exclusiveWith.contains(p._2.name))
+    else ret
+  }
 
   def onCommand(
     user: String,
     actuator: ActorRef[Actuator.Command[Content]]
-  )(state: State, command: Command): Effect[Node, State] = command match {
+  )(state: State, command: Command): Effect[Node2, State] = command match {
     case Sensor.Sense(message, replyTo) =>
-      println(state.keys.headOption)
-      println(message.forComparison)
-      val node = state.get(message.forComparison)
+      println(s"trigger = ${state.keys.headOption}")
+      println(s"message = ${message.forComparison}")
+      val node = state.get(message.forComparison).map(_.replace(user))
       val actions = node.map(_.actions).getOrElse(Nil)
       actions.foreach(a => actuator ! Perform(a.copy(session = Session(message.scenarioId, None))))
-      node.fold[Effect[Node, State]](Effect.none)(n => Effect.persist(n))
+      node.fold[Effect[Node2, State]](Effect.none)(n => Effect.persist(n))
     case Sensor.Create(scenario, replyTo)    => Effect.none
     case Sensor.Destroy(scenarioId, replyTo) => Effect.none
   }
 
-  val exampleScript: Node =
-    decode[Node](Source.fromResource("test-script-5.json").mkString).fold(throw _, identity)
-
   def initialState(user: String) = {
-    val node = exampleScript.replace(user)
-    Map(node.trigger -> node)
+    val initial: Node2 = exampleScript("initial").replace(user)
+    initial.triggers.map(_ -> initial).toMap
   }
 
   def ub(user: String, actuator: ActorRef[Actuator.Command[Content]]) =
     Behaviors.setup[Command] { ctx =>
-      EventSourcedBehavior[Command, Node, State](
+      EventSourcedBehavior[Command, Node2, State](
         persistenceId = PersistenceId.ofUniqueId(s"scn-$user"),
         emptyState = initialState(user),
         commandHandler = onCommand(user, actuator),
-        eventHandler = onEvent
+        eventHandler = onEvent(user)
       )
     }
 

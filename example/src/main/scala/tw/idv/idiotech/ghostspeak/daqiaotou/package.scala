@@ -13,6 +13,7 @@ package object daqiaotou {
   implicit val configuration = Configuration.default
     .withDiscriminator("type")
     .withScreamingSnakeCaseConstructorNames
+    .withDefaults
 
   @typeHint[String]
   sealed trait Destination extends EnumEntry

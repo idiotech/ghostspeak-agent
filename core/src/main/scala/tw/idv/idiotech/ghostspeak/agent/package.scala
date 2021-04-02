@@ -13,6 +13,7 @@ package object agent {
   private implicit val configuration = Configuration.default
     .withDiscriminator("type")
     .withScreamingSnakeCaseConstructorNames
+    .withDefaults
 
   @ConfiguredJsonCodec
   case class Session(scenario: String, chapter: Option[String])
@@ -104,7 +105,14 @@ package object agent {
     case object Leave extends SystemPayload
 
     case class Modal(modality: Modality, time: Long = System.currentTimeMillis())
-        extends SystemPayload
+        extends SystemPayload {
+      override def hashCode(): Int = modality.hashCode()
+
+      override def equals(obj: Any): Boolean = obj match {
+        case other: Modal => other.modality == modality
+        case _            => false
+      }
+    }
   }
 
   @title("Events for server to process")
