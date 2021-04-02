@@ -1,164 +1,189 @@
-{
-  "name" : "node1",
-  "trigger" : {
-    "id" : "",
-    "actionId" : null,
-    "receiver" : "ghost",
-    "sender" : "?u",
-    "payload" : {
-      "type" : "JOIN"
-    },
-    "scenarioId" : ""
-  },
-  "actions" : [
-    {
-      "id" : "yafen-ai-walk",
-      "receiver" : "?u",
-      "sender" : "ghost",
-      "content" : {
-        "task" : {
-          "url" : "http://daqiaotou-storage.floraland.tw/sounds/mandarin/yafen-ai-walk.mp3",
-          "volumeSetting" : {
-            "type": "STATIC_VOLUME",
-            "fadeOutSeconds": 10,
-            "fadeInSeconds": 0,
-            "speechLength": 234
-          },
-          "mode" : "MAIN",
-          "type" : "SOUND"
-        },
-        "condition" : {
-          "type" : "ALWAYS"
-        }
-      },
-      "session" : {
-        "scenario" : "",
-        "chapter" : ""
-      }
-    },
-    {
-      "id" : "chenghsiung-home-appear",
-      "receiver" : "?u",
-      "sender" : "ghost",
-      "content" : {
-        "task" : {
-          "id": "chenghsiung-home",
-          "location" : {
-            "lat" : 25.065567,
-            "lon" : 121.510084
-          },
-          "icon": "local:pin_active",
-          "title": "正雄的家",
-          "type" : "MARKER"
-        },
-        "condition" : {
-          "type" : "ALWAYS"
-        }
-      },
-      "session" : {
-        "scenario" : "",
-        "chapter" : ""
-      }
-    },
-    {
-      "id" : "yafen-ai-arrive",
-      "receiver" : "?u",
-      "sender" : "ghost",
-      "content" : {
-        "task" : {
-          "url": "http://daqiaotou-storage.floraland.tw/sounds/mandarin/yafen-ai-arrive.mp3",
-          "volumeSetting" : {
-            "type": "DYNAMIC_VOLUME",
-            "radius": 14,
-            "center" : {
-              "lat" : 25.065567,
-              "lon" : 121.510084
-            },
-            "minVolume": 0.3
-          },
-          "mode" : "MAIN",
-          "type" : "SOUND"
-        },
-        "condition" : {
-          "location" : {
-            "lat" : 25.065567,
-            "lon" : 121.510084
-          },
-          "radius" : 14,
-          "type" : "GEOFENCE"
-        }
-      },
-      "session" : {
-        "scenario" : "",
-        "chapter" : ""
-      }
-    }
-  ],
-  "children" : [
-    {
-      "name" : "node2",
-      "trigger" : {
-        "id" : "",
-        "actionId" : "yafen-ai-arrive",
+[
+  {
+    "name" : "initial",
+    "triggers" : [
+      {
+       "id" : "",
+        "actionId" : null,
         "receiver" : "ghost",
         "sender" : "?u",
         "payload" : {
-          "type" : "END"
+          "type" : "JOIN"
+        },
+        "scenarioId" : ""
+      }
+    ],
+    "actions" : [
+      {
+        "id" : "chooseTeam",
+        "receiver" : "?u",
+        "sender" : "ghost",
+        "content" : {
+          "task" : {
+            "text": "歡迎來到《大橋一九八八》，首先選擇您的組別",
+            "choices" : ["張正雄", "陳雅芬"],
+            "allowTextReply" : false,
+            "pictures" : [],
+            "destinations" : [
+              "INTRO"
+            ],
+            "type" : "POPUP"
+          },
+          "condition" : {
+            "type" : "ALWAYS"
+          }
+        },
+        "session" : {
+          "scenario" : "",
+          "chapter" : ""
+        }
+      }
+    ],
+    "children" : ["chenghsiung", "yafen"],
+    "exclusiveWith": []
+  },
+  {
+    "name": "yafen",
+    "triggers": [
+      {
+        "id": "",
+        "actionId": "chooseTeam",
+        "receiver": "ghost",
+        "sender": "?u",
+        "payload": {
+          "text": "陳雅芬",
+          "type": "TEXT"
+        },
+        "scenarioId": ""
+      }
+    ],
+    "actions": [
+      {
+        "id" : "prologue_yafen",
+        "receiver" : "?u",
+        "sender" : "ghost",
+        "content" : {
+          "task" : {
+            "text": "歡迎來到陳雅芬的世界，我們將用一個故事，帶領著你們穿梭在這個街區之中，去體驗這個街區的不同樣貌。在那之前，請先閱讀手上所抽到的詩籤以及注意事項，並且仔細觀察這個附近的人們，以及街區內的風景。一分鐘之後，這個故事將會正式開始。",
+            "choices" : [],
+            "allowTextReply" : false,
+            "pictures" : [],
+            "destinations" : [
+              "WELCOME"
+            ],
+            "type" : "POPUP"
+          },
+          "condition" : {
+            "type" : "ALWAYS"
+          }
+        },
+        "session" : {
+          "scenario" : "",
+          "chapter" : ""
+        }
+      }
+    ],
+    "children": ["prologue"],
+    "exclusiveWith": ["chenghsiung"]
+  },
+
+  {
+    "name": "chenghsiung",
+    "triggers": [
+      {
+        "id": "",
+        "actionId": "chooseTeam",
+        "receiver": "ghost",
+        "sender": "?u",
+        "payload": {
+          "text": "張正雄",
+          "type": "TEXT"
+        },
+        "scenarioId": ""
+      }
+    ],
+    "actions": [
+      {
+        "id" : "prologue_chenghsiung",
+        "receiver" : "?u",
+        "sender" : "ghost",
+        "content" : {
+          "task" : {
+            "text": "歡迎來到張正雄的世界，我們將用一個故事，帶領著你們穿梭在這個街區之中，去體驗這個街區的不同樣貌。在那之前，請先閱讀手上所抽到的詩籤以及注意事項，並且仔細觀察這個附近的人們，以及街區內的風景。一分鐘之後，這個故事將會正式開始。",
+            "choices" : [],
+            "allowTextReply" : false,
+            "pictures" : [],
+            "destinations" : [
+              "WELCOME"
+            ],
+            "type" : "POPUP"
+          },
+          "condition" : {
+            "type" : "ALWAYS"
+          }
+        },
+        "session" : {
+          "scenario" : "",
+          "chapter" : ""
+        }
+      }
+    ],
+    "children": ["prologue"],
+    "exclusiveWith": ["yafen"]
+  },
+  {
+    "name" : "prologue",
+    "triggers" : [
+      {
+        "id" : "",
+        "actionId" : "prologue_chenghsiung",
+        "receiver" : "ghost",
+        "sender" : "?u",
+        "payload" : {
+          "type" : "DONE"
         },
         "scenarioId" : ""
       },
-      "actions" : [
-        {
-          "id" : "chenghsiung-home-disappear",
-          "receiver" : "?u",
-          "sender" : "ghost",
-          "content" : {
-            "task" : {
-              "id": "chenghsiung-home",
-              "type" : "MARKER_REMOVAL"
+      {
+        "id" : "",
+        "actionId" : "prologue_yafen",
+        "receiver" : "ghost",
+        "sender" : "?u",
+        "payload" : {
+          "type" : "DONE"
+        },
+        "scenarioId" : ""
+      }
+    ],
+    "actions" : [
+      {
+        "id" : "prologue-sound",
+        "receiver" : "?u",
+        "sender" : "ghost",
+        "content" : {
+          "task" : {
+            "url": "http://daqiaotou-storage.floraland.tw/sounds/mandarin/prologue.mp3",
+            "volumeSetting" : {
+              "type": "STATIC_VOLUME",
+              "fadeOutSeconds": 10,
+              "fadeInSeconds": 0,
+              "speechLength": null
             },
-            "condition" : {
-              "type" : "ALWAYS"
-            }
+            "mode" : "MAIN",
+            "type" : "SOUND"
           },
-          "session" : {
-            "scenario" : "",
-            "chapter" : ""
+          "condition" : {
+            "type" : "ALWAYS"
           }
         },
-        {
-          "id" : "yafen-b",
-          "receiver" : "?u",
-          "sender" : "ghost",
-          "content" : {
-            "task" : {
-              "url": "http://daqiaotou-storage.floraland.tw/sounds/mandarin/yafen-b.mp3",
-              "volumeSetting" : {
-                "type": "STATIC_VOLUME",
-                "fadeOutSeconds": 10,
-                "fadeInSeconds": 0,
-                "speechLength": 173
-              },
-              "mode" : "MAIN",
-              "type" : "SOUND"
-            },
-            "condition" : {
-              "location" : {
-                "lat" : 25.065567,
-                "lon" : 121.510084
-              },
-              "radius" : 14,
-              "type" : "GEOFENCE"
-            }
-          },
-          "session" : {
-            "scenario" : "",
-            "chapter" : ""
-          }
+        "session" : {
+          "scenario" : "",
+          "chapter" : ""
         }
-      ],
-      "children" : [
-      ]
-    }
-  ]
-}
+      }
+    ],
+    "children": [],
+    "exclusiveWith": []
+  }
+]
+
