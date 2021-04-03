@@ -30,13 +30,13 @@ object ScenarioCreator {
   type State = Map[Message, Node2]
 
   implicit val exampleScript: Map[String, Node2] =
-    decode[List[Node2]](Source.fromResource("test-script-4.json").mkString)
+    decode[List[Node2]](Source.fromResource("test-script-6.json").mkString)
       .fold(throw _, identity)
       .map(n => n.name -> n)
       .toMap
 
-  def onEvent(state: State, event: Node2): State = {
-    val ret = (state -- event.triggers) ++ event.childMap()
+  def onEvent(user: String)(state: State, event: Node2): State = {
+    val ret = (state -- event.triggers) ++ event.childMap(user)
     if (event.exclusiveWith.nonEmpty) ret.filter(p => !event.exclusiveWith.contains(p._2.name))
     else ret
   }
@@ -46,8 +46,8 @@ object ScenarioCreator {
     actuator: ActorRef[Actuator.Command[Content]]
   )(state: State, command: Command): Effect[Node2, State] = command match {
     case Sensor.Sense(message, replyTo) =>
-      println(state.keys.headOption)
-      println(message.forComparison)
+      println(s"trigger = ${state.keys.headOption}")
+      println(s"message = ${message.forComparison}")
       val node = state.get(message.forComparison).map(_.replace(user))
       val actions = node.map(_.actions).getOrElse(Nil)
       actions.foreach(a => actuator ! Perform(a.copy(session = Session(message.scenarioId, None))))
@@ -67,7 +67,7 @@ object ScenarioCreator {
         persistenceId = PersistenceId.ofUniqueId(s"scn-$user"),
         emptyState = initialState(user),
         commandHandler = onCommand(user, actuator),
-        eventHandler = onEvent
+        eventHandler = onEvent(user)
       )
     }
 

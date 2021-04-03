@@ -39,7 +39,7 @@ class ModelTest extends AnyFlatSpec with Matchers {
       "Juliet",
       "Romeo",
 //      Right(Location(25.0, 121.0)),
-      Left(SystemPayload.Join),
+      Left(SystemPayload.Modal(Modality.Done)),
       "romeo and juliet"
     )
 //    implicit val geofenceSchema = Json.schema[Condition.Geofence]("Geofence")

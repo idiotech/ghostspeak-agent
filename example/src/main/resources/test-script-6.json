@@ -86,7 +86,6 @@
     "children": ["prologue"],
     "exclusiveWith": ["chenghsiung"]
   },
-
   {
     "name": "chenghsiung",
     "triggers": [
@@ -140,7 +139,8 @@
         "receiver" : "ghost",
         "sender" : "?u",
         "payload" : {
-          "type" : "DONE"
+          "type" : "MODAL",
+          "modality": "DONE"
         },
         "scenarioId" : ""
       },
@@ -150,7 +150,8 @@
         "receiver" : "ghost",
         "sender" : "?u",
         "payload" : {
-          "type" : "DONE"
+          "type" : "MODAL",
+          "modality": "DONE"
         },
         "scenarioId" : ""
       }

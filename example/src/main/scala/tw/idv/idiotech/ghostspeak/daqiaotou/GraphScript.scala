@@ -50,8 +50,11 @@ object GraphScript {
         children
       )
 
-    def childMap()(implicit map: Map[String, Node2]): Map[Message, Node2] =
-      children.flatMap(name => map.get(name).map(n => n.triggers.map(_ -> n))).flatten.toMap
+    def childMap(user: String)(implicit map: Map[String, Node2]): Map[Message, Node2] =
+      children
+        .flatMap(name => map.get(name).map(_.replace(user)).map(n => n.triggers.map(_ -> n)))
+        .flatten
+        .toMap
 
   }
 
