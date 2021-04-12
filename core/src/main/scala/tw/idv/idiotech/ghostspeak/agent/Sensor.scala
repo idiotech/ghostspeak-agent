@@ -58,7 +58,7 @@ object Sensor {
       if (!state.contains(scenario.id))
         createChild(ctx, scenario)
           .fold[Reff[P]] {
-            Effect.reply(replyTo)(StatusReply.Error("no such template"))
+            Effect.reply(replyTo)(StatusReply.Error("no such engine"))
           } { actor =>
             Effect
               .persist(Created[P](scenario))
@@ -127,11 +127,11 @@ object Sensor {
     }
   }
 
-  def perUser[P](name: String, createScenarioPerUser: CreatorScenarioActor[P]) =
+  def perUser[P](name: String, createScenarioPerUser: Scenario => CreatorScenarioActor[P]) =
     apply[P](
       name,
       { (ctx, scn) =>
-        val actor = apply[P](scn.id, createScenarioPerUser, onCommandPerUser[P])
+        val actor = apply[P](scn.id, createScenarioPerUser(scn), onCommandPerUser[P])
         Some(ctx.spawn(actor, scn.id))
       }
     )

@@ -7,7 +7,7 @@ import akka.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
 import io.circe.Encoder
 import tw.idv.idiotech.ghostspeak.agent
 import tw.idv.idiotech.ghostspeak.agent.Actuator.Perform
-import tw.idv.idiotech.ghostspeak.agent.Sensor.Command
+import tw.idv.idiotech.ghostspeak.agent.Sensor.{ onCommandPerUser, Command }
 import tw.idv.idiotech.ghostspeak.agent.{
   Actuator,
   FcmSender,
@@ -25,17 +25,12 @@ import scala.io.Source
 
 object ScenarioCreator {
 
-  import GraphScript.Node
   type Command = Sensor.Command[EventPayload]
   type State = Map[Message, Node2]
 
-  implicit val exampleScript: Map[String, Node2] =
-    decode[List[Node2]](Source.fromResource("test-script-6.json").mkString)
-      .fold(throw _, identity)
-      .map(n => n.name -> n)
-      .toMap
-
-  def onEvent(user: String)(state: State, event: Node2): State = {
+  def onEvent(
+    user: String
+  )(state: State, event: Node2)(implicit script: Map[String, Node2]): State = {
     val ret = (state -- event.triggers) ++ event.childMap(user)
     if (event.exclusiveWith.nonEmpty) ret.filter(p => !event.exclusiveWith.contains(p._2.name))
     else ret
@@ -56,16 +51,20 @@ object ScenarioCreator {
     case Sensor.Destroy(scenarioId, replyTo) => Effect.none
   }
 
-  def initialState(user: String) = {
-    val initial: Node2 = exampleScript("initial").replace(user)
-    initial.triggers.map(_ -> initial).toMap
-  }
-
-  def ub(user: String, actuator: ActorRef[Actuator.Command[Content]]) =
+  def ub(
+    scenario: Scenario
+  )(userScenario: Scenario, actuator: ActorRef[Actuator.Command[Content]]) =
     Behaviors.setup[Command] { ctx =>
+      implicit val script: Map[String, Node2] =
+        decode[List[Node2]](scenario.template)
+          .fold(throw _, identity)
+          .map(n => n.name -> n)
+          .toMap
+      val user = userScenario.id
+      val initial: Node2 = script("initial").replace(user)
       EventSourcedBehavior[Command, Node2, State](
         persistenceId = PersistenceId.ofUniqueId(s"scn-$user"),
-        emptyState = initialState(user),
+        emptyState = initial.triggers.map(_ -> initial).toMap,
         commandHandler = onCommand(user, actuator),
         eventHandler = onEvent(user)
       )
@@ -190,8 +189,10 @@ object ScenarioCreator {
    */
   def createUserScenario(
     actuatorRef: ActorRef[Actuator.Command[Content]]
-  )(actorContext: ActorContext[_], scenario: Scenario): Option[ActorRef[Command]] =
-    Some(actorContext.spawn(ub(scenario.id, actuatorRef), scenario.id))
+  )(
+    scenario: Scenario
+  )(actorContext: ActorContext[_], userScenario: Scenario): Option[ActorRef[Command]] =
+    Some(actorContext.spawn(ub(scenario)(userScenario, actuatorRef), userScenario.id))
 
   val scenarioBehavior: Behavior[Command] =
     Behaviors.setup[Command] { ctx =>
@@ -207,7 +208,16 @@ object ScenarioCreator {
         Actuator(discover, sensor)
       }
       val actuatorRef: ActorRef[Actuator.Command[Content]] = ctx.spawn(actuator, "actuator")
-      Sensor.perUser("root", createUserScenario(actuatorRef))
+      // TODO check engine before deciding actor
+      Sensor[EventPayload](
+        "root",
+        (ctx, scn) =>
+          if (scn.engine == "graphscript") {
+            val actor =
+              Sensor(scn.id, createUserScenario(actuatorRef)(scn), onCommandPerUser[EventPayload])
+            Some(ctx.spawn(actor, scn.id))
+          } else None
+      )
     }
 
 }

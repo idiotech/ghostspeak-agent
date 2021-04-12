@@ -7,13 +7,11 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
-import akka.http.scaladsl.unmarshalling._
 import akka.pattern.StatusReply
-import akka.stream.scaladsl.PartitionHub
 import io.circe.Decoder
+import io.circe.Json
 
 import scala.concurrent.duration._
-import scala.concurrent.Future
 import scala.util.{ Failure, Success }
 
 class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]])(implicit
@@ -32,7 +30,7 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]])(implicit
 
   lazy val theEventRoutes: Route =
     concat(
-      pathPrefix("event") {
+      pathPrefix("v1" / "event") {
         concat(
           pathEnd {
             concat(
@@ -51,18 +49,20 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]])(implicit
           }
         )
       },
-      pathPrefix("scenario" / Segment / Segment / Segment) { (engine, scenarioId, template) =>
+      pathPrefix("v1" / "scenario" / Segment / Segment) { (engine, scenarioId) =>
         put {
-          onComplete(
-            sensor.askWithStatus[String](x =>
-              Sensor.Create[T](Scenario(scenarioId, engine, template), x)
-            )
-          ) {
-            case Success(msg) => complete(msg)
-            case Failure(StatusReply.ErrorMessage(reason)) =>
-              complete(StatusCodes.InternalServerError -> reason)
-            case Failure(e) =>
-              complete(StatusCodes.InternalServerError -> e.getMessage)
+          entity(as[Json]) { template =>
+            onComplete(
+              sensor.askWithStatus[String](x =>
+                Sensor.Create[T](Scenario(scenarioId, engine, template.toString), x)
+              )
+            ) {
+              case Success(msg) => complete(msg)
+              case Failure(StatusReply.ErrorMessage(reason)) =>
+                complete(StatusCodes.InternalServerError -> reason)
+              case Failure(e) =>
+                complete(StatusCodes.InternalServerError -> e.getMessage)
+            }
           }
         }
       }

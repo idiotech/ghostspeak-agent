@@ -14,17 +14,10 @@ project/plugins/project/
 .scannerwork
 .history
 .DS_Store
-test-scripts/gen-nodejs
-test-scripts/thrift
-test-scripts/node_modules
 .metals/
 .vscode/
 
-modules/connectors/*.json
-modules/.jvmopts
-modules/.sbtopts
-modules/.bloop/
-modules/.bsp/
-modules/out/
-
-modules/.run/
+.bloop/
+.bsp/
+journal/
+out/
