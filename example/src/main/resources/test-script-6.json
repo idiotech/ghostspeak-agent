@@ -25,7 +25,8 @@
             "allowTextReply" : false,
             "pictures" : [],
             "destinations" : [
-              "INTRO"
+              "INTRO",
+              "NOTIFICATION"
             ],
             "type" : "POPUP"
           },
@@ -111,9 +112,9 @@
             "text": "歡迎來到張正雄的世界，我們將用一個故事，帶領著你們穿梭在這個街區之中，去體驗這個街區的不同樣貌。在那之前，請先閱讀手上所抽到的詩籤以及注意事項，並且仔細觀察這個附近的人們，以及街區內的風景。一分鐘之後，這個故事將會正式開始。",
             "choices" : [],
             "allowTextReply" : false,
-            "pictures" : [],
+            "pictures" : ["local:image_1_1_l"],
             "destinations" : [
-              "WELCOME"
+              "APP", "NOTIFICATION"
             ],
             "type" : "POPUP"
           },
