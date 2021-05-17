@@ -82,17 +82,17 @@ package object daqiaotou {
     @description("Client should show it as a notification or a popup window in the app.")
     case class Popup(
       @description("This is the message to be shown. Can be null.")
-      text: Option[String],
+      text: Option[String] = None,
       @description(
         "They are acceptable choices from the user. They can be shown as buttons or drop-down menu depending on client design."
       )
-      choices: List[String],
+      choices: List[String] = Nil,
       @description("If true, user is allowed to enter a text reply")
-      allowTextReply: Boolean,
+      allowTextReply: Boolean = false,
       @title("Picture URL to be shown")
-      pictures: List[String],
+      pictures: List[String] = Nil,
       @title("Destinations to be shown")
-      destinations: Set[Destination]
+      destinations: Set[Destination] = Set.empty
     ) extends Task
 
     @title("Sound message")
@@ -147,11 +147,11 @@ package object daqiaotou {
     @description("Beacon condition for action")
     case class Beacon(
       @description("Beacon ID")
-      id: String,
+      beaconId: String,
       @description("Threshold value for triggering")
       threshold: Int,
       @description("Whether to activate on enter or on exit")
-      `type`: BeaconType
+      mode: BeaconType
     ) extends Condition
 
   }
