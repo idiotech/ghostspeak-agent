@@ -21,6 +21,7 @@ import com.github.kolotaev.ride.Id
 import io.circe.parser.decode
 import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.Node2
 
+import java.util.UUID
 import scala.io.Source
 
 object ScenarioCreator {
@@ -207,15 +208,16 @@ object ScenarioCreator {
         }
         Actuator(discover, sensor)
       }
-      val actuatorRef: ActorRef[Actuator.Command[Content]] = ctx.spawn(actuator, "actuator")
+      val actuatorRef: ActorRef[Actuator.Command[Content]] =
+        ctx.spawn(actuator, UUID.randomUUID().toString)
       // TODO check engine before deciding actor
       Sensor[EventPayload](
         "root",
         (ctx, scn) =>
           if (scn.engine == "graphscript") {
-            val actor =
+            val actor: Behavior[Sensor.Command[EventPayload]] =
               Sensor(scn.id, createUserScenario(actuatorRef)(scn), onCommandPerUser[EventPayload])
-            Some(ctx.spawn(actor, scn.id))
+            Some(ctx.spawn(actor, UUID.randomUUID().toString))
           } else None
       )
     }

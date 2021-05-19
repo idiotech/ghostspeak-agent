@@ -6,6 +6,8 @@ import akka.pattern.StatusReply
 import akka.persistence.typed.{ PersistenceId, RecoveryCompleted }
 import akka.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior, ReplyEffect }
 
+import java.util.UUID
+
 object Sensor {
   sealed trait Command[P]
 
@@ -20,7 +22,9 @@ object Sensor {
 
   sealed trait Event[P]
   case class Destroyed[P](scenarioId: String) extends Event[P]
-  case class Created[P](scenario: Scenario) extends Event[P]
+
+  case class Created[P](scenario: Scenario, uniqueId: String = UUID.randomUUID().toString)
+      extends Event[P]
 
   type State[P] = Map[String, Created[P]]
 
@@ -42,7 +46,7 @@ object Sensor {
     case Sense(message, replyTo) =>
       val reply: StatusReply[String] =
         ctx
-          .getChild[P](message.scenarioId)
+          .getChild[P](state.get(message.scenarioId).map(_.uniqueId).getOrElse("invalid"))
           .fold[StatusReply[String]](
             StatusReply.Error("no such scenario")
           ) { actor =>
@@ -61,17 +65,24 @@ object Sensor {
             Effect.reply(replyTo)(StatusReply.Error("no such engine"))
           } { actor =>
             Effect
-              .persist(Created[P](scenario))
+              .persist(Created[P](scenario, actor.path.name))
               .thenReply(replyTo)(_ => StatusReply.Success("created"))
           }
       else Effect.reply(replyTo)(StatusReply.Error("already exists"))
     case Destroy(id, replyTo) =>
-      if (state.contains(id))
-        Effect
-          .persist[Event[P], State[P]](Destroyed[P](id))
-          .thenReply(replyTo)(_ => StatusReply.Success("destroying"))
-      else
-        Effect.reply(replyTo)(StatusReply.Error("already exists"))
+      state
+        .get(id)
+        .fold[ReplyEffect[Event[P], State[P]]] {
+          Effect.reply(replyTo)(StatusReply.Error("doesn't exist"))
+        } { created =>
+          ctx.child(created.uniqueId).foreach { a =>
+            println(s"stopping $a")
+            ctx.stop(a)
+          }
+          Effect
+            .persist[Event[P], State[P]](Destroyed[P](id))
+            .thenReply(replyTo)(_ => StatusReply.Success("destroying"))
+        }
   }
 
   type OnCommand[P] = (ActorContext[Command[P]], CreatorScenarioActor[P]) => (
@@ -82,6 +93,8 @@ object Sensor {
   def onEvent[P](state: State[P], evt: Event[P]): State[P] = evt match {
     case c: Created[P] =>
       state + (c.scenario.id -> c)
+    case d: Destroyed[P] =>
+      state - d.scenarioId
   }
 
   def apply[P](

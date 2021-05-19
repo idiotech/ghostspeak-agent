@@ -8,9 +8,12 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import akka.pattern.StatusReply
+import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
+import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import io.circe.Decoder
 import io.circe.Json
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{ Failure, Success }
 
@@ -28,7 +31,7 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]])(implicit
   implicit val timeout: Timeout = 3.seconds
   implicit val ec = system.executionContext
 
-  lazy val theEventRoutes: Route =
+  lazy val theEventRoutes: Route = cors() {
     concat(
       pathPrefix("v1" / "event") {
         concat(
@@ -50,21 +53,34 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]])(implicit
         )
       },
       pathPrefix("v1" / "scenario" / Segment / Segment) { (engine, scenarioId) =>
-        put {
-          entity(as[Json]) { template =>
-            onComplete(
-              sensor.askWithStatus[String](x =>
-                Sensor.Create[T](Scenario(scenarioId, engine, template.toString), x)
-              )
-            ) {
-              case Success(msg) => complete(msg)
-              case Failure(StatusReply.ErrorMessage(reason)) =>
-                complete(StatusCodes.InternalServerError -> reason)
-              case Failure(e) =>
-                complete(StatusCodes.InternalServerError -> e.getMessage)
+        parameters("overwrite".optional) { overwriteParam =>
+          val overwrite = overwriteParam.fold(false)(_ == "true")
+          put {
+            entity(as[Json]) { template =>
+              val ret: Route = onComplete {
+                val deletion = if (overwrite) {
+                  println("overwriting!")
+                  sensor.askWithStatus[String](x => Sensor.Destroy[T](scenarioId, x)).recover {
+                    case e => println(e)
+                  }
+                } else Future.unit
+                deletion.flatMap(_ =>
+                  sensor.askWithStatus[String](x =>
+                    Sensor.Create[T](Scenario(scenarioId, engine, template.toString), x)
+                  )
+                )
+              } {
+                case Success(msg) => complete(msg)
+                case Failure(StatusReply.ErrorMessage(reason)) =>
+                  complete(StatusCodes.InternalServerError -> reason)
+                case Failure(e) =>
+                  complete(StatusCodes.InternalServerError -> e.getMessage)
+              }
+              ret
             }
           }
         }
       }
     )
+  }
 }

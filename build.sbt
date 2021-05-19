@@ -41,6 +41,7 @@ libraryDependencies in ThisBuild ++= Seq(
   "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % Test,
   "com.typesafe.akka" %% "akka-persistence-typed" % akkaVersion,
   "com.typesafe.akka" %% "akka-persistence-testkit" % akkaVersion % Test,
+  "ch.megard" %% "akka-http-cors" % "1.1.1",
   "com.lightbend.akka" %% "akka-stream-alpakka-google-fcm" % "2.0.2",
   "com.twitter" %% "chill" % "0.9.5",
   "com.twitter" %% "chill-akka" % "0.9.5",
