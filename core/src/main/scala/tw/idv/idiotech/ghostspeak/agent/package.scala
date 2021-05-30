@@ -150,6 +150,6 @@ package object agent {
   }
 
   @ConfiguredJsonCodec
-  case class Scenario(id: String, engine: String, template: String)
+  case class Scenario(id: String, engine: String, template: String, name: Option[String] = None)
 
 }

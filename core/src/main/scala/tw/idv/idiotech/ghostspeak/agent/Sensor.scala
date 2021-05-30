@@ -5,6 +5,8 @@ import akka.actor.typed.{ ActorRef, Behavior }
 import akka.pattern.StatusReply
 import akka.persistence.typed.{ PersistenceId, RecoveryCompleted }
 import akka.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior, ReplyEffect }
+import io.circe.generic.extras.ConfiguredJsonCodec
+import io.circe.syntax._
 
 import java.util.UUID
 
@@ -16,6 +18,8 @@ object Sensor {
 
   case class Create[P](scenario: Scenario, replyTo: ActorRef[StatusReply[String]])
       extends Command[P]
+
+  case class Query[P](replyTo: ActorRef[StatusReply[String]]) extends Command[P]
 
   case class Destroy[P](scenarioId: String, replyTo: ActorRef[StatusReply[String]])
       extends Command[P]
@@ -83,6 +87,10 @@ object Sensor {
             .persist[Event[P], State[P]](Destroyed[P](id))
             .thenReply(replyTo)(_ => StatusReply.Success("destroying"))
         }
+    case Query(replyTo) =>
+      Effect.reply(replyTo)(
+        StatusReply.success(state.values.map(_.scenario).toList.asJson.toString())
+      )
   }
 
   type OnCommand[P] = (ActorContext[Command[P]], CreatorScenarioActor[P]) => (

@@ -6,12 +6,16 @@ import akka.util.Timeout
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.ContentTypes._
+import akka.http.scaladsl.model.headers.`Content-Type`
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import akka.pattern.StatusReply
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
 import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import io.circe.Decoder
 import io.circe.Json
+import io.circe.parser.parse
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -53,7 +57,7 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]])(implicit
         )
       },
       pathPrefix("v1" / "scenario" / Segment / Segment) { (engine, scenarioId) =>
-        parameters("overwrite".optional) { overwriteParam =>
+        parameters("overwrite".optional, "name".optional) { (overwriteParam, name) =>
           val overwrite = overwriteParam.fold(false)(_ == "true")
           put {
             entity(as[Json]) { template =>
@@ -66,7 +70,7 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]])(implicit
                 } else Future.unit
                 deletion.flatMap(_ =>
                   sensor.askWithStatus[String](x =>
-                    Sensor.Create[T](Scenario(scenarioId, engine, template.toString), x)
+                    Sensor.Create[T](Scenario(scenarioId, engine, template.toString, name), x)
                   )
                 )
               } {
@@ -78,6 +82,31 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]])(implicit
               }
               ret
             }
+          }
+        }
+      },
+      pathPrefix("v1" / "scenario") {
+        get {
+          onComplete(sensor.askWithStatus[String](x => Sensor.Query[T](x))) {
+            case Success(msg) =>
+              parse(msg).fold(
+                e => complete(StatusCodes.InternalServerError -> e.getMessage),
+                j =>
+                  complete(
+                    StatusCodes.OK,
+                    List(`Content-Type`(`application/json`)), {
+                      println(s"original: $j")
+                      val ret =
+                        j.mapArray(_.map(_.mapObject(_.remove("template").remove("engine"))))
+                      println(s"modified: $ret")
+                      ret
+                    }
+                  )
+              )
+            case Failure(StatusReply.ErrorMessage(reason)) =>
+              complete(StatusCodes.InternalServerError -> reason)
+            case Failure(e) =>
+              complete(StatusCodes.InternalServerError -> e.getMessage)
           }
         }
       }
