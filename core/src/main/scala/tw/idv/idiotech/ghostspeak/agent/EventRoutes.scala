@@ -95,10 +95,8 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]])(implicit
                   complete(
                     StatusCodes.OK,
                     List(`Content-Type`(`application/json`)), {
-                      println(s"original: $j")
                       val ret =
                         j.mapArray(_.map(_.mapObject(_.remove("template").remove("engine"))))
-                      println(s"modified: $ret")
                       ret
                     }
                   )

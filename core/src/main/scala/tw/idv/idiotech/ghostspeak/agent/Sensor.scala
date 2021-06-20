@@ -120,7 +120,7 @@ object Sensor {
         )
         .receiveSignal { case (state, RecoveryCompleted) =>
           val scns = state.values.map(s => createScenario(context, s.scenario))
-          println(s"====== recovery complete!")
+          println(s"====== recovery complete for $name")
           scns.foreach(println)
 
         }
