@@ -1,21 +1,25 @@
 package tw.idv.idiotech.ghostspeak.agent
 
-import akka.actor.typed.scaladsl.{ActorContext, Behaviors, TimerScheduler}
-import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
-import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior}
-import akka.persistence.typed.{PersistenceId, RecoveryCompleted}
+import akka.actor.typed.scaladsl.{ ActorContext, Behaviors, TimerScheduler }
+import akka.actor.typed.{ ActorRef, ActorSystem, Behavior }
+import akka.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
+import akka.persistence.typed.{ PersistenceId, RecoveryCompleted }
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Sense
 
 import scala.collection.SortedSet
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-import scala.util.{Failure, Success}
+import scala.util.{ Failure, Success }
 
 object Actuator {
 
   sealed trait Command[T]
-  case class Perform[T](action: Action[T], startTime: Long) extends Command[T] with Event[T] with Ordered[Perform[T]] {
+
+  case class Perform[T](action: Action[T], startTime: Long)
+      extends Command[T]
+      with Event[T]
+      with Ordered[Perform[T]] {
     override def compare(that: Perform[T]): Int = startTime.compare(that.startTime)
   }
   case class OK[T](action: Action[T]) extends Command[T]
@@ -29,11 +33,16 @@ object Actuator {
 
   type Discover[T] = (
     ActorContext[_],
-      Action[T],
-      ActorRef[Actuator.Command[T]]
-    ) => Option[ActorRef[Actuator.Command[T]]]
+    Action[T],
+    ActorRef[Actuator.Command[T]]
+  ) => Option[ActorRef[Actuator.Command[T]]]
 
-  def commandHandler[T, P](ctx: ActorContext[Command[T]], discover: Discover[T], sensor: ActorRef[Sensor.Command[P]], timer: TimerScheduler[Command[T]])(state: State[T], cmd: Command[T]) : Effect[Event[T], State[T]] = {
+  def commandHandler[T, P](
+    ctx: ActorContext[Command[T]],
+    discover: Discover[T],
+    sensor: ActorRef[Sensor.Command[P]],
+    timer: TimerScheduler[Command[T]]
+  )(state: State[T], cmd: Command[T]): Effect[Event[T], State[T]] = {
     def sendAction(action: Action[T]) = discover(ctx, action, ctx.self).foreach { a =>
       println("send action to child actuator")
       a ! Perform(action, System.currentTimeMillis())
@@ -50,7 +59,8 @@ object Actuator {
           Effect.none
         } else {
           println("delaying execution")
-          val earliest = state.map(_.startTime).find(_ > System.currentTimeMillis()).getOrElse(Long.MaxValue)
+          val earliest =
+            state.map(_.startTime).find(_ > System.currentTimeMillis()).getOrElse(Long.MaxValue)
           if (startTime < earliest) {
             timer.startSingleTimer(TimerKey, Timeout(), remainingTime.millis)
           }
@@ -59,9 +69,11 @@ object Actuator {
       case Timeout() =>
         val current = System.currentTimeMillis()
         val toExecute = state.filter(_.startTime <= current)
-        println(s"ready to execute: ${toExecute}")
+        println(s"ready to execute: $toExecute")
         toExecute.foreach(p => sendAction(p.action))
-        state.find(_.startTime > current).foreach(p => timer.startSingleTimer(TimerKey, Timeout(), (p.startTime - current).millis))
+        state
+          .find(_.startTime > current)
+          .foreach(p => timer.startSingleTimer(TimerKey, Timeout(), (p.startTime - current).millis))
         Effect.persist(ActionDone(toExecute))
       case OK(action) =>
         sensor ! Sense(action.toMessage(Modality.Done))
@@ -73,7 +85,7 @@ object Actuator {
   }
 
   def eventHandler[T](state: State[T], event: Event[T]): State[T] = event match {
-    case p: Perform[T] => state + p
+    case p: Perform[T]       => state + p
     case ActionDone(actions) => state diff actions
   }
 
@@ -91,7 +103,6 @@ object Actuator {
       )
     }
   }
-
 
   def fromFuture[T](
     send: Action[T] => Future[_],

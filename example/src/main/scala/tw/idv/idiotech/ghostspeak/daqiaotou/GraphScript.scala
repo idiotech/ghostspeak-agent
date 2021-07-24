@@ -32,6 +32,7 @@ object GraphScript {
         .flatten
         .toMap
   }
+
   object Node {
     val leave = Node("leave", Nil, Nil, Set.empty, Nil)
   }

@@ -12,9 +12,9 @@ import tw.idv.idiotech.ghostspeak.agent.{
   Scenario,
   Sensor,
   Session,
-  SystemPayload,
+  SystemPayload
 }
-import io.circe.parser.decode
+import io.circe.parser.{ decode, parse }
 import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.Node
 
 import java.util.UUID
@@ -36,36 +36,76 @@ object ScenarioCreator {
       else ret
     }
 
+  def fakeTextPayload = Right(EventPayload.Text("fake_text"))
+
+  val regexPattern = """regex:(.+)""".r
+  val containsPattern = """contains:(.+)""".r
+
+  def textMatches(reply: String, answer: String): Boolean =
+    answer match {
+      case regexPattern(text)    => text.r.matches(reply)
+      case containsPattern(text) => reply.contains(text)
+      case _                     => false
+    }
+
+  case class StringComparisonResult(matching: Option[Node] = None, fallback: Option[Node])
+
   def onCommand(
     user: String,
     actuator: ActorRef[Actuator.Command[Content]]
   )(state: State, command: Command): Effect[Node, State] = command match {
     case Sensor.Sense(message, replyTo) =>
+      def getEffect(node: Option[Node]): Effect[Node, State] = {
+        val performances = node.map(_.performances).getOrElse(Nil)
+        performances.foreach { p =>
+          val action = p.action.copy(session = Session(message.scenarioId, None))
+          val startTime = System.currentTimeMillis() + p.delay
+          actuator ! Perform(action, startTime)
+        }
+        node.fold[Effect[Node, State]](Effect.none)(n => Effect.persist(n))
+      }
+
       message.payload match {
         case Left(SystemPayload.Leave) =>
           println(s"user $user left")
           Effect.persist(Node.leave)
+        case Right(EventPayload.Text(reply)) =>
+          val forComparison = message.forComparison.copy(payload = fakeTextPayload)
+          def findMatch(matcher: (String, String) => Boolean): Option[Node] =
+            state
+              .find {
+                case (k, _) =>
+                  k.payload match {
+                    case Right(EventPayload.Text(answer)) =>
+                      k.copy(payload = fakeTextPayload) == forComparison && matcher(reply, answer)
+                    case Left(_) => false
+                  }
+                case _ => false
+              }
+              .map(_._2)
+          val node: Option[Node] = state
+            .get(message.forComparison)
+            .orElse(
+              findMatch(textMatches)
+            )
+            .orElse(findMatch((_, a) => a == "fallback:"))
+            .map(_.replace(user))
+          getEffect(node)
         case _ =>
           println(s"trigger = ${state.keys.headOption}")
           println(s"message = ${message.forComparison}")
           val node = state.get(message.forComparison).map(_.replace(user))
-          val performances = node.map(_.performances).getOrElse(Nil)
-          performances.foreach{ p =>
-            val action = p.action.copy(session = Session(message.scenarioId, None))
-            val startTime = System.currentTimeMillis() + p.delay
-            actuator ! Perform(action, startTime)
-          }
-          node.fold[Effect[Node, State]](Effect.none)(n => Effect.persist(n))
+          getEffect(node)
       }
     case Sensor.Create(scenario, replyTo)    => Effect.none
     case Sensor.Destroy(scenarioId, replyTo) => Effect.none
   }
 
   def createScript(scenario: Scenario) =
-      decode[List[Node]](scenario.template)
-        .fold(throw _, identity)
-        .map(n => n.name -> n)
-        .toMap
+    decode[List[Node]](scenario.template)
+      .fold(throw _, identity)
+      .map(n => n.name -> n)
+      .toMap
 
   def ub(
     scenario: Scenario
