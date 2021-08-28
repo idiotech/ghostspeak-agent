@@ -1,13 +1,13 @@
 package tw.idv.idiotech.ghostspeak.agent
 
 import akka.actor.typed.scaladsl.Behaviors
-import akka.actor.typed.{ ActorSystem, Behavior, PostStop }
+import akka.actor.typed.{ActorRef, ActorSystem, Behavior, PostStop}
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.Http
 import io.circe.Decoder
 
 import scala.concurrent.Future
-import scala.util.{ Failure, Success }
+import scala.util.{Failure, Success}
 
 object Server {
 
@@ -18,14 +18,15 @@ object Server {
 
   def apply[P: Decoder](
     behavior: Behavior[Sensor.Command[P]],
+    routing: (ActorRef[Sensor.Command[P]], ActorSystem[_]) => EventRoutes[P] ,
     host: String,
     port: Int
   ): Behavior[Msg] =
     Behaviors.setup { ctx =>
       implicit val system = ctx.system
 
-      val dummySensor = ctx.spawn(behavior, "RootSensor")
-      val routes = new EventRoutes(dummySensor)
+      val dummySensor: ActorRef[Sensor.Command[P]] = ctx.spawn(behavior, "RootSensor")
+      val routes = routing(dummySensor, system)
 
       val serverBinding: Future[Http.ServerBinding] =
         Http().newServerAt(host, port).bind(routes.theEventRoutes)

@@ -14,7 +14,7 @@ import tw.idv.idiotech.ghostspeak.agent.{
   Session,
   SystemPayload
 }
-import io.circe.parser.{ decode, parse }
+import io.circe.parser.{ decode }
 import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.Node
 
 import java.util.UUID
@@ -62,6 +62,7 @@ object ScenarioCreator {
           val startTime = System.currentTimeMillis() + p.delay
           actuator ! Perform(action, startTime)
         }
+        println(s"=== transition to node: $node")
         node.fold[Effect[Node, State]](Effect.none)(n => Effect.persist(n))
       }
 
@@ -92,7 +93,7 @@ object ScenarioCreator {
             .map(_.replace(user))
           getEffect(node)
         case _ =>
-          println(s"trigger = ${state.keys.headOption}")
+          println(s"trigger = ${state.keys}")
           println(s"message = ${message.forComparison}")
           val node = state.get(message.forComparison).map(_.replace(user))
           getEffect(node)
