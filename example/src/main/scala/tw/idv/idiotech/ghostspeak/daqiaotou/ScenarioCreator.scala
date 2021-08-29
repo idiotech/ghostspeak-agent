@@ -5,7 +5,7 @@ import akka.actor.typed.scaladsl.{ ActorContext, Behaviors }
 import akka.persistence.typed.PersistenceId
 import akka.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
 import tw.idv.idiotech.ghostspeak.agent.Actuator.Perform
-import tw.idv.idiotech.ghostspeak.agent.Sensor.{ onCommandPerUser, Command }
+import tw.idv.idiotech.ghostspeak.agent.Sensor.{ onCommandPerUser, Command, Created }
 import tw.idv.idiotech.ghostspeak.agent.{
   Actuator,
   FcmSender,
@@ -14,10 +14,11 @@ import tw.idv.idiotech.ghostspeak.agent.{
   Session,
   SystemPayload
 }
-import io.circe.parser.{ decode }
+import io.circe.parser.decode
 import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.Node
 
 import java.util.UUID
+import scala.util.Try
 
 object ScenarioCreator {
 
@@ -108,11 +109,10 @@ object ScenarioCreator {
       .map(n => n.name -> n)
       .toMap
 
-  def ub(
-    scenario: Scenario
-  )(userScenario: Scenario, actuator: ActorRef[Actuator.Command[Content]]) =
+  def ub(userScenario: Scenario, actuator: ActorRef[Actuator.Command[Content]])(implicit
+    script: Map[String, Node]
+  ) =
     Behaviors.setup[Command] { ctx =>
-      implicit val script: Map[String, Node] = createScript(scenario)
       val user = userScenario.id
       val initial: Node = script("initial").replace(user)
       EventSourcedBehavior[Command, Node, State](
@@ -125,10 +125,10 @@ object ScenarioCreator {
 
   def createUserScenario(
     actuatorRef: ActorRef[Actuator.Command[Content]]
-  )(
-    scenario: Scenario
-  )(actorContext: ActorContext[_], userScenario: Scenario): Option[ActorRef[Command]] =
-    Some(actorContext.spawn(ub(scenario)(userScenario, actuatorRef), userScenario.id))
+  )(actorContext: ActorContext[_], created: Created[EventPayload])(implicit
+    script: Map[String, Node]
+  ): Either[String, ActorRef[Command]] =
+    Right(actorContext.spawn(ub(created.scenario, actuatorRef), created.scenario.id))
 
   val scenarioBehavior: Behavior[Command] =
     Behaviors.setup[Command] { ctx =>
@@ -149,12 +149,26 @@ object ScenarioCreator {
       // TODO check engine before deciding actor
       Sensor[EventPayload](
         "root",
-        (ctx, scn) =>
-          if (scn.engine == "graphscript") {
-            val actor: Behavior[Sensor.Command[EventPayload]] =
-              Sensor(scn.id, createUserScenario(actuatorRef)(scn), onCommandPerUser[EventPayload])
-            Some(ctx.spawn(actor, UUID.randomUUID().toString))
-          } else None
+        (ctx, created) =>
+          if (created.scenario.engine == "graphscript")
+            Try {
+              val scn = created.scenario
+              implicit val script: Map[String, Node] = createScript(scn)
+              val actor: Behavior[Sensor.Command[EventPayload]] =
+                Sensor(scn.id, createUserScenario(actuatorRef), onCommandPerUser[EventPayload])
+              ctx.spawn(
+                actor,
+                if (created.uniqueId.nonEmpty) created.uniqueId else UUID.randomUUID().toString
+              )
+            }
+              .fold(
+                e => {
+                  e.printStackTrace()
+                  Left(s"invalid template: ${e.getMessage}")
+                },
+                Right(_)
+              )
+          else Left("not a graphscript scenario")
       )
     }
 

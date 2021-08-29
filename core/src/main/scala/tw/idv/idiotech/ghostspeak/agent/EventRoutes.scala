@@ -19,7 +19,8 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{ Failure, Success }
 
-class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: ActorSystem[_]) extends FailFastCirceSupport {
+class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: ActorSystem[_])
+    extends FailFastCirceSupport {
 
   import akka.actor.typed.scaladsl.AskPattern.schedulerFromActorSystem
   import akka.actor.typed.scaladsl.AskPattern.Askable
@@ -107,6 +108,6 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
   )
 
   lazy val theEventRoutes: Route = cors() {
-    concat(routes :_*)
+    concat(routes: _*)
   }
 }

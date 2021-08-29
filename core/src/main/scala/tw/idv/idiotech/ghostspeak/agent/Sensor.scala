@@ -34,8 +34,8 @@ object Sensor {
 
   type CreatorScenarioActor[P] = (
     ActorContext[_],
-    Scenario
-  ) => Option[ActorRef[Command[P]]]
+    Created[P]
+  ) => Either[String, ActorRef[Command[P]]]
 
   type Reff[P] = ReplyEffect[Event[P], State[P]]
 
@@ -48,9 +48,12 @@ object Sensor {
     createChild: CreatorScenarioActor[P]
   )(state: State[P], cmd: Command[P]): Reff[P] = cmd match {
     case Sense(message, replyTo) =>
+//      println(s"state = $state")
+      val id = state.get(message.scenarioId).map(_.uniqueId).getOrElse("invalid")
+      println(s"id = $id, test = ${ctx.children}")
       val reply: StatusReply[String] =
         ctx
-          .getChild[P](state.get(message.scenarioId).map(_.uniqueId).getOrElse("invalid"))
+          .getChild[P](id)
           .fold[StatusReply[String]](
             StatusReply.Error("no such scenario")
           ) { actor =>
@@ -64,14 +67,14 @@ object Sensor {
       }
     case Create(scenario, replyTo) =>
       if (!state.contains(scenario.id))
-        createChild(ctx, scenario)
-          .fold[Reff[P]] {
-            Effect.reply(replyTo)(StatusReply.Error("no such engine"))
-          } { actor =>
-            Effect
-              .persist(Created[P](scenario, actor.path.name))
-              .thenReply(replyTo)(_ => StatusReply.Success("created"))
-          }
+        createChild(ctx, Created(scenario, ""))
+          .fold[Reff[P]](
+            e => Effect.reply(replyTo)(StatusReply.Error(s"invalid scenario: $e")),
+            actor =>
+              Effect
+                .persist(Created[P](scenario, actor.path.name))
+                .thenReply(replyTo)(_ => StatusReply.Success("created"))
+          )
       else Effect.reply(replyTo)(StatusReply.Error("already exists"))
     case Destroy(id, replyTo) =>
       state
@@ -119,7 +122,7 @@ object Sensor {
           eventHandler = onEvent
         )
         .receiveSignal { case (state, RecoveryCompleted) =>
-          val scns = state.values.map(s => createScenario(context, s.scenario))
+          val scns = state.values.map(s => createScenario(context, s))
           println(s"====== recovery complete for $name")
           scns.foreach(println)
 
@@ -135,26 +138,17 @@ object Sensor {
       case Sense(message, _) =>
         val scenario = Scenario(message.sender, message.scenarioId, "")
         val existingActor = ctx.getChild[P](message.sender)
-        val maybeActor = existingActor.orElse {
-          create(ctx, scenario)
+        val maybeActor = existingActor.toRight("no such user").orElse {
+          create(ctx, Created(scenario, ""))
         }
         maybeActor.foreach(_ ! Sense(message))
         if (existingActor.isEmpty) {
-          maybeActor.fold[Reff[P]](Effect.noReply) { s =>
-            Effect.persist(Created[P](scenario)).thenNoReply()
-          }
+          maybeActor.fold[Reff[P]](
+            e => Effect.noReply,
+            s => Effect.persist(Created[P](scenario)).thenNoReply()
+          )
         } else Effect.noReply
       case _ => general(state, cmd)
     }
   }
-
-  def perUser[P](name: String, createScenarioPerUser: Scenario => CreatorScenarioActor[P]) =
-    apply[P](
-      name,
-      { (ctx, scn) =>
-        val actor = apply[P](scn.id, createScenarioPerUser(scn), onCommandPerUser[P])
-        Some(ctx.spawn(actor, scn.id))
-      }
-    )
-
 }
