@@ -27,8 +27,8 @@ object Actuator {
   case class Timeout[T]() extends Command[T]
   sealed trait Event[T]
   type PendingAction[T] = Perform[T]
-  case class ActionDone[T](actions: SortedSet[PendingAction[T]]) extends Event[T]
-  type State[T] = SortedSet[PendingAction[T]]
+  case class ActionDone[T](actions: Set[PendingAction[T]]) extends Event[T]
+  type State[T] = Set[PendingAction[T]]
   private case object TimerKey
 
   type Discover[T] = (
@@ -44,36 +44,42 @@ object Actuator {
     timer: TimerScheduler[Command[T]]
   )(state: State[T], cmd: Command[T]): Effect[Event[T], State[T]] = {
     def sendAction(action: Action[T]) = discover(ctx, action, ctx.self).foreach { a =>
-      println("send action to child actuator")
+      println(s"send action to child actuator: ${action.id} to actor ${a.path}")
       a ! Perform(action, System.currentTimeMillis())
       sensor ! Sense(action.toMessage(Modality.Doing))
     }
 
     cmd match {
       case p @ Perform(action, startTime) =>
-        println(s"current time = ${System.currentTimeMillis()}; start time = $startTime")
         val remainingTime = startTime - System.currentTimeMillis()
         if (remainingTime <= 0) {
-          println("executing immediately")
+          println(s"executing immediately: ${action.id}")
           sendAction(action)
           Effect.none
         } else {
-          println("delaying execution")
+          println(s"delaying execution: ${action.id}")
           val earliest =
             state.map(_.startTime).find(_ > System.currentTimeMillis()).getOrElse(Long.MaxValue)
-          if (startTime < earliest) {
+          if (startTime <= earliest) {
+            println(s"set timer for ${action.id} after ${remainingTime.millis}")
             timer.startSingleTimer(TimerKey, Timeout(), remainingTime.millis)
+          } else {
+            println(s"not setting timer for ${action.id}; start time = ${startTime}, earliest = $earliest")
           }
           Effect.persist(p)
         }
       case Timeout() =>
         val current = System.currentTimeMillis()
+        println(s"total queue at $current: ${state.map(_.action.id)}")
         val toExecute = state.filter(_.startTime <= current)
-        println(s"ready to execute: $toExecute")
-        toExecute.foreach(p => sendAction(p.action))
+        println(s"ready to execute: ${toExecute.map(_.action.id)}")
+        toExecute.toList.sorted.foreach(p => sendAction(p.action))
         state
           .find(_.startTime > current)
-          .foreach(p => timer.startSingleTimer(TimerKey, Timeout(), (p.startTime - current).millis))
+          .foreach { p =>
+            println(s"set timer again for ${p.action.id} after ${(p.startTime - current).millis}")
+            timer.startSingleTimer(TimerKey, Timeout(), (p.startTime - current).millis)
+          }
         Effect.persist(ActionDone(toExecute))
       case OK(action) =>
         sensor ! Sense(action.toMessage(Modality.Done))
@@ -85,8 +91,16 @@ object Actuator {
   }
 
   def eventHandler[T](state: State[T], event: Event[T]): State[T] = event match {
-    case p: Perform[T]       => state + p
-    case ActionDone(actions) => state diff actions
+    case p: Perform[T] =>
+      println(s"adding to state: ${p.action.id}")
+      val ret = state ++ Set(p)
+      println(s"latest state: ${state.map(_.action.id)}")
+      ret
+    case ActionDone(actions) =>
+      println(s"removing from to state: ${actions.map(_.action.id)}}")
+      val ret = state diff actions
+      println(s"latest state: ${state.map(_.action.id)}")
+      ret
   }
 
   def apply[T, P](
@@ -97,7 +111,7 @@ object Actuator {
     Behaviors.setup { ctx =>
       EventSourcedBehavior[Command[T], Event[T], State[T]](
         persistenceId = PersistenceId.ofUniqueId(s"actuator-$name"),
-        emptyState = SortedSet.empty,
+        emptyState = Set.empty,
         commandHandler = commandHandler(ctx, discover, sensor, timer),
         eventHandler = eventHandler
       )

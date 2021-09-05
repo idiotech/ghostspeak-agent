@@ -26,11 +26,15 @@ object GraphScript {
         children
       )
 
-    def childMap(user: String)(implicit map: Map[String, Node]): Map[Message, Node] =
+    def childMap(user: String)(implicit map: Map[String, Node]) =
       children
         .flatMap(name => map.get(name).map(_.replace(user)).map(n => n.triggers.map(_ -> n)))
         .flatten
+        .groupBy(_._1)
+        .view
+        .mapValues(_.map(_._2))
         .toMap
+
   }
 
   object Node {

@@ -16,6 +16,7 @@ import tw.idv.idiotech.ghostspeak.agent.{
 }
 import io.circe.parser.decode
 import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.Node
+import cats.implicits._
 
 import java.util.UUID
 import scala.util.Try
@@ -23,18 +24,33 @@ import scala.util.Try
 object ScenarioCreator {
 
   type Command = Sensor.Command[EventPayload]
-  type State = Map[Message, Node]
+  type State = Map[Message, List[Node]]
 
   def onEvent(
     user: String
-  )(state: State, event: Node)(implicit script: Map[String, Node]): State =
-    if (event == Node.leave) {
+  )(state: State, events: List[Node])(implicit script: Map[String, Node]): State =
+    if (events == List(Node.leave)) {
       val initial = script("initial").replace(user)
-      initial.triggers.map(_ -> initial).toMap
+      initial.triggers.map(_ -> List(initial)).toMap
     } else {
-      val ret = (state -- event.triggers) ++ event.childMap(user)
-      if (event.exclusiveWith.nonEmpty) ret.filter(p => !event.exclusiveWith.contains(p._2.name))
-      else ret
+      val removalMap =
+        events.flatMap(n => n.triggers.map(_ -> n)).groupBy(_._1).map(p => p._1 -> p._2.map(_._2))
+      val triggerMap: Map[Message, List[Node]] = events.map(_.childMap(user)).reduce(_ |+| _)
+      val ret: State = triggerMap.toList.foldLeft(state) { (s, trigger) =>
+        val nodes = (s.getOrElse(trigger._1, Nil) ++ trigger._2).distinct
+        if (nodes.nonEmpty) s + (trigger._1 -> nodes) else s - trigger._1
+      }
+      val removed = removalMap.toList.foldLeft(ret) { (s, trigger) =>
+        val nodes = s.getOrElse(trigger._1, Nil).filterNot(trigger._2.toSet.contains).distinct
+        if (nodes.nonEmpty) s + (trigger._1 -> nodes) else s - trigger._1
+      }
+      events
+        .foldLeft(removed) { (s, node) =>
+          if (node.exclusiveWith.nonEmpty) {
+            s.view.mapValues(_.filterNot(n => node.exclusiveWith.contains(n.name))).toMap
+          } else s
+        }
+        .filter(_._2.nonEmpty)
     }
 
   def fakeTextPayload = Right(EventPayload.Text("fake_text"))
@@ -54,26 +70,27 @@ object ScenarioCreator {
   def onCommand(
     user: String,
     actuator: ActorRef[Actuator.Command[Content]]
-  )(state: State, command: Command): Effect[Node, State] = command match {
+  )(state: State, command: Command): Effect[List[Node], State] = command match {
     case Sensor.Sense(message, replyTo) =>
-      def getEffect(node: Option[Node]): Effect[Node, State] = {
-        val performances = node.map(_.performances).getOrElse(Nil)
+      def getEffect(nodes: List[Node]): Effect[List[Node], State] = {
+        val performances = nodes.flatMap(_.performances)
         performances.foreach { p =>
           val action = p.action.copy(session = Session(message.scenarioId, None))
           val startTime = System.currentTimeMillis() + p.delay
+          println(s"carrying out ${Perform(action, startTime)}")
           actuator ! Perform(action, startTime)
         }
-        println(s"=== transition to node: $node")
-        node.fold[Effect[Node, State]](Effect.none)(n => Effect.persist(n))
+        nodes.foreach(n => println(s"transition to ${n.name}"))
+        if (nodes.nonEmpty) Effect.persist(nodes) else Effect.none
       }
 
       message.payload match {
         case Left(SystemPayload.Leave) =>
           println(s"user $user left")
-          Effect.persist(Node.leave)
+          Effect.persist(List(Node.leave))
         case Right(EventPayload.Text(reply)) =>
           val forComparison = message.forComparison.copy(payload = fakeTextPayload)
-          def findMatch(matcher: (String, String) => Boolean): Option[Node] =
+          def findMatch(matcher: (String, String) => Boolean): Option[List[Node]] =
             state
               .find {
                 case (k, _) =>
@@ -85,18 +102,24 @@ object ScenarioCreator {
                 case _ => false
               }
               .map(_._2)
-          val node: Option[Node] = state
+              .filter(_.nonEmpty)
+          val nodes: List[Node] = state
             .get(message.forComparison)
             .orElse(
               findMatch(textMatches)
             )
             .orElse(findMatch((_, a) => a == "fallback:"))
+            .getOrElse(Nil)
             .map(_.replace(user))
-          getEffect(node)
+          getEffect(nodes)
         case _ =>
           println(s"trigger = ${state.keys}")
           println(s"message = ${message.forComparison}")
-          val node = state.get(message.forComparison).map(_.replace(user))
+          val node = state
+            .get(message.forComparison)
+            .map(_.map(_.replace(user)))
+            .filter(_.nonEmpty)
+            .getOrElse(Nil)
           getEffect(node)
       }
     case Sensor.Create(scenario, replyTo)    => Effect.none
@@ -115,9 +138,9 @@ object ScenarioCreator {
     Behaviors.setup[Command] { ctx =>
       val user = userScenario.id
       val initial: Node = script("initial").replace(user)
-      EventSourcedBehavior[Command, Node, State](
+      EventSourcedBehavior[Command, List[Node], State](
         persistenceId = PersistenceId.ofUniqueId(s"scn-$user"),
-        emptyState = initial.triggers.map(_ -> initial).toMap,
+        emptyState = initial.triggers.map(_ -> List(initial)).toMap,
         commandHandler = onCommand(user, actuator),
         eventHandler = onEvent(user)
       )

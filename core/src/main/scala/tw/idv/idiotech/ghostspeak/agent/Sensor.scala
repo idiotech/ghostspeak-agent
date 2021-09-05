@@ -50,7 +50,6 @@ object Sensor {
     case Sense(message, replyTo) =>
 //      println(s"state = $state")
       val id = state.get(message.scenarioId).map(_.uniqueId).getOrElse("invalid")
-      println(s"id = $id, test = ${ctx.children}")
       val reply: StatusReply[String] =
         ctx
           .getChild[P](id)
