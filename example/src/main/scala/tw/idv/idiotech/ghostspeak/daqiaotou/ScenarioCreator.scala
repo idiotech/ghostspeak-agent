@@ -17,11 +17,12 @@ import tw.idv.idiotech.ghostspeak.agent.{
 import io.circe.parser.decode
 import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.Node
 import cats.implicits._
+import com.typesafe.scalalogging.LazyLogging
 
 import java.util.UUID
 import scala.util.Try
 
-object ScenarioCreator {
+object ScenarioCreator extends LazyLogging {
 
   type Command = Sensor.Command[EventPayload]
   type State = Map[Message, List[Node]]
@@ -77,16 +78,16 @@ object ScenarioCreator {
         performances.foreach { p =>
           val action = p.action.copy(session = Session(message.scenarioId, None))
           val startTime = System.currentTimeMillis() + p.delay
-          println(s"carrying out ${Perform(action, startTime)}")
+          logger.info(s"carrying out ${Perform(action, startTime)}")
           actuator ! Perform(action, startTime)
         }
-        nodes.foreach(n => println(s"transition to ${n.name}"))
+        nodes.foreach(n => logger.info(s"transition to ${n.name}"))
         if (nodes.nonEmpty) Effect.persist(nodes) else Effect.none
       }
 
       message.payload match {
         case Left(SystemPayload.Leave) =>
-          println(s"user $user left")
+          logger.info(s"user $user left")
           Effect.persist(List(Node.leave))
         case Right(EventPayload.Text(reply)) =>
           val forComparison = message.forComparison.copy(payload = fakeTextPayload)
@@ -113,8 +114,8 @@ object ScenarioCreator {
             .map(_.replace(user))
           getEffect(nodes)
         case _ =>
-          println(s"trigger = ${state.keys}")
-          println(s"message = ${message.forComparison}")
+          logger.info(s"trigger = ${state.keys}")
+          logger.info(s"message = ${message.forComparison}")
           val node = state
             .get(message.forComparison)
             .map(_.map(_.replace(user)))

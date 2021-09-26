@@ -4,15 +4,15 @@ import akka.actor.typed.scaladsl.{ ActorContext, Behaviors, TimerScheduler }
 import akka.actor.typed.{ ActorRef, ActorSystem, Behavior }
 import akka.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
 import akka.persistence.typed.{ PersistenceId, RecoveryCompleted }
+import com.typesafe.scalalogging.LazyLogging
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Sense
 
 import scala.collection.SortedSet
 import scala.concurrent.Future
 import scala.concurrent.duration._
-
 import scala.util.{ Failure, Success }
 
-object Actuator {
+object Actuator extends LazyLogging {
 
   sealed trait Command[T]
 
@@ -44,7 +44,7 @@ object Actuator {
     timer: TimerScheduler[Command[T]]
   )(state: State[T], cmd: Command[T]): Effect[Event[T], State[T]] = {
     def sendAction(action: Action[T]) = discover(ctx, action, ctx.self).foreach { a =>
-      println(s"send action to child actuator: ${action.id} to actor ${a.path}")
+      logger.info(s"send action to child actuator: ${action.id} to actor ${a.path}")
       a ! Perform(action, System.currentTimeMillis())
       sensor ! Sense(action.toMessage(Modality.Doing))
     }
@@ -53,31 +53,35 @@ object Actuator {
       case p @ Perform(action, startTime) =>
         val remainingTime = startTime - System.currentTimeMillis()
         if (remainingTime <= 0) {
-          println(s"executing immediately: ${action.id}")
+          logger.info(s"executing immediately: ${action.id}")
           sendAction(action)
           Effect.none
         } else {
-          println(s"delaying execution: ${action.id}")
+          logger.info(s"delaying execution: ${action.id}")
           val earliest =
             state.map(_.startTime).find(_ > System.currentTimeMillis()).getOrElse(Long.MaxValue)
           if (startTime <= earliest) {
-            println(s"set timer for ${action.id} after ${remainingTime.millis}")
+            logger.info(s"set timer for ${action.id} after ${remainingTime.millis}")
             timer.startSingleTimer(TimerKey, Timeout(), remainingTime.millis)
           } else {
-            println(s"not setting timer for ${action.id}; start time = ${startTime}, earliest = $earliest")
+            logger.info(
+              s"not setting timer for ${action.id}; start time = $startTime, earliest = $earliest"
+            )
           }
           Effect.persist(p)
         }
       case Timeout() =>
         val current = System.currentTimeMillis()
-        println(s"total queue at $current: ${state.map(_.action.id)}")
+        logger.info(s"total queue at $current: ${state.map(x => s"${x.action.id} ${x.startTime}")}")
         val toExecute = state.filter(_.startTime <= current)
-        println(s"ready to execute: ${toExecute.map(_.action.id)}")
+        logger.info(s"ready to execute: ${toExecute.map(_.action.id)}")
         toExecute.toList.sorted.foreach(p => sendAction(p.action))
-        state
+        state.toList.sorted
           .find(_.startTime > current)
           .foreach { p =>
-            println(s"set timer again for ${p.action.id} after ${(p.startTime - current).millis}")
+            logger.info(
+              s"set timer again for ${p.action.id} after ${(p.startTime - current).millis}"
+            )
             timer.startSingleTimer(TimerKey, Timeout(), (p.startTime - current).millis)
           }
         Effect.persist(ActionDone(toExecute))
@@ -92,14 +96,14 @@ object Actuator {
 
   def eventHandler[T](state: State[T], event: Event[T]): State[T] = event match {
     case p: Perform[T] =>
-      println(s"adding to state: ${p.action.id}")
+      logger.info(s"adding to state: ${p.action.id}")
       val ret = state ++ Set(p)
-      println(s"latest state: ${state.map(_.action.id)}")
+      logger.info(s"latest state: ${state.map(_.action.id)}")
       ret
     case ActionDone(actions) =>
-      println(s"removing from to state: ${actions.map(_.action.id)}}")
+      logger.info(s"removing from to state: ${actions.map(_.action.id)}}")
       val ret = state diff actions
-      println(s"latest state: ${state.map(_.action.id)}")
+      logger.info(s"latest state: ${state.map(_.action.id)}")
       ret
   }
 

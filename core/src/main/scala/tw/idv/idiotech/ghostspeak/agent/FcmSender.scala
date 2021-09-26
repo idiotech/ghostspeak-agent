@@ -41,7 +41,7 @@ object FcmSender extends LazyLogging {
   )(implicit actorSystem: ActorSystem[_], encoder: Encoder[Action[T]]): Future[Done] =
     Source
       .single {
-        println(s"sending action: ${action.asJson.toString()} to receiver: ${action.receiver}")
+        logger.info(s"sending action: ${action.asJson.toString()} to receiver: ${action.receiver}")
         FcmNotification.empty
           .withData(
             Map("action" -> action.asJson.toString())
@@ -51,10 +51,10 @@ object FcmSender extends LazyLogging {
       .via(RestartFlow.onFailuresWithBackoff(settings)(() => GoogleFcm.send(fcmConfig)))
       .map {
         case res @ FcmSuccessResponse(name) =>
-          println(s"Successful $name")
+          logger.info(s"Successful $name")
           res
         case res @ FcmErrorResponse(errorMessage) =>
-          println(s"Send error $errorMessage")
+          logger.info(s"Send error $errorMessage")
           res
       }
       .runWith(Sink.ignore)

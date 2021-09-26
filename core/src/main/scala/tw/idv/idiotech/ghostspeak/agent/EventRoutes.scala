@@ -11,6 +11,7 @@ import akka.http.scaladsl.model.headers.`Content-Type`
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import akka.pattern.StatusReply
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
+import com.typesafe.scalalogging.LazyLogging
 import io.circe.Decoder
 import io.circe.Json
 import io.circe.parser.parse
@@ -20,7 +21,8 @@ import scala.concurrent.duration._
 import scala.util.{ Failure, Success }
 
 class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: ActorSystem[_])
-    extends FailFastCirceSupport {
+    extends FailFastCirceSupport
+    with LazyLogging {
 
   import akka.actor.typed.scaladsl.AskPattern.schedulerFromActorSystem
   import akka.actor.typed.scaladsl.AskPattern.Askable
@@ -60,9 +62,9 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
           entity(as[Json]) { template =>
             val ret: Route = onComplete {
               val deletion = if (overwrite) {
-                println("overwriting!")
+                logger.info("overwriting!")
                 sensor.askWithStatus[String](x => Sensor.Destroy[T](scenarioId, x)).recover {
-                  case e => println(e)
+                  case e => logger.error("failed to delete scanario", e)
                 }
               } else Future.unit
               deletion.flatMap(_ =>

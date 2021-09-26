@@ -5,12 +5,13 @@ import akka.actor.typed.{ ActorRef, Behavior }
 import akka.pattern.StatusReply
 import akka.persistence.typed.{ PersistenceId, RecoveryCompleted }
 import akka.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior, ReplyEffect }
+import com.typesafe.scalalogging.LazyLogging
 import io.circe.generic.extras.ConfiguredJsonCodec
 import io.circe.syntax._
 
 import java.util.UUID
 
-object Sensor {
+object Sensor extends LazyLogging {
   sealed trait Command[P]
 
   case class Sense[P](message: Message[P], replyTo: Option[ActorRef[StatusReply[String]]] = None)
@@ -48,7 +49,7 @@ object Sensor {
     createChild: CreatorScenarioActor[P]
   )(state: State[P], cmd: Command[P]): Reff[P] = cmd match {
     case Sense(message, replyTo) =>
-//      println(s"state = $state")
+//      logger.info(s"state = $state")
       val id = state.get(message.scenarioId).map(_.uniqueId).getOrElse("invalid")
       val reply: StatusReply[String] =
         ctx
@@ -82,7 +83,7 @@ object Sensor {
           Effect.reply(replyTo)(StatusReply.Error("doesn't exist"))
         } { created =>
           ctx.child(created.uniqueId).foreach { a =>
-            println(s"stopping $a")
+            logger.info(s"stopping $a")
             ctx.stop(a)
           }
           Effect
@@ -122,7 +123,7 @@ object Sensor {
         )
         .receiveSignal { case (state, RecoveryCompleted) =>
           val scns = state.values.map(s => createScenario(context, s))
-          println(s"====== recovery complete for $name")
+          logger.info(s"====== recovery complete for $name")
           scns.foreach(println)
 
         }
