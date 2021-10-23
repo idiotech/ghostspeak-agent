@@ -114,8 +114,10 @@ object ScenarioCreator extends LazyLogging {
             .map(_.replace(user))
           getEffect(nodes)
         case _ =>
-          logger.info(s"trigger = ${state.keys}")
-          logger.info(s"message = ${message.forComparison}")
+          state.keys.foreach { k =>
+            logger.info(s"trigger: ${k.actionId} ${k.payload}")
+          }
+          logger.info(s"message: ${message.actionId} ${message.payload}")
           val node = state
             .get(message.forComparison)
             .map(_.map(_.replace(user)))

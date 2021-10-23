@@ -43,7 +43,9 @@ package object agent {
     @description("Content to be shown or played. Can be text/image popup, sound or marker.")
     content: Content,
     @description("The session ID indicates a chapter, episode, etc.")
-    session: Session
+    session: Session,
+    @description("Human-readable info for the action")
+    description: Option[String] = None
   ) {
 
     def toMessage[T](modality: Modality) =

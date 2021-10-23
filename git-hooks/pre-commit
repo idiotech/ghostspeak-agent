@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 echo -e "Scalafmt RUNNING"
-scalafmt --git true --diff -c .scalafmt.conf
+scalafmt --mode diff -c .scalafmt.conf
 RESULT=$?
 if [ ${RESULT} -ne 0 ]; then
     echo -e "Scalafmt FAILED"

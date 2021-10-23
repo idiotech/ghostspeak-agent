@@ -28,7 +28,6 @@ package object daqiaotou {
     case object Welcome extends Destination with UpperSnakecase
 
     case object Notification extends Destination with UpperSnakecase
-
   }
 
   @typeHint[String]
@@ -54,6 +53,18 @@ package object daqiaotou {
     case object Enter extends BeaconType with UpperSnakecase
 
     case object Exit extends BeaconType with UpperSnakecase
+
+  }
+
+  @typeHint[String]
+  sealed trait IncomingCallType extends EnumEntry
+
+  object IncomingCallType extends Enum[IncomingCallType] with CirceEnum[IncomingCallType] {
+    val values: immutable.IndexedSeq[IncomingCallType] = findValues
+
+    case object Connecting extends IncomingCallType with UpperSnakecase
+    case object Connected extends IncomingCallType with UpperSnakecase
+    case object Disconnected extends IncomingCallType with UpperSnakecase
 
   }
 
@@ -95,6 +106,22 @@ package object daqiaotou {
       destinations: Set[Destination] = Set.empty
     ) extends Task
 
+    @title("Close popup message")
+    @description("Client should close popup message")
+    case class PopupDismissal(
+      @description("Destinations to be dismissed")
+      destinations: Set[Destination] = Set.empty
+    ) extends Task
+
+    @title("Incoming call")
+    @description("Client should show an incoming call message.")
+    case class IncomingCall(
+      @description("The marker to delete; should be the action id that adds the marker.")
+      caller: String,
+      status: IncomingCallType,
+      portrait: String
+    ) extends Task
+
     @title("Sound message")
     @description("Client should play the sound.")
     case class Sound(
@@ -123,7 +150,6 @@ package object daqiaotou {
       @description("The marker to delete; should be the action id that adds the marker.")
       id: String
     ) extends Task
-
   }
 
   @ConfiguredJsonCodec
