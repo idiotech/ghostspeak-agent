@@ -113,6 +113,8 @@ object ScenarioCreator extends LazyLogging {
             .getOrElse(Nil)
             .map(_.replace(user))
           getEffect(nodes)
+        case Right(EventPayload.GoldenFinger) =>
+          getEffect(state.values.toList. flatten)
         case _ =>
           state.keys.foreach { k =>
             logger.info(s"trigger: ${k.actionId} ${k.payload}")

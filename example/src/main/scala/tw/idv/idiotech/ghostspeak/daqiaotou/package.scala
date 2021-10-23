@@ -194,6 +194,7 @@ package object daqiaotou {
   object EventPayload {
 
     case class Text(text: String) extends EventPayload
+    case object GoldenFinger extends EventPayload
 
   }
 
