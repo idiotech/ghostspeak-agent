@@ -71,17 +71,23 @@ object ScenarioCreator extends LazyLogging {
   def onCommand(
     user: String,
     actuator: ActorRef[Actuator.Command[Content]]
-  )(state: State, command: Command): Effect[List[Node], State] = command match {
+  )(state: State, command: Command)(implicit script: Map[String, Node]): Effect[List[Node], State] = command match {
     case Sensor.Sense(message, replyTo) =>
       def getEffect(nodes: List[Node]): Effect[List[Node], State] = {
-        val performances = nodes.flatMap(_.performances)
-        performances.foreach { p =>
-          val action = p.action.copy(session = Session(message.scenarioId, None))
-          val startTime = System.currentTimeMillis() + p.delay
-          logger.info(s"carrying out ${Perform(action, startTime)}")
-          actuator ! Perform(action, startTime)
+        nodes.foreach { n =>
+          n.performances.foreach { p =>
+            val action = p
+              .action
+              .copy(
+                session = Session(message.scenarioId, None),
+                content = p.action.content.copy(exclusiveWith = n.exclusiveWith.toList.flatMap(e => script.get(e)).flatMap(_.performances.map(_.action.id)))
+              )
+            val startTime = System.currentTimeMillis() + p.delay
+            logger.info(s"carrying out ${Perform(action, startTime)}")
+            actuator ! Perform(action, startTime)
+          }
+          logger.info(s"transition to ${n.name}")
         }
-        nodes.foreach(n => logger.info(s"transition to ${n.name}"))
         if (nodes.nonEmpty) Effect.persist(nodes) else Effect.none
       }
 
@@ -114,12 +120,11 @@ object ScenarioCreator extends LazyLogging {
             .map(_.replace(user))
           getEffect(nodes)
         case Right(EventPayload.GoldenFinger) =>
-          getEffect(state.values.toList. flatten)
+          getEffect(state.values.toList.flatten)
         case _ =>
-          state.keys.foreach { k =>
-            logger.info(s"trigger: ${k.actionId} ${k.payload}")
+          state.foreach{ case (k, v) =>
+            logger.info(s"trigger: ${k.actionId.getOrElse("none")} ${k.payload} to ${v.map(_.performances.map(_.action.description))}")
           }
-          logger.info(s"message: ${message.actionId} ${message.payload}")
           val node = state
             .get(message.forComparison)
             .map(_.map(_.replace(user)))

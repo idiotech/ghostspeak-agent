@@ -23,6 +23,8 @@ package object daqiaotou {
 
     case object App extends Destination with UpperSnakecase
 
+    case object Alert extends Destination with UpperSnakecase
+
     case object Intro extends Destination with UpperSnakecase
 
     case object Welcome extends Destination with UpperSnakecase
@@ -183,7 +185,7 @@ package object daqiaotou {
   }
 
   @ConfiguredJsonCodec
-  case class Content(task: Task, condition: Condition)
+  case class Content(task: Task, condition: Condition, exclusiveWith: List[String] = Nil)
 
   type Action = tw.idv.idiotech.ghostspeak.agent.Action[Content]
   type Message = tw.idv.idiotech.ghostspeak.agent.Message[EventPayload]
