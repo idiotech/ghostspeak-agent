@@ -152,6 +152,13 @@ package object daqiaotou {
       @description("The marker to delete; should be the action id that adds the marker.")
       id: String
     ) extends Task
+
+    @title("Map style")
+    @description("Client should change the style of the map")
+    case class MapStyle(
+      url: String
+    ) extends Task
+
   }
 
   @ConfiguredJsonCodec

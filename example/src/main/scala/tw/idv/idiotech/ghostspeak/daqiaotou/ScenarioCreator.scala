@@ -71,70 +71,75 @@ object ScenarioCreator extends LazyLogging {
   def onCommand(
     user: String,
     actuator: ActorRef[Actuator.Command[Content]]
-  )(state: State, command: Command)(implicit script: Map[String, Node]): Effect[List[Node], State] = command match {
-    case Sensor.Sense(message, replyTo) =>
-      def getEffect(nodes: List[Node]): Effect[List[Node], State] = {
-        nodes.foreach { n =>
-          n.performances.foreach { p =>
-            val action = p
-              .action
-              .copy(
-                session = Session(message.scenarioId, None),
-                content = p.action.content.copy(exclusiveWith = n.exclusiveWith.toList.flatMap(e => script.get(e)).flatMap(_.performances.map(_.action.id)))
-              )
-            val startTime = System.currentTimeMillis() + p.delay
-            logger.info(s"carrying out ${Perform(action, startTime)}")
-            actuator ! Perform(action, startTime)
+  )(state: State, command: Command)(implicit script: Map[String, Node]): Effect[List[Node], State] =
+    command match {
+      case Sensor.Sense(message, replyTo) =>
+        def getEffect(nodes: List[Node]): Effect[List[Node], State] = {
+          nodes.foreach { n =>
+            n.performances.foreach { p =>
+              val action = p.action
+                .copy(
+                  session = Session(message.scenarioId, None),
+                  content = p.action.content.copy(exclusiveWith =
+                    n.exclusiveWith.toList
+                      .flatMap(e => script.get(e))
+                      .flatMap(_.performances.map(_.action.id))
+                  )
+                )
+              val startTime = System.currentTimeMillis() + p.delay
+              logger.info(s"carrying out ${Perform(action, startTime)}")
+              actuator ! Perform(action, startTime)
+            }
+            logger.info(s"transition to ${n.name}")
           }
-          logger.info(s"transition to ${n.name}")
+          if (nodes.nonEmpty) Effect.persist(nodes) else Effect.none
         }
-        if (nodes.nonEmpty) Effect.persist(nodes) else Effect.none
-      }
 
-      message.payload match {
-        case Left(SystemPayload.Leave) =>
-          logger.info(s"user $user left")
-          Effect.persist(List(Node.leave))
-        case Right(EventPayload.Text(reply)) =>
-          val forComparison = message.forComparison.copy(payload = fakeTextPayload)
-          def findMatch(matcher: (String, String) => Boolean): Option[List[Node]] =
-            state
-              .find {
-                case (k, _) =>
-                  k.payload match {
-                    case Right(EventPayload.Text(answer)) =>
-                      k.copy(payload = fakeTextPayload) == forComparison && matcher(reply, answer)
-                    case Left(_) => false
-                  }
-                case _ => false
-              }
-              .map(_._2)
+        message.payload match {
+          case Left(SystemPayload.Leave) =>
+            logger.info(s"user $user left")
+            Effect.persist(List(Node.leave))
+          case Right(EventPayload.Text(reply)) =>
+            val forComparison = message.forComparison.copy(payload = fakeTextPayload)
+            def findMatch(matcher: (String, String) => Boolean): Option[List[Node]] =
+              state
+                .find {
+                  case (k, _) =>
+                    k.payload match {
+                      case Right(EventPayload.Text(answer)) =>
+                        k.copy(payload = fakeTextPayload) == forComparison && matcher(reply, answer)
+                      case Left(_) => false
+                    }
+                  case _ => false
+                }
+                .map(_._2)
+                .filter(_.nonEmpty)
+            val nodes: List[Node] = state
+              .get(message.forComparison)
+              .orElse(
+                findMatch(textMatches)
+              )
+              .orElse(findMatch((_, a) => a == "fallback:"))
+              .getOrElse(Nil)
+              .map(_.replace(user))
+            getEffect(nodes)
+          case Right(EventPayload.GoldenFinger) =>
+            getEffect(state.values.toList.flatten)
+          case _ =>
+            state.foreach { case (k, v) =>
+              logger.info(s"trigger: ${k.actionId.getOrElse("none")} ${k.payload} to ${v
+                .map(_.performances.map(_.action.description))}")
+            }
+            val node = state
+              .get(message.forComparison)
+              .map(_.map(_.replace(user)))
               .filter(_.nonEmpty)
-          val nodes: List[Node] = state
-            .get(message.forComparison)
-            .orElse(
-              findMatch(textMatches)
-            )
-            .orElse(findMatch((_, a) => a == "fallback:"))
-            .getOrElse(Nil)
-            .map(_.replace(user))
-          getEffect(nodes)
-        case Right(EventPayload.GoldenFinger) =>
-          getEffect(state.values.toList.flatten)
-        case _ =>
-          state.foreach{ case (k, v) =>
-            logger.info(s"trigger: ${k.actionId.getOrElse("none")} ${k.payload} to ${v.map(_.performances.map(_.action.description))}")
-          }
-          val node = state
-            .get(message.forComparison)
-            .map(_.map(_.replace(user)))
-            .filter(_.nonEmpty)
-            .getOrElse(Nil)
-          getEffect(node)
-      }
-    case Sensor.Create(scenario, replyTo)    => Effect.none
-    case Sensor.Destroy(scenarioId, replyTo) => Effect.none
-  }
+              .getOrElse(Nil)
+            getEffect(node)
+        }
+      case Sensor.Create(scenario, replyTo)    => Effect.none
+      case Sensor.Destroy(scenarioId, replyTo) => Effect.none
+    }
 
   def createScript(scenario: Scenario) =
     decode[List[Node]](scenario.template)
