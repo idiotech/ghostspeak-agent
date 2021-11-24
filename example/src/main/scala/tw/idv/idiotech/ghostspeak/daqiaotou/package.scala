@@ -4,11 +4,14 @@ import enumeratum.EnumEntry.UpperSnakecase
 import enumeratum.{ CirceEnum, Enum, EnumEntry }
 import io.circe.generic.extras.{ Configuration, ConfiguredJsonCodec }
 import json.schema.{ description, title, typeHint }
+import com.redis._
 import tw.idv.idiotech.ghostspeak.agent.{ Action, Message }
 
 import scala.collection.immutable
 
 package object daqiaotou {
+
+  val redis = new RedisClientPool("host.docker.internal", 6379)
 
   implicit val configuration = Configuration.default
     .withDiscriminator("type")

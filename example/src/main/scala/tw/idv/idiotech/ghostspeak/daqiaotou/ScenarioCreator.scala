@@ -1,6 +1,7 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
-import akka.actor.typed.{ ActorRef, Behavior }
+import akka.Done
+import akka.actor.typed.{ ActorRef, ActorSystem, Behavior }
 import akka.actor.typed.scaladsl.{ ActorContext, Behaviors }
 import akka.persistence.typed.PersistenceId
 import akka.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
@@ -15,11 +16,15 @@ import tw.idv.idiotech.ghostspeak.agent.{
   SystemPayload
 }
 import io.circe.parser.decode
+import io.circe.syntax._
 import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.Node
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
+import io.circe.Encoder
 
 import java.util.UUID
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Try
 
 object ScenarioCreator extends LazyLogging {
@@ -126,6 +131,7 @@ object ScenarioCreator extends LazyLogging {
           case Right(EventPayload.GoldenFinger) =>
             getEffect(state.values.toList.flatten)
           case _ =>
+            logger.info(s"message: $message")
             state.foreach { case (k, v) =>
               logger.info(s"trigger: ${k.actionId.getOrElse("none")} ${k.payload} to ${v
                 .map(_.performances.map(_.action.description))}")
@@ -168,13 +174,26 @@ object ScenarioCreator extends LazyLogging {
   ): Either[String, ActorRef[Command]] =
     Right(actorContext.spawn(ub(created.scenario, actuatorRef), created.scenario.id))
 
+  def sendMessage(
+    action: Action
+  )(implicit actorSystem: ActorSystem[_], encoder: Encoder[Action]): Future[Done] = {
+    val actionJson = action.asJson.toString()
+    val redisKey = s"action-${action.session.scenario}-${action.receiver}"
+    val hashKey = action.id
+    logger.info(s"saving action to redis: $redisKey $hashKey")
+    redis.withClient(r =>
+      r.hset(redisKey, hashKey, actionJson)
+    )
+    FcmSender.send(action)
+  }
+
   val scenarioBehavior: Behavior[Command] =
     Behaviors.setup[Command] { ctx =>
       val sensor = ctx.self
       val actuator = Behaviors.setup[Actuator.Command[Content]] { actx =>
         implicit val system = ctx.system
         def fcm(root: ActorRef[Actuator.Command[Content]]) =
-          Actuator.fromFuture[Content](FcmSender.send[Content], root)
+          Actuator.fromFuture[Content](sendMessage, root)
 
         def discover(c: ActorContext[_], a: Action, r: ActorRef[Actuator.Command[Content]]) = Some {
           c.spawnAnonymous(fcm(actx.self))

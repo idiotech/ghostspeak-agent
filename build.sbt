@@ -4,7 +4,7 @@ version := "0.1"
 
 scalaVersion in ThisBuild := "2.13.4"
 
-val akkaVersion = "2.6.11"
+val akkaVersion = "2.6.14"
 val akkaHttpVersion = "10.2.2"
 val enumeratumVersion = "1.6.1"
 val circeVersion = "0.13.0"
@@ -42,7 +42,8 @@ libraryDependencies in ThisBuild ++= Seq(
   "com.typesafe.akka" %% "akka-persistence-typed" % akkaVersion,
   "com.typesafe.akka" %% "akka-persistence-testkit" % akkaVersion % Test,
   "ch.megard" %% "akka-http-cors" % "1.1.1",
-  "com.lightbend.akka" %% "akka-stream-alpakka-google-fcm" % "2.0.2",
+  "com.lightbend.akka" %% "akka-stream-alpakka-google-fcm" % "3.0.3",
+  "net.debasishg" %% "redisclient" % "3.41",
   "com.twitter" %% "chill" % "0.9.5",
   "com.twitter" %% "chill-akka" % "0.9.5",
   "com.beachape" %% "enumeratum" % enumeratumVersion,

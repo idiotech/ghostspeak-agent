@@ -1,8 +1,9 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
+import cats.implicits._
 import akka.actor.typed.{ ActorRef, ActorSystem }
 import akka.http.scaladsl.server.Route
-import io.circe.{ Decoder, Json }
+import io.circe.{ Decoder, Json, ParsingFailure }
 import tw.idv.idiotech.ghostspeak.agent
 import tw.idv.idiotech.ghostspeak.agent.{ Scenario, Sensor }
 import akka.actor.typed.{ ActorRef, ActorSystem }
@@ -21,6 +22,7 @@ import akka.actor.typed.scaladsl.AskPattern.Askable
 import io.circe.generic.JsonCodec
 
 import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{ Failure, Success }
 
 class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: ActorSystem[_])
@@ -29,6 +31,37 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
   import EventRoutes._
 
   override lazy val routes: List[Route] = List(
+    pathPrefix("v1" / "scenario" / Segment / Segment / "user" / Segment / "actions") {
+      (engine, scenarioId, userId) =>
+        val key = s"action-$scenarioId-$userId"
+        logger.info(s"getting action from redis: $key")
+        delete {
+          val fetch: Future[Map[String, String]] = for {
+            res <- Future(redis.withClient(c => c.hgetall[String, String](key)))
+            all <- Future.successful(res.getOrElse(Map.empty))
+            _   <- Future.traverse(all.keys)(actionId => Future(redis.withClient(c => c.hdel(key, actionId))))
+          } yield all
+          onComplete(fetch) {
+            case Success(all) =>
+              val parseResults: Either[ParsingFailure, Json] =
+                all.values.map(parse).toList.sequence.map(_.asJson)
+              parseResults.fold(
+                e => complete(StatusCodes.InternalServerError -> e.getMessage()),
+                actions =>
+                  complete(
+                    StatusCodes.OK,
+                    List(`Content-Type`(`application/json`)),
+                    actions
+                  )
+              )
+            case Failure(StatusReply.ErrorMessage(reason)) =>
+              complete(StatusCodes.InternalServerError -> reason)
+            case Failure(e) =>
+              complete(StatusCodes.InternalServerError -> e.getMessage)
+          }
+        }
+
+    },
     pathPrefix("v1" / "scenario" / Segment / Segment / "resources") { (engine, scenarioId) =>
       get {
         onComplete(sensor.askWithStatus[String](x => Sensor.Query[T](x))) {
