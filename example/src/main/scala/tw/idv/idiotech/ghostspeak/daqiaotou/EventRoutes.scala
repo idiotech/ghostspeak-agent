@@ -38,7 +38,10 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
         delete {
           val fetch: Future[Map[String, String]] = for {
             res <- Future(redis.withClient(c => c.hgetall[String, String](key)))
-            all <- Future.successful(res.getOrElse(Map.empty))
+            all <- {
+              logger.info(s"getting action from redis: ${res.getOrElse(Map.empty)}")
+              Future.successful(res.getOrElse(Map.empty))
+            }
             _   <- Future.traverse(all.keys)(actionId => Future(redis.withClient(c => c.hdel(key, actionId))))
           } yield all
           onComplete(fetch) {

@@ -103,6 +103,11 @@ object ScenarioCreator extends LazyLogging {
         message.payload match {
           case Left(SystemPayload.Leave) =>
             logger.info(s"user $user left")
+            val redisKey = s"action-${message.scenarioId}-$user"
+            logger.info(s"deleting user from redis: $redisKey")
+            redis.withClient(r =>
+              r.del(redisKey)
+            )
             Effect.persist(List(Node.leave))
           case Right(EventPayload.Text(reply)) =>
             val forComparison = message.forComparison.copy(payload = fakeTextPayload)
