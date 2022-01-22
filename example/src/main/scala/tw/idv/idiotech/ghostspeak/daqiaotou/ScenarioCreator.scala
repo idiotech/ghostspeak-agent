@@ -30,33 +30,51 @@ import scala.util.Try
 object ScenarioCreator extends LazyLogging {
 
   type Command = Sensor.Command[EventPayload]
-  type State = Map[Message, List[Node]]
+  type NodeId = String
+  type ActionId = String
+  case class State(triggers: Map[Message, List[Node]], exclusions: Map[ActionId, List[NodeId]])
+  case class Event(nodes: List[Node], message: Message)
 
   def onEvent(
     user: String
-  )(state: State, events: List[Node])(implicit script: Map[String, Node]): State =
-    if (events == List(Node.leave)) {
+  )(state: State, event: Event)(implicit script: Map[String, Node]): State =
+    if (event.nodes == List(Node.leave)) {
       val initial = script("initial").replace(user)
-      initial.triggers.map(_ -> List(initial)).toMap
+      State(initial.triggers.map(_ -> List(initial)).toMap, Map.empty)
     } else {
+      val currentNodes = event.nodes
       val removalMap =
-        events.flatMap(n => n.triggers.map(_ -> n)).groupBy(_._1).map(p => p._1 -> p._2.map(_._2))
-      val triggerMap: Map[Message, List[Node]] = events.map(_.childMap(user)).reduce(_ |+| _)
-      val ret: State = triggerMap.toList.foldLeft(state) { (s, trigger) =>
+        currentNodes.flatMap(n => n.triggers.map(_ -> n)).groupBy(_._1).map(p => p._1 -> p._2.map(_._2))
+      val triggerMap: Map[Message, List[Node]] = if (currentNodes.isEmpty) Map.empty else currentNodes.map(_.childMap(user)).reduce(_ |+| _)
+      val ret: Map[Message, List[Node]] = if (triggerMap.isEmpty) state.triggers else triggerMap.toList.foldLeft(state.triggers) { (s, trigger) =>
         val nodes = (s.getOrElse(trigger._1, Nil) ++ trigger._2).distinct
         if (nodes.nonEmpty) s + (trigger._1 -> nodes) else s - trigger._1
       }
-      val removed = removalMap.toList.foldLeft(ret) { (s, trigger) =>
+      val removed = if (ret.isEmpty) ret else removalMap.toList.foldLeft(ret) { (s, trigger) =>
         val nodes = s.getOrElse(trigger._1, Nil).filterNot(trigger._2.toSet.contains).distinct
         if (nodes.nonEmpty) s + (trigger._1 -> nodes) else s - trigger._1
       }
-      events
+      val excluded = if (currentNodes.isEmpty) removed else currentNodes
         .foldLeft(removed) { (s, node) =>
           if (node.exclusiveWith.nonEmpty) {
             s.view.mapValues(_.filterNot(n => node.exclusiveWith.contains(n.name))).toMap
           } else s
         }
         .filter(_._2.nonEmpty)
+      val exclusions: Map[ActionId, List[NodeId]] = currentNodes.flatMap { n =>
+        n.exclusiveWith.flatMap(name => script.get(name)).flatMap(x =>
+          x.childMap(user).flatMap{ p =>
+            val xNodes: List[String] = p._2.map(_.name)
+            n.performances.map(_.action.id -> xNodes)
+          }
+        )
+      }.toMap ++ state.exclusions
+      val result = event.message.actionId.filter(_ => event.message.payload.fold(_ == SystemPayload.Start, _ => false)).flatMap(state.exclusions.get).fold(
+        State(excluded, exclusions)
+      ) { nodeId =>
+        State(excluded.view.mapValues(_.filterNot(n => nodeId.contains(n.name))).toMap, exclusions.filterNot(_._2 == nodeId))
+      }
+      result
     }
 
   def fakeTextPayload = Right(EventPayload.Text("fake_text"))
@@ -76,10 +94,10 @@ object ScenarioCreator extends LazyLogging {
   def onCommand(
     user: String,
     actuator: ActorRef[Actuator.Command[Content]]
-  )(state: State, command: Command)(implicit script: Map[String, Node]): Effect[List[Node], State] =
+  )(state: State, command: Command)(implicit script: Map[String, Node]): Effect[Event, State] =
     command match {
       case Sensor.Sense(message, replyTo) =>
-        def getEffect(nodes: List[Node]): Effect[List[Node], State] = {
+        def getEffect(nodes: List[Node]): Effect[Event, State] = {
           nodes.foreach { n =>
             n.performances.foreach { p =>
               val action = p.action
@@ -97,7 +115,7 @@ object ScenarioCreator extends LazyLogging {
             }
             logger.info(s"transition to ${n.name}")
           }
-          if (nodes.nonEmpty) Effect.persist(nodes) else Effect.none
+          Effect.persist(Event(nodes, message))
         }
 
         message.payload match {
@@ -108,11 +126,11 @@ object ScenarioCreator extends LazyLogging {
             redis.withClient(r =>
               r.del(redisKey)
             )
-            Effect.persist(List(Node.leave))
+            Effect.persist(Event(List(Node.leave), message))
           case Right(EventPayload.Text(reply)) =>
             val forComparison = message.forComparison.copy(payload = fakeTextPayload)
             def findMatch(matcher: (String, String) => Boolean): Option[List[Node]] =
-              state
+              state.triggers
                 .find {
                   case (k, _) =>
                     k.payload match {
@@ -124,7 +142,7 @@ object ScenarioCreator extends LazyLogging {
                 }
                 .map(_._2)
                 .filter(_.nonEmpty)
-            val nodes: List[Node] = state
+            val nodes: List[Node] = state.triggers
               .get(message.forComparison)
               .orElse(
                 findMatch(textMatches)
@@ -134,14 +152,14 @@ object ScenarioCreator extends LazyLogging {
               .map(_.replace(user))
             getEffect(nodes)
           case Right(EventPayload.GoldenFinger) =>
-            getEffect(state.values.toList.flatten)
+            getEffect(state.triggers.values.toList.flatten)
           case _ =>
             logger.info(s"message: $message")
-            state.foreach { case (k, v) =>
+            state.triggers.foreach { case (k, v) =>
               logger.info(s"trigger: ${k.actionId.getOrElse("none")} ${k.payload} to ${v
                 .map(_.performances.map(_.action.description))}")
             }
-            val node = state
+            val node = state.triggers
               .get(message.forComparison)
               .map(_.map(_.replace(user)))
               .filter(_.nonEmpty)
@@ -164,9 +182,9 @@ object ScenarioCreator extends LazyLogging {
     Behaviors.setup[Command] { ctx =>
       val user = userScenario.id
       val initial: Node = script("initial").replace(user)
-      EventSourcedBehavior[Command, List[Node], State](
+      EventSourcedBehavior[Command, Event, State](
         persistenceId = PersistenceId.ofUniqueId(s"scn-$user"),
-        emptyState = initial.triggers.map(_ -> List(initial)).toMap,
+        emptyState = State(initial.triggers.map(_ -> List(initial)).toMap, Map.empty),
         commandHandler = onCommand(user, actuator),
         eventHandler = onEvent(user)
       )
