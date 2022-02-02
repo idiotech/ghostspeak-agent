@@ -55,6 +55,25 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
         }
       )
     },
+    pathPrefix("v1" / "broadcast") {
+      concat(
+        pathEnd {
+          concat(
+            post {
+              entity(as[Message[T]]) { message =>
+                onComplete(sensor.askWithStatus[String](x => Sensor.Broadcast[T](message, Some(x)))) {
+                  case Success(msg) => complete(msg)
+                  case Failure(StatusReply.ErrorMessage(reason)) =>
+                    complete(StatusCodes.InternalServerError -> reason)
+                  case Failure(e) =>
+                    complete(StatusCodes.InternalServerError -> e.getMessage)
+                }
+              }
+            }
+          )
+        }
+      )
+    },
     pathPrefix("v1" / "scenario" / Segment / Segment) { (engine, scenarioId) =>
       parameters("overwrite".optional, "name".optional) { (overwriteParam, name) =>
         val overwrite = overwriteParam.fold(false)(_ == "true")

@@ -207,6 +207,7 @@ package object daqiaotou {
 
     case class Text(text: String) extends EventPayload
     case object GoldenFinger extends EventPayload
+    case class PerformDirectly(action: Action) extends EventPayload
 
   }
 

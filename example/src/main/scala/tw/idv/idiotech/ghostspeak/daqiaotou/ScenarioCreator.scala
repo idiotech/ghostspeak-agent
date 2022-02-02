@@ -97,6 +97,15 @@ object ScenarioCreator extends LazyLogging {
   )(state: State, command: Command)(implicit script: Map[String, Node]): Effect[Event, State] =
     command match {
       case Sensor.Sense(message, replyTo) =>
+        def simplyPerform(action: Action) = {
+          val a = action
+            .copy(
+              session = Session(message.scenarioId, None),
+              receiver = user
+            )
+          logger.info(s"carrying out ${Perform(action, System.currentTimeMillis())}")
+          actuator ! Perform(a, System.currentTimeMillis())
+        }
         def getEffect(nodes: List[Node]): Effect[Event, State] = {
           nodes.foreach { n =>
             n.performances.foreach { p =>
@@ -127,6 +136,9 @@ object ScenarioCreator extends LazyLogging {
               r.del(redisKey)
             )
             Effect.persist(Event(List(Node.leave), message))
+          case Right(EventPayload.PerformDirectly(action)) =>
+            simplyPerform(action)
+            Effect.none
           case Right(EventPayload.Text(reply)) =>
             val forComparison = message.forComparison.copy(payload = fakeTextPayload)
             def findMatch(matcher: (String, String) => Boolean): Option[List[Node]] =

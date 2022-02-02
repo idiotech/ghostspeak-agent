@@ -17,6 +17,9 @@ object Sensor extends LazyLogging {
   case class Sense[P](message: Message[P], replyTo: Option[ActorRef[StatusReply[String]]] = None)
       extends Command[P]
 
+  case class Broadcast[P](message: Message[P], replyTo: Option[ActorRef[StatusReply[String]]] = None)
+    extends Command[P]
+
   case class Create[P](scenario: Scenario, replyTo: ActorRef[StatusReply[String]])
       extends Command[P]
 
@@ -42,6 +45,7 @@ object Sensor extends LazyLogging {
 
   implicit class RichActorContext(val ctx: ActorContext[_]) extends AnyVal {
     def getChild[P](name: String) = ctx.child(name).map(_.asInstanceOf[ActorRef[Command[P]]])
+    def getChildren[P](): Iterable[ActorRef[Command[P]]] = ctx.children.map(_.asInstanceOf[ActorRef[Command[P]]])
   }
 
   def onCommand[P](
@@ -49,7 +53,6 @@ object Sensor extends LazyLogging {
     createChild: CreatorScenarioActor[P]
   )(state: State[P], cmd: Command[P]): Reff[P] = cmd match {
     case Sense(message, replyTo) =>
-//      logger.info(s"state = $state")
       val id = state.get(message.scenarioId).map(_.uniqueId).getOrElse("invalid")
       val reply: StatusReply[String] =
         ctx
@@ -58,6 +61,22 @@ object Sensor extends LazyLogging {
             StatusReply.Error("no such scenario")
           ) { actor =>
             actor ! Sense(message)
+            StatusReply.success("OK")
+          }
+      replyTo.fold[Reff[P]] {
+        Effect.noReply
+      } { r =>
+        Effect.reply[StatusReply[String], Event[P], State[P]](r)(reply)
+      }
+    case Broadcast(message, replyTo) =>
+      val id = state.get(message.scenarioId).map(_.uniqueId).getOrElse("invalid")
+      val reply: StatusReply[String] =
+        ctx
+          .getChild[P](id)
+          .fold[StatusReply[String]](
+            StatusReply.Error("no such scenario")
+          ) { actor =>
+            actor ! Broadcast(message)
             StatusReply.success("OK")
           }
       replyTo.fold[Reff[P]] {
@@ -148,6 +167,13 @@ object Sensor extends LazyLogging {
             s => Effect.persist(Created[P](scenario)).thenNoReply()
           )
         } else Effect.noReply
+      case Broadcast(message, _) =>
+        val children: Iterable[ActorRef[Command[P]]] = ctx.getChildren()
+        children.foreach(c => c ! Sense(message.copy(
+          sender = c.path.name,
+          receiver = c.path.name
+        )))
+        Effect.noReply
       case _ => general(state, cmd)
     }
   }
