@@ -29,6 +29,7 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
   implicit val jsonStreamingSupport = EntityStreamingSupport.json()
   implicit val decoder = Message.decoder[T]
   implicit val ac = system
+  import Sensor.Command._
 
   // asking someone requires a timeout and a scheduler, if the timeout hits without response
   // the ask is failed with a TimeoutException
@@ -42,7 +43,7 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
           concat(
             post {
               entity(as[Message[T]]) { message =>
-                onComplete(sensor.askWithStatus[String](x => Sensor.Sense[T](message, Some(x)))) {
+                onComplete(sensor.askWithStatus[String](x => Sense[T](message, Some(x)))) {
                   case Success(msg) => complete(msg)
                   case Failure(StatusReply.ErrorMessage(reason)) =>
                     complete(StatusCodes.InternalServerError -> reason)
@@ -61,7 +62,7 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
           concat(
             post {
               entity(as[Message[T]]) { message =>
-                onComplete(sensor.askWithStatus[String](x => Sensor.Broadcast[T](message, Some(x)))) {
+                onComplete(sensor.askWithStatus[String](x => Broadcast[T](message, Some(x)))) {
                   case Success(msg) => complete(msg)
                   case Failure(StatusReply.ErrorMessage(reason)) =>
                     complete(StatusCodes.InternalServerError -> reason)
@@ -82,13 +83,13 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
             val ret: Route = onComplete {
               val deletion = if (overwrite) {
                 logger.info("overwriting!")
-                sensor.askWithStatus[String](x => Sensor.Destroy[T](scenarioId, x)).recover {
-                  case e => logger.error("failed to delete scanario", e)
+                sensor.askWithStatus[String](x => Destroy[T](scenarioId, x)).recover { case e =>
+                  logger.error("failed to delete scanario", e)
                 }
               } else Future.unit
               deletion.flatMap(_ =>
                 sensor.askWithStatus[String](x =>
-                  Sensor.Create[T](Scenario(scenarioId, engine, template.toString, name), x)
+                  Create[T](Scenario(scenarioId, engine, template.toString, name), x)
                 )
               )
             } {
@@ -105,7 +106,7 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
     },
     pathPrefix("v1" / "scenario") {
       get {
-        onComplete(sensor.askWithStatus[String](x => Sensor.Query[T](x))) {
+        onComplete(sensor.askWithStatus[String](x => Query[T](x))) {
           case Success(msg) =>
             parse(msg).fold(
               e => complete(StatusCodes.InternalServerError -> e.getMessage),

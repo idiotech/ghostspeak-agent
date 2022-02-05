@@ -6,99 +6,84 @@ import akka.pattern.StatusReply
 import akka.persistence.typed.{ PersistenceId, RecoveryCompleted }
 import akka.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior, ReplyEffect }
 import com.typesafe.scalalogging.LazyLogging
+import io.circe.{ Decoder, Encoder }
 import io.circe.generic.extras.ConfiguredJsonCodec
 import io.circe.syntax._
+import tw.idv.idiotech.ghostspeak.agent.Sensor.Event.Created
 
 import java.util.UUID
 
-object Sensor extends LazyLogging {
-  sealed trait Command[P]
+class Sensor[P: Encoder: Decoder] extends LazyLogging {
 
-  case class Sense[P](message: Message[P], replyTo: Option[ActorRef[StatusReply[String]]] = None)
-      extends Command[P]
+  import Sensor.Command
+  import Sensor.Command._
 
-  case class Broadcast[P](message: Message[P], replyTo: Option[ActorRef[StatusReply[String]]] = None)
-    extends Command[P]
+  import Sensor.Event
+  import Sensor.Event._
+  import Sensor.State
 
-  case class Create[P](scenario: Scenario, replyTo: ActorRef[StatusReply[String]])
-      extends Command[P]
-
-  case class Query[P](replyTo: ActorRef[StatusReply[String]]) extends Command[P]
-
-  case class Destroy[P](scenarioId: String, replyTo: ActorRef[StatusReply[String]])
-      extends Command[P]
-
-  sealed trait Event[P]
-  case class Destroyed[P](scenarioId: String) extends Event[P]
-
-  case class Created[P](scenario: Scenario, uniqueId: String = UUID.randomUUID().toString)
-      extends Event[P]
-
-  type State[P] = Map[String, Created[P]]
-
-  type CreatorScenarioActor[P] = (
+  type CreatorScenarioActor = (
     ActorContext[_],
-    Created[P]
+    Created
   ) => Either[String, ActorRef[Command[P]]]
 
-  type Reff[P] = ReplyEffect[Event[P], State[P]]
+  type Reff = ReplyEffect[Event, State]
 
-  implicit class RichActorContext(val ctx: ActorContext[_]) extends AnyVal {
-    def getChild[P](name: String) = ctx.child(name).map(_.asInstanceOf[ActorRef[Command[P]]])
-    def getChildren[P](): Iterable[ActorRef[Command[P]]] = ctx.children.map(_.asInstanceOf[ActorRef[Command[P]]])
-  }
+  def getChild(ctx: ActorContext[_], name: String) =
+    ctx.child(name).map(_.asInstanceOf[ActorRef[Command[P]]])
 
-  def onCommand[P](
+  def getChildren(ctx: ActorContext[_]): Iterable[ActorRef[Command[P]]] =
+    ctx.children.map(_.asInstanceOf[ActorRef[Command[P]]])
+
+  def onCommand(
     ctx: ActorContext[Command[P]],
-    createChild: CreatorScenarioActor[P]
-  )(state: State[P], cmd: Command[P]): Reff[P] = cmd match {
+    createChild: CreatorScenarioActor
+  )(state: State, cmd: Command[P]): Reff = cmd match {
     case Sense(message, replyTo) =>
-      val id = state.get(message.scenarioId).map(_.uniqueId).getOrElse("invalid")
+      val id = state.scenarios.get(message.scenarioId).map(_.uniqueId).getOrElse("invalid")
       val reply: StatusReply[String] =
-        ctx
-          .getChild[P](id)
+        getChild(ctx, id)
           .fold[StatusReply[String]](
             StatusReply.Error("no such scenario")
           ) { actor =>
             actor ! Sense(message)
             StatusReply.success("OK")
           }
-      replyTo.fold[Reff[P]] {
+      replyTo.fold[Reff] {
         Effect.noReply
       } { r =>
-        Effect.reply[StatusReply[String], Event[P], State[P]](r)(reply)
+        Effect.reply[StatusReply[String], Event, State](r)(reply)
       }
     case Broadcast(message, replyTo) =>
-      val id = state.get(message.scenarioId).map(_.uniqueId).getOrElse("invalid")
+      val id = state.scenarios.get(message.scenarioId).map(_.uniqueId).getOrElse("invalid")
       val reply: StatusReply[String] =
-        ctx
-          .getChild[P](id)
+        getChild(ctx, id)
           .fold[StatusReply[String]](
             StatusReply.Error("no such scenario")
           ) { actor =>
             actor ! Broadcast(message)
             StatusReply.success("OK")
           }
-      replyTo.fold[Reff[P]] {
+      replyTo.fold[Reff] {
         Effect.noReply
       } { r =>
-        Effect.reply[StatusReply[String], Event[P], State[P]](r)(reply)
+        Effect.reply[StatusReply[String], Event, State](r)(reply)
       }
     case Create(scenario, replyTo) =>
-      if (!state.contains(scenario.id))
+      if (!state.scenarios.contains(scenario.id))
         createChild(ctx, Created(scenario, ""))
-          .fold[Reff[P]](
+          .fold[Reff](
             e => Effect.reply(replyTo)(StatusReply.Error(s"invalid scenario: $e")),
             actor =>
               Effect
-                .persist(Created[P](scenario, actor.path.name))
+                .persist(Created(scenario, actor.path.name))
                 .thenReply(replyTo)(_ => StatusReply.Success("created"))
           )
       else Effect.reply(replyTo)(StatusReply.Error("already exists"))
     case Destroy(id, replyTo) =>
-      state
+      state.scenarios
         .get(id)
-        .fold[ReplyEffect[Event[P], State[P]]] {
+        .fold[ReplyEffect[Event, State]] {
           Effect.reply(replyTo)(StatusReply.Error("doesn't exist"))
         } { created =>
           ctx.child(created.uniqueId).foreach { a =>
@@ -106,75 +91,117 @@ object Sensor extends LazyLogging {
             ctx.stop(a)
           }
           Effect
-            .persist[Event[P], State[P]](Destroyed[P](id))
+            .persist[Event, State](Destroyed(id))
             .thenReply(replyTo)(_ => StatusReply.Success("destroying"))
         }
     case Query(replyTo) =>
       Effect.reply(replyTo)(
-        StatusReply.success(state.values.map(_.scenario).toList.asJson.toString())
+        StatusReply.success(state.scenarios.values.map(_.scenario).toList.asJson.toString())
       )
   }
 
-  type OnCommand[P] = (ActorContext[Command[P]], CreatorScenarioActor[P]) => (
-    State[P],
+  type OnCommand = (ActorContext[Command[P]], CreatorScenarioActor) => (
+    State,
     Command[P]
-  ) => Reff[P]
+  ) => Reff
 
-  def onEvent[P](state: State[P], evt: Event[P]): State[P] = evt match {
-    case c: Created[P] =>
-      state + (c.scenario.id -> c)
-    case d: Destroyed[P] =>
-      state - d.scenarioId
+  def onEvent(state: State, evt: Event): State = evt match {
+    case c: Created =>
+      State(state.scenarios + (c.scenario.id -> c))
+    case d: Destroyed =>
+      State(state.scenarios - d.scenarioId)
   }
 
-  def apply[P](
+  def apply(
     name: String,
-    createScenario: CreatorScenarioActor[P],
-    handle: OnCommand[P] = onCommand[P] _
+    createScenario: CreatorScenarioActor,
+    handle: OnCommand = onCommand _
   ): Behavior[Command[P]] =
     Behaviors.setup { context: ActorContext[Command[P]] =>
       EventSourcedBehavior
-        .withEnforcedReplies[Command[P], Event[P], State[P]](
+        .withEnforcedReplies[Command[P], Event, State](
           persistenceId = PersistenceId.ofUniqueId(s"sensor-$name"),
-          emptyState = Map.empty,
+          emptyState = State(),
           commandHandler = handle(context, createScenario),
           eventHandler = onEvent
         )
         .receiveSignal { case (state, RecoveryCompleted) =>
-          val scns = state.values.map(s => createScenario(context, s))
+          val scns = state.scenarios.values.map(s => createScenario(context, s))
           logger.info(s"====== recovery complete for $name")
           scns.foreach(println)
 
         }
     }
 
-  def onCommandPerUser[P](
+  def onCommandPerUser(
     ctx: ActorContext[Command[P]],
-    create: CreatorScenarioActor[P]
-  )(state: State[P], cmd: Command[P]): Reff[P] = {
-    val general = onCommand[P](ctx, create) _
+    create: CreatorScenarioActor
+  )(state: State, cmd: Command[P]): Reff = {
+    val general = onCommand(ctx, create) _
     cmd match {
       case Sense(message, _) =>
         val scenario = Scenario(message.sender, message.scenarioId, "")
-        val existingActor = ctx.getChild[P](message.sender)
+        val existingActor = getChild(ctx, message.sender)
         val maybeActor = existingActor.toRight("no such user").orElse {
           create(ctx, Created(scenario, ""))
         }
         maybeActor.foreach(_ ! Sense(message))
         if (existingActor.isEmpty) {
-          maybeActor.fold[Reff[P]](
+          maybeActor.fold[Reff](
             e => Effect.noReply,
-            s => Effect.persist(Created[P](scenario)).thenNoReply()
+            s => Effect.persist(Created(scenario)).thenNoReply()
           )
         } else Effect.noReply
       case Broadcast(message, _) =>
-        val children: Iterable[ActorRef[Command[P]]] = ctx.getChildren()
-        children.foreach(c => c ! Sense(message.copy(
-          sender = c.path.name,
-          receiver = c.path.name
-        )))
+        val children: Iterable[ActorRef[Command[P]]] = getChildren(ctx)
+        children.foreach(c =>
+          c ! Sense(
+            message.copy(
+              sender = c.path.name,
+              receiver = c.path.name
+            )
+          )
+        )
         Effect.noReply
       case _ => general(state, cmd)
     }
+  }
+}
+
+object Sensor {
+
+  @ConfiguredJsonCodec
+  sealed trait Event extends EventBase
+
+  object Event {
+    case class Destroyed(scenarioId: String) extends Event
+
+    @ConfiguredJsonCodec
+    case class Created(scenario: Scenario, uniqueId: String = UUID.randomUUID().toString)
+        extends Event
+  }
+
+  @ConfiguredJsonCodec
+  case class State(scenarios: Map[String, Created] = Map.empty) extends EventBase
+
+  sealed trait Command[P] extends CommandBase
+
+  object Command {
+
+    case class Sense[P](message: Message[P], replyTo: Option[ActorRef[StatusReply[String]]] = None)
+        extends Command[P]
+
+    case class Broadcast[P](
+      message: Message[P],
+      replyTo: Option[ActorRef[StatusReply[String]]] = None
+    ) extends Command[P]
+
+    case class Create[P](scenario: Scenario, replyTo: ActorRef[StatusReply[String]])
+        extends Command[P]
+
+    case class Query[P](replyTo: ActorRef[StatusReply[String]]) extends Command[P]
+
+    case class Destroy[P](scenarioId: String, replyTo: ActorRef[StatusReply[String]])
+        extends Command[P]
   }
 }

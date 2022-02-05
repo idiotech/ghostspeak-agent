@@ -42,7 +42,9 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
               logger.info(s"getting action from redis: ${res.getOrElse(Map.empty)}")
               Future.successful(res.getOrElse(Map.empty))
             }
-            _   <- Future.traverse(all.keys)(actionId => Future(redis.withClient(c => c.hdel(key, actionId))))
+            _ <- Future.traverse(all.keys)(actionId =>
+              Future(redis.withClient(c => c.hdel(key, actionId)))
+            )
           } yield all
           onComplete(fetch) {
             case Success(all) =>
@@ -67,7 +69,7 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
     },
     pathPrefix("v1" / "scenario" / Segment / Segment / "resources") { (engine, scenarioId) =>
       get {
-        onComplete(sensor.askWithStatus[String](x => Sensor.Query[T](x))) {
+        onComplete(sensor.askWithStatus[String](x => Sensor.Command.Query[T](x))) {
           case Success(msg) =>
             parse(msg).fold(
               e => complete(StatusCodes.InternalServerError -> e.getMessage),

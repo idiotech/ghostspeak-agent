@@ -48,7 +48,7 @@ class ModelTest extends AnyFlatSpec with Matchers {
 
 //    val schema = Json.schema[BaseAction[Content]]
 //    logger.info(schema.asCirce(Draft04()))
-    logger.info(message.asJson)
+//    logger.info(message.asJson)
 //    logger.info(action.asJson)
 
 //    val messageSchema = Json.schema[Message[EventPayload]]

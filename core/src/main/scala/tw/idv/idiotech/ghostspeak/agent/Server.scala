@@ -5,13 +5,15 @@ import akka.actor.typed.{ ActorRef, ActorSystem, Behavior, PostStop }
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.Http
 import io.circe.Decoder
+import org.virtuslab.ash.annotation.SerializabilityTrait
 
 import scala.concurrent.Future
 import scala.util.{ Failure, Success }
 
 object Server {
 
-  sealed trait Msg
+  sealed trait Msg extends CommandBase
+
   private final case class StartFailed(cause: Throwable) extends Msg
   private final case class Started(binding: ServerBinding) extends Msg
   case object Stop extends Msg

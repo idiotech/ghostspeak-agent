@@ -4,10 +4,12 @@ version := "0.1"
 
 scalaVersion in ThisBuild := "2.13.4"
 
-val akkaVersion = "2.6.14"
+val akkaVersion = "2.6.18"
 val akkaHttpVersion = "10.2.2"
 val enumeratumVersion = "1.6.1"
 val circeVersion = "0.13.0"
+
+import org.virtuslab.ash.AkkaSerializationHelperPlugin
 
 scalacOptions in ThisBuild ++= Seq(
   "-Ybackend-parallelism",
@@ -41,6 +43,8 @@ libraryDependencies in ThisBuild ++= Seq(
   "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % Test,
   "com.typesafe.akka" %% "akka-persistence-typed" % akkaVersion,
   "com.typesafe.akka" %% "akka-persistence-testkit" % akkaVersion % Test,
+  "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
+  AkkaSerializationHelperPlugin.circeAkkaSerializer,
   "ch.megard" %% "akka-http-cors" % "1.1.1",
   "com.lightbend.akka" %% "akka-stream-alpakka-google-fcm" % "3.0.3",
   "net.debasishg" %% "redisclient" % "3.41",
@@ -69,7 +73,7 @@ resolvers in ThisBuild ++= List(
 def project(projectName: String) = Project(projectName, new File(projectName)).settings(
   name := projectName,
   version := "0.1"
-)
+).enablePlugins(AkkaSerializationHelperPlugin)
 
 val core = project("core")
 val example = project("example").dependsOn(core)

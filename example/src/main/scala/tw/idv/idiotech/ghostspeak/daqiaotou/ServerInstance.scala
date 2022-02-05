@@ -1,12 +1,15 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
 import akka.actor.typed.ActorSystem
-import tw.idv.idiotech.ghostspeak.agent.Server
+import tw.idv.idiotech.ghostspeak.agent.{ Actuator, Sensor, Server }
 
 object ServerInstance extends App {
+  val sensor = new Sensor[EventPayload]
+  val actuator = new Actuator[Content, EventPayload]
+  val scenarioCreator = new ScenarioCreator(sensor, actuator)
   ActorSystem(
     Server[EventPayload](
-      ScenarioCreator.scenarioBehavior,
+      scenarioCreator.scenarioBehavior,
       (a, s) => new EventRoutes(a, s),
       "0.0.0.0",
       8080

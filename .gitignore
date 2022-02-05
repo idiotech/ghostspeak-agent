@@ -21,3 +21,4 @@ project/plugins/project/
 .bsp/
 journal/
 out/
+leveldb/

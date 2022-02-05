@@ -8,15 +8,18 @@ import io.circe.generic.extras.semiauto._
 
 import scala.collection.immutable
 import json.schema._
+import org.virtuslab.ash.annotation.SerializabilityTrait
 package object agent {
 
-  private implicit val configuration = Configuration.default
+  implicit val configuration = Configuration.default
     .withDiscriminator("type")
     .withScreamingSnakeCaseConstructorNames
     .withDefaults
 
+  trait CirceSerializable
+
   @ConfiguredJsonCodec
-  case class Session(scenario: String, chapter: Option[String])
+  case class Session(scenario: String, chapter: Option[String]) extends CirceSerializable
 
   @typeHint[String]
   sealed trait Modality extends EnumEntry
@@ -121,6 +124,7 @@ package object agent {
   @description(
     "An event represents something to process on the server. It is sent from the client to the server."
   )
+//  @ConfiguredJsonCodec
   case class Message[T](
     @description("Unique ID for an event instance")
     id: String,
