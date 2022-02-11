@@ -59,6 +59,8 @@ libraryDependencies in ThisBuild ++= Seq(
   "com.softwaremill.retry" %% "retry" % "0.3.3",
   "io.circe"        %% "circe-generic"       % circeVersion,
   "io.circe"        %% "circe-generic-extras"       % "0.13.1-M4",
+  "com.typesafe" % "config" % "1.4.1",
+  "io.circe" %% "circe-config" % "0.8.0",
   "org.typelevel" %% "cats-core" % "2.1.0",
   "org.typelevel" %% "cats-effect" % "2.0.0",
   "org.scalatest" %% "scalatest" % "3.1.0" % Test

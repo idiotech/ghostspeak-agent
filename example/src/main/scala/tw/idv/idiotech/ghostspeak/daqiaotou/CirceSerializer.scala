@@ -1,13 +1,11 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
 import akka.serialization.Serializer
-import io.circe
 import io.circe.Json
 import io.circe.syntax._
 import io.circe.parser.decode
 import tw.idv.idiotech.ghostspeak.agent.EventBase
-import tw.idv.idiotech.ghostspeak.agent
-import tw.idv.idiotech.ghostspeak.daqiaotou
+import tw.idv.idiotech.ghostspeak.{ agent, daqiaotou }
 
 class CirceSerializer extends Serializer {
   override def identifier: Int = 5566
@@ -16,17 +14,22 @@ class CirceSerializer extends Serializer {
 
   import daqiaotou.ServerInstance.scenarioCreator
   import daqiaotou.ServerInstance.actuator
+  import daqiaotou.ServerInstance.spotKeeperActuator
 
   override def toBinary(o: AnyRef): Array[Byte] = {
     val json: Json = o match {
       case eb: EventBase =>
         eb match {
-          case e: scenarioCreator.Event => e.asJson
-          case e: scenarioCreator.State => e.asJson
-          case e: actuator.Event        => e.asJson
-          case e: actuator.State        => e.asJson
-          case e: agent.Sensor.Event    => e.asJson
-          case e: agent.Sensor.State    => e.asJson
+          case e: scenarioCreator.Event    => e.asJson
+          case e: scenarioCreator.State    => e.asJson
+          case e: actuator.Event           => e.asJson
+          case e: actuator.State           => e.asJson
+          case e: agent.Sensor.Event       => e.asJson
+          case e: agent.Sensor.State       => e.asJson
+          case e: SpotKeeper.Event         => e.asJson
+          case e: SpotKeeper.State         => e.asJson
+          case e: spotKeeperActuator.Event => e.asJson
+          case e: spotKeeperActuator.State => e.asJson
         }
     }
     json.toString.getBytes("UTF-8")
@@ -39,21 +42,22 @@ class CirceSerializer extends Serializer {
     val as = classOf[actuator.State]
     val se = classOf[agent.Sensor.Event]
     val ss = classOf[agent.Sensor.State]
+    val spe = classOf[daqiaotou.SpotKeeper.Event]
+    val sps = classOf[daqiaotou.SpotKeeper.State]
+    val spae = classOf[spotKeeperActuator.Event]
+    val spas = classOf[spotKeeperActuator.State]
     val string = new String(bytes, "UTF-8")
-//    val r1: Option[Either[circe.Error, EventBase]] = manifest.map(c => c match {
-//      case `sce` => decode[scenarioCreator.Event](string)
-//      case `scs` => decode[scenarioCreator.State](string)
-//      case `ae` => decode[actuator.Event](string)
-//      case `as` => decode[actuator.State](string)
-//      case `se` => decode[agent.Sensor.Event](string)
-//      case `ss` => decode[agent.Sensor.State](string)
-//    })
     val result = manifest.map(c =>
       if (sce.isAssignableFrom(c)) decode[scenarioCreator.Event](string)
       else if (scs.isAssignableFrom(c)) decode[scenarioCreator.State](string)
       else if (ae.isAssignableFrom(c)) decode[actuator.Event](string)
       else if (as.isAssignableFrom(c)) decode[actuator.State](string)
       else if (se.isAssignableFrom(c)) decode[agent.Sensor.Event](string)
+      else if (ss.isAssignableFrom(c)) decode[agent.Sensor.State](string)
+      else if (spe.isAssignableFrom(c)) decode[daqiaotou.SpotKeeper.Event](string)
+      else if (sps.isAssignableFrom(c)) decode[daqiaotou.SpotKeeper.State](string)
+      else if (spae.isAssignableFrom(c)) decode[spotKeeperActuator.Event](string)
+      else if (spas.isAssignableFrom(c)) decode[spotKeeperActuator.State](string)
       else decode[agent.Sensor.State](string)
     )
     result.fold {

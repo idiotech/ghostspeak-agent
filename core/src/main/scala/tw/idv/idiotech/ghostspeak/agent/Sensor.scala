@@ -157,7 +157,6 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
         children.foreach(c =>
           c ! Sense(
             message.copy(
-              sender = c.path.name,
               receiver = c.path.name
             )
           )

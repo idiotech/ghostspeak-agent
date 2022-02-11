@@ -116,12 +116,12 @@ object EventRoutes {
         t match {
           case Task.Popup(text, choices, allowTextReply, pictures, destinations) =>
             r.copy(images = pictures ++ r.images)
-          case Task.Sound(url, volumeSetting, mode)        => r.copy(sounds = url :: r.sounds)
-          case Task.Marker(location, icon, title)          => r.copy(images = icon :: r.images)
-          case Task.MarkerRemoval(id)                      => r
-          case Task.PopupDismissal(places)                 => r
-          case Task.IncomingCall(caller, status, portrait) => r
-          case Task.MapStyle(url)                          => r
+          case Task.Sound(url, volumeSetting, mode)         => r.copy(sounds = url :: r.sounds)
+          case Task.Marker(location, icon, title, actionId) => r.copy(images = icon :: r.images)
+          case Task.MarkerRemoval(id)                       => r
+          case Task.PopupDismissal(places)                  => r
+          case Task.IncomingCall(caller, status, portrait)  => r
+          case Task.MapStyle(url)                           => r
         }
       )
     }

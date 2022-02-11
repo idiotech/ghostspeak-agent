@@ -1,17 +1,30 @@
 package tw.idv.idiotech.ghostspeak
 
 import enumeratum.EnumEntry.UpperSnakecase
-import enumeratum.{ CirceEnum, Enum, EnumEntry }
-import io.circe.generic.extras.{ Configuration, ConfiguredJsonCodec }
-import json.schema.{ description, title, typeHint }
+import enumeratum.{CirceEnum, Enum, EnumEntry}
+import io.circe.generic.extras.{Configuration, ConfiguredJsonCodec}
+import json.schema.{description, title, typeHint}
 import com.redis._
-import tw.idv.idiotech.ghostspeak.agent.{ Action, Message }
+import com.typesafe.config.ConfigFactory
+import tw.idv.idiotech.ghostspeak.agent.{Action, Message}
+import io.circe.config.syntax._
 
 import scala.collection.immutable
 
 package object daqiaotou {
 
-  val redis = new RedisClientPool("host.docker.internal", 6379)
+  @ConfiguredJsonCodec
+  case class RedisConf(host: String, port: Int)
+
+  @ConfiguredJsonCodec
+  case class IconConf(pending: String, arrived: String)
+
+  @ConfiguredJsonCodec
+  case class DaqiaotouConf(engine: String, redis: RedisConf, icon: IconConf)
+
+  lazy val config: DaqiaotouConf = ConfigFactory.load("app").as[DaqiaotouConf].fold(throw _, identity)
+
+  val redis = new RedisClientPool(config.redis.host, config.redis.port)
 
   implicit val configuration = Configuration.default
     .withDiscriminator("type")
@@ -146,7 +159,9 @@ package object daqiaotou {
       @description("The icon image URL for the marker.")
       icon: String,
       @description("The marker title.")
-      title: String
+      title: String,
+      @description("The action to call on click")
+      onClickActionId: Option[String] = None
     ) extends Task
 
     @title("Marker removal")

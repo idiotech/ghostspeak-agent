@@ -279,14 +279,14 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
         def discover(c: ActorContext[_], a: Action, r: ActorRef[Actuator.Command[Content]]) = Some {
           c.spawnAnonymous(fcm(actx.self))
         }
-        actuator.behavior("root", discover, sensorRef)
+        actuator.behavior("graphscript", discover, sensorRef)
       }
       val actuatorRef: ActorRef[Actuator.Command[Content]] =
         ctx.spawn(actuatorBehavior, UUID.randomUUID().toString)
       actuatorRef ! Actuator.Command.Timeout() // for recovery
       // TODO check engine before deciding actor
       sensor.apply(
-        "root",
+        "graphscript",
         (ctx, created) =>
           if (created.scenario.engine == "graphscript")
             Try {
