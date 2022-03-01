@@ -1,17 +1,22 @@
 package tw.idv.idiotech.ghostspeak
 
 import enumeratum.EnumEntry.UpperSnakecase
-import enumeratum.{CirceEnum, Enum, EnumEntry}
-import io.circe.generic.extras.{Configuration, ConfiguredJsonCodec}
-import json.schema.{description, title, typeHint}
+import enumeratum.{ CirceEnum, Enum, EnumEntry }
+import io.circe.generic.extras.{ Configuration, ConfiguredJsonCodec }
+import json.schema.{ description, title, typeHint }
 import com.redis._
 import com.typesafe.config.ConfigFactory
-import tw.idv.idiotech.ghostspeak.agent.{Action, Message}
+import tw.idv.idiotech.ghostspeak.agent.{ Action, Message }
 import io.circe.config.syntax._
 
 import scala.collection.immutable
 
 package object daqiaotou {
+
+  implicit val configuration = Configuration.default
+    .withDiscriminator("type")
+    .withScreamingSnakeCaseConstructorNames
+    .withDefaults
 
   @ConfiguredJsonCodec
   case class RedisConf(host: String, port: Int)
@@ -20,16 +25,13 @@ package object daqiaotou {
   case class IconConf(pending: String, arrived: String)
 
   @ConfiguredJsonCodec
-  case class DaqiaotouConf(engine: String, redis: RedisConf, icon: IconConf)
+  case class DaqiaotouConf(engine: String = "graphscript", redis: RedisConf, icon: IconConf)
 
-  lazy val config: DaqiaotouConf = ConfigFactory.load("app").as[DaqiaotouConf].fold(throw _, identity)
+  lazy val config: DaqiaotouConf = {
+    ConfigFactory.load().as[DaqiaotouConf]("app").fold(throw _, identity)
+  }
 
   val redis = new RedisClientPool(config.redis.host, config.redis.port)
-
-  implicit val configuration = Configuration.default
-    .withDiscriminator("type")
-    .withScreamingSnakeCaseConstructorNames
-    .withDefaults
 
   @typeHint[String]
   sealed trait Destination extends EnumEntry
