@@ -1,24 +1,35 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
 import akka.Done
-import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
-import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
+import akka.actor.typed.scaladsl.{ ActorContext, Behaviors }
+import akka.actor.typed.{ ActorRef, ActorSystem, Behavior }
 import akka.persistence.typed.PersistenceId
-import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior}
+import akka.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.generic.extras.ConfiguredJsonCodec
 import io.circe.syntax._
-import io.circe.{Decoder, Encoder, Printer}
+import io.circe.{ Decoder, Encoder, Printer }
 import tw.idv.idiotech.ghostspeak.agent.Actuator.Command.Perform
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Command
 import tw.idv.idiotech.ghostspeak.agent.SystemPayload.Join
-import tw.idv.idiotech.ghostspeak.agent.{Action, Actuator, EventBase, FcmSender, Message, Scenario, Sensor, Session, SystemPayload}
+import tw.idv.idiotech.ghostspeak.agent.{
+  Action,
+  Actuator,
+  EventBase,
+  FcmSender,
+  Message,
+  Scenario,
+  Sensor,
+  Session,
+  SystemPayload
+}
 
 import java.util.UUID
 import scala.concurrent.Future
 import scala.util.Try
 import SpotKeeper._
+
 class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPayload])
     extends LazyLogging {
 
@@ -47,7 +58,7 @@ class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPa
                 user,
                 Right(SpotPayload.Dump(user)),
                 scenarioId
-              ),
+              )
             )
             Effect.none
           case Right(SpotPayload.Upload(spot)) =>
@@ -64,10 +75,14 @@ class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPa
             )
             Effect.persist(Event.Uploaded(spot))
           case Right(SpotPayload.Show(spot)) =>
-            spot.toActions(user, Session(scenarioId, None)).foreach(a => actuator ! Perform(a, System.currentTimeMillis()))
+            spot
+              .toActions(user, Session(scenarioId, None))
+              .foreach(a => actuator ! Perform(a, System.currentTimeMillis()))
             Effect.none
           case Right(SpotPayload.Dump(newUser)) =>
-            state.spots.flatMap(_.toActions(newUser, Session(scenarioId, None))).foreach(a => actuator ! Perform(a, System.currentTimeMillis()))
+            state.spots
+              .flatMap(_.toActions(newUser, Session(scenarioId, None)))
+              .foreach(a => actuator ! Perform(a, System.currentTimeMillis()))
             Effect.none
           case _ => Effect.none
         }
@@ -75,11 +90,11 @@ class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPa
     }
 
   def ub(
-          userScenario: Scenario,
-          scenarioId: String,
-          sensorRef: ActorRef[Command],
-          actuator: ActorRef[Actuator.Command[Content]]
-        ) =
+    userScenario: Scenario,
+    scenarioId: String,
+    sensorRef: ActorRef[Command],
+    actuator: ActorRef[Actuator.Command[Content]]
+  ) =
     Behaviors.setup[Command] { ctx =>
       val user = userScenario.id
       EventSourcedBehavior[Command, Event, State](
@@ -94,8 +109,16 @@ class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPa
     scenarioId: String,
     sensorRef: ActorRef[Command],
     actuatorRef: ActorRef[Actuator.Command[Content]]
-  )(actorContext: ActorContext[_], created: Sensor.Event.Created): Either[String, ActorRef[Command]] =
-    Right(actorContext.spawn(ub(created.scenario, scenarioId, sensorRef, actuatorRef), created.scenario.id))
+  )(
+    actorContext: ActorContext[_],
+    created: Sensor.Event.Created
+  ): Either[String, ActorRef[Command]] =
+    Right(
+      actorContext.spawn(
+        ub(created.scenario, scenarioId, sensorRef, actuatorRef),
+        created.scenario.id
+      )
+    )
 
   def sendMessage(
     action: Action[Content]
@@ -117,7 +140,11 @@ class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPa
         def fcm(root: ActorRef[Actuator.Command[Content]]) =
           actuator.fromFuture(sendMessage, root)
 
-        def discover(c: ActorContext[_], a: Action[Content], r: ActorRef[Actuator.Command[Content]]) = Some {
+        def discover(
+          c: ActorContext[_],
+          a: Action[Content],
+          r: ActorRef[Actuator.Command[Content]]
+        ) = Some {
           c.spawnAnonymous(fcm(actx.self))
         }
         actuator.behavior("spotkeeper", discover, sensorRef)
@@ -132,7 +159,11 @@ class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPa
             Try {
               val scn = created.scenario
               val actor: Behavior[Sensor.Command[SpotPayload]] =
-                sensor.apply(scn.id, createUserScenario(created.scenario.id, sensorRef, actuatorRef), sensor.onCommandPerUser)
+                sensor.apply(
+                  scn.id,
+                  createUserScenario(created.scenario.id, sensorRef, actuatorRef),
+                  sensor.onCommandPerUser
+                )
               ctx.spawn(
                 actor,
                 if (created.uniqueId.nonEmpty) created.uniqueId else UUID.randomUUID().toString
@@ -150,10 +181,18 @@ class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPa
     }
 
 }
+
 object SpotKeeper {
 
   @ConfiguredJsonCodec
-  case class Spot(id: String = s"SPOT-${UUID.randomUUID()}", title: String, text: String, images: List[String], location: Location) {
+  case class Spot(
+    id: String = s"SPOT-${UUID.randomUUID()}",
+    title: String,
+    text: String,
+    images: List[String],
+    location: Location
+  ) {
+
     def toActions(user: String, session: Session): List[Action[Content]] = List(
       Action[Content](
         s"$id-marker-pending",
@@ -180,8 +219,7 @@ object SpotKeeper {
             List("關閉"),
             false,
             images,
-            Set(Destination.Alert, Destination.Notification),
-
+            Set(Destination.Alert, Destination.Notification)
           ),
           Condition.Geofence(location, 14)
         ),
@@ -196,17 +234,18 @@ object SpotKeeper {
             location,
             config.icon.arrived,
             title,
-            Some(s"$id-popup"),
+            Some(s"$id-popup")
           ),
           Condition.Geofence(location, 14)
         ),
         session
-      ),
+      )
     )
   }
 
   @ConfiguredJsonCodec
   sealed trait SpotPayload
+
   // need to maintain an outer instance
   object SpotPayload {
     // broadcast image to every user
@@ -220,6 +259,7 @@ object SpotKeeper {
 
   @ConfiguredJsonCodec
   sealed trait Event extends EventBase
+
   object Event {
     case class Uploaded(spot: Spot) extends Event
   }
