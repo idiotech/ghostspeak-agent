@@ -179,6 +179,10 @@ package object daqiaotou {
       url: String
     ) extends Task
 
+    @title("Intro image")
+    @description("The background image to show ")
+    case class IntroImage(backgroundUrl: String, logoUrl: String) extends Task
+
   }
 
   @ConfiguredJsonCodec
