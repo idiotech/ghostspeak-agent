@@ -122,6 +122,7 @@ object EventRoutes {
           case Task.PopupDismissal(places)                  => r
           case Task.IncomingCall(caller, status, portrait)  => r
           case Task.MapStyle(url)                           => r
+          case Task.IntroImage(backgroundUrl, logoUrl)      => r
         }
       )
     }
