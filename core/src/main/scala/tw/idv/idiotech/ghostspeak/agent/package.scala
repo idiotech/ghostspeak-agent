@@ -8,7 +8,6 @@ import io.circe.generic.extras.semiauto._
 
 import scala.collection.immutable
 import json.schema._
-import org.virtuslab.ash.annotation.SerializabilityTrait
 package object agent {
 
   implicit val configuration = Configuration.default
@@ -156,6 +155,12 @@ package object agent {
   }
 
   @ConfiguredJsonCodec
-  case class Scenario(id: String, engine: String, template: String, name: Option[String] = None)
+  case class Scenario(
+    id: String,
+    engine: String,
+    template: String,
+    name: Option[String] = None,
+    displayName: Option[String] = None
+  )
 
 }

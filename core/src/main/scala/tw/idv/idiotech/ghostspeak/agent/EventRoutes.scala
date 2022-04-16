@@ -76,32 +76,37 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
       )
     },
     pathPrefix("v1" / "scenario" / Segment / Segment) { (engine, scenarioId) =>
-      parameters("overwrite".optional, "name".optional) { (overwriteParam, name) =>
-        val overwrite = overwriteParam.fold(false)(_ == "true")
-        put {
-          entity(as[Json]) { template =>
-            val ret: Route = onComplete {
-              val deletion = if (overwrite) {
-                logger.info("overwriting!")
-                sensor.askWithStatus[String](x => Destroy[T](scenarioId, x)).recover { case e =>
-                  logger.error("failed to delete scanario", e)
+      parameters("overwrite".optional, "name".optional, "displayName".optional) {
+        (overwriteParam, name, displayName) =>
+          val overwrite = overwriteParam.fold(false)(_ == "true")
+          put {
+            entity(as[Json]) {
+              template =>
+                val ret: Route = onComplete {
+                  val deletion = if (overwrite) {
+                    logger.info("overwriting!")
+                    sensor.askWithStatus[String](x => Destroy[T](scenarioId, x)).recover { case e =>
+                      logger.error("failed to delete scanario", e)
+                    }
+                  } else Future.unit
+                  deletion.flatMap(_ =>
+                    sensor.askWithStatus[String](x =>
+                      Create[T](
+                        Scenario(scenarioId, engine, template.toString, name, displayName),
+                        x
+                      )
+                    )
+                  )
+                } {
+                  case Success(msg) => complete(msg)
+                  case Failure(StatusReply.ErrorMessage(reason)) =>
+                    complete(StatusCodes.InternalServerError -> reason)
+                  case Failure(e) =>
+                    complete(StatusCodes.InternalServerError -> e.getMessage)
                 }
-              } else Future.unit
-              deletion.flatMap(_ =>
-                sensor.askWithStatus[String](x =>
-                  Create[T](Scenario(scenarioId, engine, template.toString, name), x)
-                )
-              )
-            } {
-              case Success(msg) => complete(msg)
-              case Failure(StatusReply.ErrorMessage(reason)) =>
-                complete(StatusCodes.InternalServerError -> reason)
-              case Failure(e) =>
-                complete(StatusCodes.InternalServerError -> e.getMessage)
+                ret
             }
-            ret
           }
-        }
       }
     },
     pathPrefix("v1" / "scenario") {

@@ -181,8 +181,17 @@ package object daqiaotou {
 
     @title("Intro image")
     @description("The background image to show ")
-    case class IntroImage(backgroundUrl: String, logoUrl: String) extends Task
+    case class IntroImage(
+      backgroundUrl: String,
+      logoUrl: String,
+      logoMarginTop: Option[Float] = None,
+      logoWidth: Option[Float] = None,
+      logoHeight: Option[Float] = None
+    ) extends Task
 
+    @title("Button style")
+    @description("The colors of a button")
+    case class ButtonStyle(backgroundColor: String, textColor: String) extends Task
   }
 
   @ConfiguredJsonCodec
