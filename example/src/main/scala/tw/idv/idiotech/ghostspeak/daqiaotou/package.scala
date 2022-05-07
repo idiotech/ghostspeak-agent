@@ -176,7 +176,8 @@ package object daqiaotou {
     @title("Map style")
     @description("Client should change the style of the map")
     case class MapStyle(
-      url: String
+      url: Option[String],
+      satellite: Boolean = false
     ) extends Task
 
     @title("Intro image")
