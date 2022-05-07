@@ -121,7 +121,7 @@ object EventRoutes {
           case Task.MarkerRemoval(id)                       => r
           case Task.PopupDismissal(places)                  => r
           case Task.IncomingCall(caller, status, portrait)  => r
-          case Task.MapStyle(url)                           => r
+          case Task.MapStyle(url, satellite)                => r
           case Task.IntroImage(bgUrl, logoUrl, _, _, _)     => r
           case Task.ButtonStyle(bgColor, textColor)         => r
         }

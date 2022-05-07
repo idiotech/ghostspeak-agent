@@ -21,7 +21,7 @@ import io.circe.syntax._
 import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.Node
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
-import io.circe.{ Decoder, Encoder }
+import io.circe.{ Decoder, Encoder, Printer }
 import io.circe.generic.extras.ConfiguredJsonCodec
 import org.virtuslab.ash.annotation.SerializabilityTrait
 

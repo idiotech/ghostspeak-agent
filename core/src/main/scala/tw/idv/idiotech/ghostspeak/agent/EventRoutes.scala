@@ -86,13 +86,13 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
                   val deletion = if (overwrite) {
                     logger.info("overwriting!")
                     sensor.askWithStatus[String](x => Destroy[T](scenarioId, x)).recover { case e =>
-                      logger.error("failed to delete scanario", e)
+                      logger.error("failed to delete scenario", e)
                     }
                   } else Future.unit
                   deletion.flatMap(_ =>
                     sensor.askWithStatus[String](x =>
                       Create[T](
-                        Scenario(scenarioId, engine, template.toString, name, displayName),
+                        Scenario(scenarioId, engine, template.toString, name, displayName.filter(d => d != "null" && d != "undefined")),
                         x
                       )
                     )
