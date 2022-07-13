@@ -14,7 +14,8 @@ import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.Decoder
 import io.circe.Json
-import io.circe.parser.parse
+import io.circe.parser.decode
+import io.circe.syntax._
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -76,59 +77,93 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
       )
     },
     pathPrefix("v1" / "scenario" / Segment / Segment) { (engine, scenarioId) =>
-      parameters("overwrite".optional, "name".optional, "displayName".optional) {
-        (overwriteParam, name, displayName) =>
+      parameters("overwrite".optional, "name".optional, "displayName".optional, "public".optional) {
+        (overwriteParam, name, displayName, public) =>
           val overwrite = overwriteParam.fold(false)(_ == "true")
           put {
-            entity(as[Json]) {
-              template =>
-                val ret: Route = onComplete {
-                  val deletion = if (overwrite) {
-                    logger.info("overwriting!")
-                    sensor.askWithStatus[String](x => Destroy[T](scenarioId, x)).recover { case e =>
-                      logger.error("failed to delete scenario", e)
-                    }
-                  } else Future.unit
-                  deletion.flatMap(_ =>
-                    sensor.askWithStatus[String](x =>
-                      Create[T](
-                        Scenario(scenarioId, engine, template.toString, name, displayName.filter(d => d != "null" && d != "undefined")),
-                        x
-                      )
+            entity(as[Json]) { template =>
+              val ret: Route = onComplete {
+                val deletion = if (overwrite) {
+                  logger.info("overwriting!")
+                  sensor.askWithStatus[String](x => Destroy[T](scenarioId, x)).recover { case e =>
+                    logger.error("failed to delete scenario", e)
+                  }
+                } else Future.unit
+                deletion.flatMap { _ =>
+                  val scenario = Scenario(
+                    scenarioId,
+                    engine,
+                    template.toString,
+                    name,
+                    displayName.filter(d => d != "null" && d != "undefined"),
+                    public.fold(false)(_ == "true")
+                  )
+                  logger.info(s"==== $scenario")
+                  sensor.askWithStatus[String](x =>
+                    Create[T](
+                      Scenario(
+                        scenarioId,
+                        engine,
+                        template.toString,
+                        name,
+                        displayName.filter(d => d != "null" && d != "undefined"),
+                        public.fold(false)(_ == "true")
+                      ),
+                      x
                     )
                   )
-                } {
-                  case Success(msg) => complete(msg)
-                  case Failure(StatusReply.ErrorMessage(reason)) =>
-                    complete(StatusCodes.InternalServerError -> reason)
-                  case Failure(e) =>
-                    complete(StatusCodes.InternalServerError -> e.getMessage)
                 }
-                ret
+              } {
+                case Success(msg) => complete(msg)
+                case Failure(StatusReply.ErrorMessage(reason)) =>
+                  complete(StatusCodes.InternalServerError -> reason)
+                case Failure(e) =>
+                  complete(StatusCodes.InternalServerError -> e.getMessage)
+              }
+              ret
             }
           }
       }
     },
-    pathPrefix("v1" / "scenario") {
-      get {
-        onComplete(sensor.askWithStatus[String](x => Query[T](x))) {
-          case Success(msg) =>
-            parse(msg).fold(
-              e => complete(StatusCodes.InternalServerError -> e.getMessage),
-              j =>
-                complete(
-                  StatusCodes.OK,
-                  List(`Content-Type`(`application/json`)), {
-                    val ret =
-                      j.mapArray(_.map(_.mapObject(_.remove("template").remove("engine"))))
-                    ret
-                  }
-                )
-            )
+    pathPrefix("v1" / "scenario" / Segment / Segment) { (engine, scenarioId) =>
+      delete {
+        val ret: Route = onComplete {
+          sensor.askWithStatus[String](x => Destroy[T](scenarioId, x)).recover { case e =>
+            logger.error("failed to delete scenario", e)
+          }
+        } {
+          case Success(msg) => complete("DELETED")
           case Failure(StatusReply.ErrorMessage(reason)) =>
             complete(StatusCodes.InternalServerError -> reason)
           case Failure(e) =>
             complete(StatusCodes.InternalServerError -> e.getMessage)
+        }
+        ret
+      }
+    },
+    pathPrefix("v1" / "scenario") {
+      parameters("public".optional) { public =>
+        get {
+          val isPublic = public.map(_.toBoolean)
+          onComplete(sensor.askWithStatus[String](x => Query[T](x))) {
+            case Success(msg) =>
+              decode[List[Scenario]](msg).fold(
+                e => complete(StatusCodes.InternalServerError -> e.getMessage),
+                scenarios =>
+                  complete(
+                    StatusCodes.OK,
+                    List(`Content-Type`(`application/json`)),
+                    isPublic
+                      .fold(scenarios)(p => scenarios.filter(s => if (p) s.public else !s.public))
+                      .map(_.asJson.mapObject(_.remove("template").remove("engine")))
+                      .asJson
+                  )
+              )
+            case Failure(StatusReply.ErrorMessage(reason)) =>
+              complete(StatusCodes.InternalServerError -> reason)
+            case Failure(e) =>
+              complete(StatusCodes.InternalServerError -> e.getMessage)
+          }
         }
       }
     }

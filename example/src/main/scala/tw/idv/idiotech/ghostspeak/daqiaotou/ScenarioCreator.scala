@@ -157,6 +157,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
         }
         def getEffect(nodes: List[Node]): Effect[Event, State] = {
           nodes.foreach { n =>
+            logger.info(s"effects: ${n.performances}")
             n.performances.foreach { p =>
               val action = p.action
                 .copy(
@@ -227,13 +228,18 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
         }
       case Sensor.Command.Create(scenario, replyTo)    => Effect.none
       case Sensor.Command.Destroy(scenarioId, replyTo) => Effect.none
+      case _                                           => Effect.none
     }
 
-  def createScript(scenario: Scenario) =
-    decode[List[Node]](scenario.template)
+  def createScript(scenario: Scenario) = {
+    logger.info(s"new template: ${scenario.template}")
+    val ret = decode[List[Node]](scenario.template)
       .fold(throw _, identity)
       .map(n => n.name -> n)
       .toMap
+    logger.info(s"new template to case class: $ret")
+    ret
+  }
 
   def ub(userScenario: Scenario, actuator: ActorRef[Actuator.Command[Content]])(implicit
     script: Map[String, Node]
@@ -241,6 +247,8 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
     Behaviors.setup[Command] { ctx =>
       val user = userScenario.id
       val initial: Node = script("initial").replace(user)
+      logger.info(s"initial before = ${script("initial")}")
+      logger.info(s"initial after = $initial")
       EventSourcedBehavior[Command, Event, State](
         persistenceId = PersistenceId.ofUniqueId(s"scn-$user"),
         emptyState = State(initial.triggers.map(_ -> List(initial)).toMap, Map.empty),

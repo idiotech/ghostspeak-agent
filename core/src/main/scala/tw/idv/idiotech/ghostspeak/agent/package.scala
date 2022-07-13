@@ -160,7 +160,8 @@ package object agent {
     engine: String,
     template: String,
     name: Option[String] = None,
-    displayName: Option[String] = None
+    displayName: Option[String] = None,
+    public: Boolean = false
   )
 
 }

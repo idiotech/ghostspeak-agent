@@ -34,7 +34,6 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
     pathPrefix("v1" / "scenario" / Segment / Segment / "user" / Segment / "actions") {
       (engine, scenarioId, userId) =>
         val key = s"action-$scenarioId-$userId"
-        logger.info(s"getting action from redis: $key")
         delete {
           val fetch: Future[Map[String, String]] = for {
             res <- Future(redis.withClient(c => c.hgetall[String, String](key)))
@@ -122,7 +121,7 @@ object EventRoutes {
           case Task.PopupDismissal(places)                  => r
           case Task.IncomingCall(caller, status, portrait)  => r
           case Task.MapStyle(url, satellite)                => r
-          case Task.IntroImage(bgUrl, logoUrl, _, _, _)     => r
+          case Task.IntroImage(bgUrl, _, _, _, _, _)        => r
           case Task.ButtonStyle(bgColor, textColor)         => r
         }
       )

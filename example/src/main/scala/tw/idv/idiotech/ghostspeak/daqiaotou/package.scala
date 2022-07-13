@@ -183,11 +183,12 @@ package object daqiaotou {
     @title("Intro image")
     @description("The background image to show ")
     case class IntroImage(
-      backgroundUrl: String,
-      logoUrl: String,
+      backgroundUrl: Option[String],
+      logoUrl: Option[String],
       logoMarginTop: Option[Float] = None,
       logoWidth: Option[Float] = None,
-      logoHeight: Option[Float] = None
+      logoHeight: Option[Float] = None,
+      mapLogoUrl: Option[String]
     ) extends Task
 
     @title("Button style")
