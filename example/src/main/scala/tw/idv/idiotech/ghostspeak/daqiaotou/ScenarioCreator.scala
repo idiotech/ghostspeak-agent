@@ -6,7 +6,6 @@ import akka.actor.typed.scaladsl.{ ActorContext, Behaviors }
 import akka.persistence.typed.PersistenceId
 import akka.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
 import tw.idv.idiotech.ghostspeak.agent.Actuator.Command.Perform
-import tw.idv.idiotech.ghostspeak.agent
 import tw.idv.idiotech.ghostspeak.agent.{
   Actuator,
   EventBase,
@@ -18,12 +17,12 @@ import tw.idv.idiotech.ghostspeak.agent.{
 }
 import io.circe.parser.decode
 import io.circe.syntax._
-import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.Node
+import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.{ Comparison, Node, Precondition }
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
-import io.circe.{ Decoder, Encoder, Printer }
+import io.circe.{ Decoder, Encoder }
 import io.circe.generic.extras.ConfiguredJsonCodec
-import org.virtuslab.ash.annotation.SerializabilityTrait
+import tw.idv.idiotech.ghostspeak.daqiaotou.Task.VariableUpdates
 
 import java.util.UUID
 import scala.concurrent.Future
@@ -43,15 +42,43 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
   @ConfiguredJsonCodec
   case class StateStorage(triggers: List[Trigger], exclusions: Map[ActionId, List[NodeId]])
 
-  case class State(triggers: Map[Message, List[Node]], exclusions: Map[ActionId, List[NodeId]])
-      extends EventBase
+  case class State(
+    triggers: Map[Message, List[Node]],
+    exclusions: Map[ActionId, List[NodeId]],
+    variables: Map[String, Int] = Map.empty
+  ) extends EventBase {
+
+    def apply(update: VariableUpdate): State = {
+      val prevValue = variables.getOrElse(update.name, 0)
+      val newValue: Int = update.operation match {
+        case Operation.+   => prevValue + update.value
+        case Operation.-   => prevValue - update.value
+        case Operation.`=` => update.value
+      }
+      copy(variables = variables + (update.name -> newValue))
+    }
+    def apply(updates: List[VariableUpdate]): State = updates.foldLeft(this)((s, vu) => s.apply(vu))
+
+    def check(precondition: Precondition): Boolean =
+      variables
+        .get(precondition.name)
+        .fold(false)(v =>
+          precondition.comparison match {
+            case Comparison.>= => v >= precondition.value
+            case Comparison.<= => v <= precondition.value
+            case Comparison.== => v == precondition.value
+          }
+        )
+    def check(preconds: List[Precondition]): Boolean = preconds.forall(check)
+  }
 
   object State {
 
     implicit val decoder: Decoder[State] = implicitly[Decoder[StateStorage]].map(ss =>
       State(
         ss.triggers.map(t => t.message -> t.nodes).toMap,
-        ss.exclusions
+        ss.exclusions,
+        Map.empty
       )
     )
 
@@ -61,14 +88,15 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
   }
 
   @ConfiguredJsonCodec
-  case class Event(nodes: List[Node], message: Message) extends EventBase
+  case class Event(nodes: List[Node], message: Message, variableUpdates: List[VariableUpdate])
+      extends EventBase
 
   def onEvent(
     user: String
   )(state: State, event: Event)(implicit script: Map[String, Node]): State =
     if (event.nodes == List(Node.leave)) {
       val initial = script("initial").replace(user)
-      State(initial.triggers.map(_ -> List(initial)).toMap, Map.empty)
+      State(initial.triggers.map(_ -> List(initial)).toMap, Map.empty, Map.empty)
     } else {
       val currentNodes = event.nodes
       val removalMap =
@@ -116,14 +144,15 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
         .filter(_ => event.message.payload.fold(_ == SystemPayload.Start, _ => false))
         .flatMap(state.exclusions.get)
         .fold(
-          State(excluded, exclusions)
+          State(excluded, exclusions, state.variables)
         ) { nodeId =>
           State(
             excluded.view.mapValues(_.filterNot(n => nodeId.contains(n.name))).toMap,
-            exclusions.filterNot(_._2 == nodeId)
+            exclusions.filterNot(_._2 == nodeId),
+            state.variables
           )
         }
-      result
+      result.apply(event.variableUpdates)
     }
 
   def fakeTextPayload = Right(EventPayload.Text("fake_text"))
@@ -156,25 +185,32 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
           actuator ! Perform(a, System.currentTimeMillis())
         }
         def getEffect(nodes: List[Node]): Effect[Event, State] = {
-          nodes.foreach { n =>
-            logger.info(s"effects: ${n.performances}")
-            n.performances.foreach { p =>
-              val action = p.action
-                .copy(
-                  session = Session(message.scenarioId, None),
-                  content = p.action.content.copy(exclusiveWith =
-                    n.exclusiveWith.toList
-                      .flatMap(e => script.get(e))
-                      .flatMap(_.performances.map(_.action.id))
+          val variableUpdates: List[VariableUpdate] =
+            nodes.filter(n => state.check(n.preconditions)).flatMap { n =>
+              logger.info(s"effects: ${n.performances}")
+              val vus: List[VariableUpdate] = n.performances.flatMap { p =>
+                val action = p.action
+                  .copy(
+                    session = Session(message.scenarioId, None),
+                    content = p.action.content.copy(exclusiveWith =
+                      n.exclusiveWith.toList
+                        .flatMap(e => script.get(e))
+                        .flatMap(_.performances.map(_.action.id))
+                    )
                   )
-                )
-              val startTime = System.currentTimeMillis() + p.delay
-              logger.info(s"carrying out ${Perform(action, startTime)}")
-              actuator ! Perform(action, startTime)
+                val startTime = System.currentTimeMillis() + p.delay
+                logger.info(s"carrying out ${Perform(action, startTime)}")
+                action.content.task match {
+                  case vu: VariableUpdates => vu.updates
+                  case _ =>
+                    actuator ! Perform(action, startTime)
+                    Nil
+                }
+              }
+              logger.info(s"transition to ${n.name}")
+              vus
             }
-            logger.info(s"transition to ${n.name}")
-          }
-          Effect.persist(Event(nodes, message))
+          Effect.persist(Event(nodes, message, variableUpdates))
         }
 
         message.payload match {
@@ -183,7 +219,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
             val redisKey = s"action-${message.scenarioId}-$user"
             logger.info(s"deleting user from redis: $redisKey")
             redis.withClient(r => r.del(redisKey))
-            Effect.persist(Event(List(Node.leave), message))
+            Effect.persist(Event(List(Node.leave), message, Nil))
           case Right(EventPayload.PerformDirectly(action)) =>
             simplyPerform(action)
             Effect.none
@@ -251,7 +287,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
       logger.info(s"initial after = $initial")
       EventSourcedBehavior[Command, Event, State](
         persistenceId = PersistenceId.ofUniqueId(s"scn-$user"),
-        emptyState = State(initial.triggers.map(_ -> List(initial)).toMap, Map.empty),
+        emptyState = State(initial.triggers.map(_ -> List(initial)).toMap, Map.empty, Map.empty),
         commandHandler = onCommand(user, actuator),
         eventHandler = onEvent(user)
       )

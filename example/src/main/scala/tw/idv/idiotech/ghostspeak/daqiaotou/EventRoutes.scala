@@ -22,7 +22,6 @@ import akka.actor.typed.scaladsl.AskPattern.Askable
 import io.circe.generic.JsonCodec
 
 import scala.concurrent.Future
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{ Failure, Success }
 
 class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: ActorSystem[_])
@@ -123,6 +122,7 @@ object EventRoutes {
           case Task.MapStyle(url, satellite)                => r
           case Task.IntroImage(bgUrl, _, _, _, _, _)        => r
           case Task.ButtonStyle(bgColor, textColor)         => r
+          case Task.VariableUpdates(_)                      => r
         }
       )
     }

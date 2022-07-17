@@ -104,6 +104,19 @@ package object daqiaotou {
     case class DynamicVolume(center: Location, radius: Int, minVolume: Double) extends Volume
   }
 
+  @typeHint[String]
+  sealed trait Operation extends EnumEntry
+
+  object Operation extends Enum[Operation] with CirceEnum[Operation] {
+    val values: immutable.IndexedSeq[Operation] = findValues
+    case object + extends Operation with UpperSnakecase
+    case object - extends Operation with UpperSnakecase
+    case object `=` extends Operation with UpperSnakecase
+  }
+
+  @ConfiguredJsonCodec
+  case class VariableUpdate(name: String, operation: Operation, value: Int) extends Task
+
   @ConfiguredJsonCodec
   sealed trait Task
 
@@ -194,6 +207,10 @@ package object daqiaotou {
     @title("Button style")
     @description("The colors of a button")
     case class ButtonStyle(backgroundColor: String, textColor: String) extends Task
+
+    @title("Variable update")
+    @description("The operation to update the value of a variable")
+    case class VariableUpdates(updates: List[VariableUpdate]) extends Task
   }
 
   @ConfiguredJsonCodec
