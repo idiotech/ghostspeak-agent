@@ -34,6 +34,9 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
       (engine, scenarioId, userId) =>
         val key = s"action-$scenarioId-$userId"
         delete {
+          logger.info(
+            s"############ HTTP DELETE: /v1/scenario/$engine/$scenarioId/user/$userId/actions"
+          )
           val fetch: Future[Map[String, String]] = for {
             res <- Future(redis.withClient(c => c.hgetall[String, String](key)))
             all <- {
@@ -46,6 +49,9 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
           } yield all
           onComplete(fetch) {
             case Success(all) =>
+              logger.info(
+                s"############ Finished HTTP DELETE: /v1/scenario/$engine/$scenarioId/user/$userId/actions"
+              )
               val parseResults: Either[ParsingFailure, Json] =
                 all.values.map(parse).toList.sequence.map(_.asJson)
               parseResults.fold(
@@ -67,8 +73,12 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
     },
     pathPrefix("v1" / "scenario" / Segment / Segment / "resources") { (engine, scenarioId) =>
       get {
+        logger.info(s"############ HTTP GET: /v1/scenario/$engine/$scenarioId/resources")
         onComplete(sensor.askWithStatus[String](x => Sensor.Command.Query[T](x))) {
           case Success(msg) =>
+            logger.info(
+              s"############ Finished HTTP GET: /v1/scenario/$engine/$scenarioId/resources"
+            )
             parse(msg).fold(
               e => complete(StatusCodes.InternalServerError -> e.getMessage),
               j =>

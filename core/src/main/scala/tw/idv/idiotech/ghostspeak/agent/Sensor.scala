@@ -43,9 +43,12 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
       val id = state.scenarios.get(message.scenarioId).map(_.uniqueId).getOrElse("invalid")
       val reply: StatusReply[String] =
         getChild(ctx, id)
-          .fold[StatusReply[String]](
+          .fold[StatusReply[String]] {
+            logger.info(
+              s"no such scenario: ${message.scenarioId} $id at $state for message $message"
+            )
             StatusReply.Error("no such scenario")
-          ) { actor =>
+          } { actor =>
             actor ! Sense(message)
             StatusReply.success("OK")
           }

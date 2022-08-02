@@ -35,7 +35,7 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
     }
 
     @JsonCodec
-    case class ActionDone(actions: Set[Performance]) extends Event
+    case class ActionDone(actions: Set[Performance] = Set.empty) extends Event
   }
   type PendingAction = Event.Performance
 
@@ -125,6 +125,9 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
       val ret = State(state.pendingActions diff actions)
       logger.info(s"latest state: ${state.pendingActions.map(_.action.id)}")
       ret
+    case _ =>
+      logger.error(s"match error for $event")
+      state
   }
 
   def behavior(

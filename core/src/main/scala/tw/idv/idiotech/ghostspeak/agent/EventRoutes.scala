@@ -44,8 +44,11 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
           concat(
             post {
               entity(as[Message[T]]) { message =>
+                logger.info(s"############ HTTP POST: /v1/event with content $message")
                 onComplete(sensor.askWithStatus[String](x => Sense[T](message, Some(x)))) {
-                  case Success(msg) => complete(msg)
+                  case Success(msg) =>
+                    logger.info(s"############ Finished HTTP POST: /v1/event")
+                    complete(msg)
                   case Failure(StatusReply.ErrorMessage(reason)) =>
                     complete(StatusCodes.InternalServerError -> reason)
                   case Failure(e) =>
@@ -63,8 +66,11 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
           concat(
             post {
               entity(as[Message[T]]) { message =>
+                logger.info(s"############ HTTP POST: /v1/broadcast")
                 onComplete(sensor.askWithStatus[String](x => Broadcast[T](message, Some(x)))) {
-                  case Success(msg) => complete(msg)
+                  case Success(msg) =>
+                    logger.info(s"############ Finished HTTP POST: /v1/broadcast")
+                    complete(msg)
                   case Failure(StatusReply.ErrorMessage(reason)) =>
                     complete(StatusCodes.InternalServerError -> reason)
                   case Failure(e) =>
@@ -82,6 +88,9 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
           val overwrite = overwriteParam.fold(false)(_ == "true")
           put {
             entity(as[Json]) { template =>
+              logger.info(
+                s"############ HTTP PUT: /v1/scenario/$engine/$scenarioId?overwrite=$overwriteParam&name=$name&displayName=$displayName&public=$public"
+              )
               val ret: Route = onComplete {
                 val deletion = if (overwrite) {
                   logger.info("overwriting!")
@@ -114,7 +123,11 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
                   )
                 }
               } {
-                case Success(msg) => complete(msg)
+                case Success(msg) =>
+                  logger.info(
+                    s"############ Finished HTTP PUT: /v1/scenario/$engine/$scenarioId?overwrite=$overwriteParam&name=$name&displayName=$displayName&public=$public"
+                  )
+                  complete(msg)
                 case Failure(StatusReply.ErrorMessage(reason)) =>
                   complete(StatusCodes.InternalServerError -> reason)
                 case Failure(e) =>
@@ -127,12 +140,15 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
     },
     pathPrefix("v1" / "scenario" / Segment / Segment) { (engine, scenarioId) =>
       delete {
+        logger.info(s"############ HTTP DELETE: /v1/scenario/$engine/$scenarioId")
         val ret: Route = onComplete {
           sensor.askWithStatus[String](x => Destroy[T](scenarioId, x)).recover { case e =>
             logger.error("failed to delete scenario", e)
           }
         } {
-          case Success(msg) => complete("DELETED")
+          case Success(msg) =>
+            logger.info(s"############ Finished HTTP DELETE: /v1/scenario/$engine/$scenarioId")
+            complete("DELETED")
           case Failure(StatusReply.ErrorMessage(reason)) =>
             complete(StatusCodes.InternalServerError -> reason)
           case Failure(e) =>
