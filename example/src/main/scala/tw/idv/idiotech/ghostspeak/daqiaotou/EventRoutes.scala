@@ -122,7 +122,14 @@ object EventRoutes {
       val tasks: List[Task] = nodes.flatMap(_.performances.map(_.action.content.task))
       tasks.foldRight(Resources(Nil, Nil))((t, r) =>
         t match {
-          case Task.Popup(text, choices, allowTextReply, pictures, destinations) =>
+          case Task.Popup(
+                text,
+                choices,
+                allowTextReply,
+                pictures,
+                destinations,
+                closeAlertAfterReply
+              ) =>
             r.copy(images = pictures ++ r.images)
           case Task.Sound(url, volumeSetting, mode)         => r.copy(sounds = url :: r.sounds)
           case Task.Marker(location, icon, title, actionId) => r.copy(images = icon :: r.images)
@@ -133,6 +140,10 @@ object EventRoutes {
           case Task.IntroImage(bgUrl, _, _, _, _, _)        => r
           case Task.ButtonStyle(bgColor, textColor)         => r
           case Task.VariableUpdates(_)                      => r
+          case Task.EndGame                                 => r
+          case Task.GuideImage(_)                           => r
+          case Task.GuideImageRemoval                       => r
+          case Task.Silence(_, _)                           => r
         }
       )
     }

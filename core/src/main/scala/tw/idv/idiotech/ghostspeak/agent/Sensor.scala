@@ -45,7 +45,8 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
         getChild(ctx, id)
           .fold[StatusReply[String]] {
             logger.info(
-              s"no such scenario: ${message.scenarioId} $id at $state for message $message"
+              s"no such scenario: ${message.scenarioId} $id in children ${ctx.children
+                .map(_.path)} at ${state.scenarios.map(p => p._1 + p._2.uniqueId)} for message $message"
             )
             StatusReply.Error("no such scenario")
           } { actor =>
@@ -73,7 +74,9 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
         Effect.reply[StatusReply[String], Event, State](r)(reply)
       }
     case Create(scenario, replyTo) =>
-      if (!state.scenarios.contains(scenario.id))
+      if (scenario.id.isBlank)
+        Effect.reply(replyTo)(StatusReply.Error("scenario name cannot be null"))
+      else if (!state.scenarios.contains(scenario.id))
         createChild(ctx, Created(scenario, ""))
           .fold[Reff](
             e => Effect.reply(replyTo)(StatusReply.Error(s"invalid scenario: $e")),
@@ -144,7 +147,7 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
     cmd match {
       case Sense(message, _) =>
         val scenario = Scenario(message.sender, message.scenarioId, "")
-        val existingActor = getChild(ctx, message.sender)
+        val existingActor = if (message.sender.isBlank) None else getChild(ctx, message.sender)
         val maybeActor = existingActor.toRight("no such user").orElse {
           create(ctx, Created(scenario, ""))
         }

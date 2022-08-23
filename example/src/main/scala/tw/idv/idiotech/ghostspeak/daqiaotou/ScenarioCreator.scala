@@ -167,8 +167,6 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
       case _                     => false
     }
 
-  case class StringComparisonResult(matching: Option[Node] = None, fallback: Option[Node])
-
   def onCommand(
     user: String,
     actuator: ActorRef[Actuator.Command[Content]]
@@ -185,9 +183,10 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
           actuator ! Perform(a, System.currentTimeMillis())
         }
         def getEffect(nodes: List[Node]): Effect[Event, State] = {
+          logger.info(s"triggered nodes: ${nodes.map(_.name)}")
           val variableUpdates: List[VariableUpdate] =
             nodes.filter(n => state.check(n.preconditions)).flatMap { n =>
-              logger.info(s"effects: ${n.performances}")
+//              logger.info(s"effects: ${n.performances}")
               val vus: List[VariableUpdate] = n.performances.flatMap { p =>
                 val action = p.action
                   .copy(
@@ -213,6 +212,13 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
           Effect.persist(Event(nodes, message, variableUpdates))
         }
 
+        state.triggers.foreach { case (k, v) =>
+          logger.info(s"trigger: responding to ${k.actionId.getOrElse("none")}")
+          logger.info(s"======== triggering event: ${k.payload}")
+          logger.info(
+            s"======== triggered actions: ${v.map(_.performances.map(_.action.description))}"
+          )
+        }
         message.payload match {
           case Left(SystemPayload.Leave) =>
             logger.info(s"user $user left")
@@ -251,15 +257,14 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
             getEffect(state.triggers.values.toList.flatten)
           case _ =>
             logger.info(s"message: $message")
-            state.triggers.foreach { case (k, v) =>
-              logger.info(s"trigger: ${k.actionId.getOrElse("none")} ${k.payload} to ${v
-                .map(_.performances.map(_.action.description))}")
-            }
             val node = state.triggers
               .get(message.forComparison)
               .map(_.map(_.replace(user)))
               .filter(_.nonEmpty)
               .getOrElse(Nil)
+            if (node.nonEmpty) {
+              logger.info(s"match: $node")
+            }
             getEffect(node)
         }
       case Sensor.Command.Create(scenario, replyTo)    => Effect.none
@@ -298,7 +303,8 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
   )(actorContext: ActorContext[_], created: Sensor.Event.Created)(implicit
     script: Map[String, Node]
   ): Either[String, ActorRef[Command]] =
-    Right(actorContext.spawn(ub(created.scenario, actuatorRef), created.scenario.id))
+    if (created.scenario.id.isBlank) Left("empty user ID not allowed")
+    else Right(actorContext.spawn(ub(created.scenario, actuatorRef), created.scenario.id))
 
   def sendMessage(
     action: Action

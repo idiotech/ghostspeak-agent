@@ -48,6 +48,8 @@ package object daqiaotou {
     case object Welcome extends Destination with UpperSnakecase
 
     case object Notification extends Destination with UpperSnakecase
+
+    case object Dialer extends Destination with UpperSnakecase
   }
 
   @typeHint[String]
@@ -136,7 +138,9 @@ package object daqiaotou {
       @title("Picture URL to be shown")
       pictures: List[String] = Nil,
       @title("Destinations to be shown")
-      destinations: Set[Destination] = Set.empty
+      destinations: Set[Destination] = Set.empty,
+      @title("Close alert popup after reply")
+      closeAlertAfterReply: Boolean = true
     ) extends Task
 
     @title("Close popup message")
@@ -211,6 +215,22 @@ package object daqiaotou {
     @title("Variable update")
     @description("The operation to update the value of a variable")
     case class VariableUpdates(updates: List[VariableUpdate]) extends Task
+
+    @title("Finish the scenario")
+    @description("Client should return to homepage")
+    case object EndGame extends Task
+
+    @title("A image on the bottom of the map to guide user to go somewhere")
+    @description("Add the guide image")
+    case class GuideImage(image: String) extends Task
+
+    @title("guide image removal")
+    @description("Remove the guide image")
+    case object GuideImageRemoval extends Task
+
+    @title("Silence a sound")
+    @description("Make a sound by the ID stop")
+    case class Silence(id: String, fadeOutSeconds: Int) extends Task
   }
 
   @ConfiguredJsonCodec
