@@ -231,9 +231,9 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
             Effect.none
           case Right(EventPayload.Text(reply)) =>
             val forComparison = message.forComparison.copy(payload = fakeTextPayload)
-            def findMatch(matcher: (String, String) => Boolean): Option[List[Node]] =
+            def findMatch(matcher: (String, String) => Boolean): Option[List[Node]] = Option(
               state.triggers
-                .find {
+                .filter {
                   case (k, _) =>
                     k.payload match {
                       case Right(EventPayload.Text(answer)) =>
@@ -242,8 +242,9 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
                     }
                   case _ => false
                 }
-                .map(_._2)
-                .filter(_.nonEmpty)
+                .values.flatten.toList
+            ).filter(_.nonEmpty)
+
             val nodes: List[Node] = state.triggers
               .get(message.forComparison)
               .orElse(
