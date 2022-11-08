@@ -128,7 +128,8 @@ object EventRoutes {
                 allowTextReply,
                 pictures,
                 destinations,
-                closeAlertAfterReply
+                closeAlertAfterReply,
+                clearDialog
               ) =>
             r.copy(images = pictures ++ r.images)
           case Task.Sound(url, volumeSetting, mode)         => r.copy(sounds = url :: r.sounds)

@@ -140,7 +140,9 @@ package object daqiaotou {
       @title("Destinations to be shown")
       destinations: Set[Destination] = Set.empty,
       @title("Close alert popup after reply")
-      closeAlertAfterReply: Boolean = true
+      closeAlertAfterReply: Boolean = true,
+      @title("Clear dialog")
+      clearDialog : Boolean = true,
     ) extends Task
 
     @title("Close popup message")
