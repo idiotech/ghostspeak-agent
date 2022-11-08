@@ -161,7 +161,9 @@ package object agent {
     template: String,
     name: Option[String] = None,
     displayName: Option[String] = None,
-    public: Boolean = false
+    public: Boolean = false,
+    owner: Option[String] = None,
+    ordinal: Long = 9999999999999L
   )
 
 }

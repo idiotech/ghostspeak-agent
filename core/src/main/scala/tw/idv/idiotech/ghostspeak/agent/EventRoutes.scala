@@ -83,8 +83,8 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
       )
     },
     pathPrefix("v1" / "scenario" / Segment / Segment) { (engine, scenarioId) =>
-      parameters("overwrite".optional, "name".optional, "displayName".optional, "public".optional) {
-        (overwriteParam, name, displayName, public) =>
+      parameters("overwrite".optional, "name".optional, "displayName".optional, "public".optional, "owner".optional, "ordinal".optional) {
+        (overwriteParam, name, displayName, public, owner, ordinal) =>
           val overwrite = overwriteParam.fold(false)(_ == "true")
           put {
             entity(as[Json]) { template =>
@@ -99,15 +99,6 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
                   }
                 } else Future.unit
                 deletion.flatMap { _ =>
-                  val scenario = Scenario(
-                    scenarioId,
-                    engine,
-                    template.toString,
-                    name,
-                    displayName.filter(d => d != "null" && d != "undefined"),
-                    public.fold(false)(_ == "true")
-                  )
-                  logger.info(s"==== $scenario")
                   sensor.askWithStatus[String](x =>
                     Create[T](
                       Scenario(
@@ -116,7 +107,9 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
                         template.toString,
                         name,
                         displayName.filter(d => d != "null" && d != "undefined"),
-                        public.fold(false)(_ == "true")
+                        public.fold(false)(_ == "true"),
+                        owner,
+                        ordinal.map(_.toLong).getOrElse(9999999999999L)
                       ),
                       x
                     )
@@ -158,9 +151,9 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
       }
     },
     pathPrefix("v1" / "scenario") {
-      parameters("public".optional) { public =>
+      parameters("public".optional, "owner".optional) { (`public`, maybeOwner) =>
         get {
-          val isPublic = public.map(_.toBoolean)
+          val isPublic = `public`.map(_.toBoolean)
           onComplete(sensor.askWithStatus[String](x => Query[T](x))) {
             case Success(msg) =>
               decode[List[Scenario]](msg).fold(
@@ -169,8 +162,11 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
                   complete(
                     StatusCodes.OK,
                     List(`Content-Type`(`application/json`)),
-                    isPublic
-                      .fold(scenarios)(p => scenarios.filter(s => if (p) s.public else !s.public))
+                    maybeOwner.fold(
+                      isPublic
+                        .fold(scenarios)(p => scenarios.filter(s => if (p) s.public else !s.public))
+                    )( owner => scenarios.filter(_.owner.contains(owner)))
+                      .sortBy(_.ordinal)
                       .map(_.asJson.mapObject(_.remove("template").remove("engine")))
                       .asJson
                   )

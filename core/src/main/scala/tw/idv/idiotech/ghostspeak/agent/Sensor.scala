@@ -102,7 +102,7 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
         }
     case Query(replyTo) =>
       Effect.reply(replyTo)(
-        StatusReply.success(state.scenarios.values.map(_.scenario).toList.asJson.toString())
+        StatusReply.success(state.scenarios.values.map(_.scenario).toList.sortBy(_.ordinal).asJson.toString())
       )
   }
 
