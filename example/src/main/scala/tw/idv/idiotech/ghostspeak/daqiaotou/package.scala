@@ -142,7 +142,7 @@ package object daqiaotou {
       @title("Close alert popup after reply")
       closeAlertAfterReply: Boolean = true,
       @title("Clear dialog")
-      clearDialog : Boolean = true,
+      clearDialog : Boolean = false,
     ) extends Task
 
     @title("Close popup message")
