@@ -25,7 +25,10 @@ package object daqiaotou {
   case class IconConf(pending: String, arrived: String)
 
   @ConfiguredJsonCodec
-  case class DaqiaotouConf(engine: String = "graphscript", redis: RedisConf, icon: IconConf)
+  case class MysqlConf(host: String, port: Int, username: String, password: String, database: String)
+
+  @ConfiguredJsonCodec
+  case class DaqiaotouConf(engine: String = "graphscript", redis: RedisConf, icon: IconConf, mysql: MysqlConf)
 
   lazy val config: DaqiaotouConf = {
     ConfigFactory.load().as[DaqiaotouConf]("app").fold(throw _, identity)

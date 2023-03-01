@@ -37,7 +37,8 @@ object FcmSender extends LazyLogging {
   ).withMaxRestarts(20, 5.minutes)
 
   def send[T](
-    action: Action[T]
+    action: Action[T],
+    logPerf: (Action[T], String) => Unit = (_: Action[T], _: String) => ()
   )(implicit actorSystem: ActorSystem[_], encoder: Encoder[Action[T]]): Future[Done] =
     Source
       .single {
@@ -52,9 +53,11 @@ object FcmSender extends LazyLogging {
       .map {
         case res @ FcmSuccessResponse(name) =>
           logger.info(s"Successful $name")
+          logPerf(action, "fcm_sent")
           res
         case res @ FcmErrorResponse(errorMessage) =>
           logger.info(s"Send error $errorMessage")
+          logPerf(action, "fcm_error")
           res
       }
       .runWith(Sink.ignore)

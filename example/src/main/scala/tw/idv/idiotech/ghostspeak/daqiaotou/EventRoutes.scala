@@ -6,12 +6,8 @@ import akka.http.scaladsl.server.Route
 import io.circe.{ Decoder, Json, ParsingFailure }
 import tw.idv.idiotech.ghostspeak.agent
 import tw.idv.idiotech.ghostspeak.agent.{ Scenario, Sensor }
-import akka.actor.typed.{ ActorRef, ActorSystem }
-import akka.http.scaladsl.common.EntityStreamingSupport
-import akka.util.Timeout
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.model.ContentTypes._
 import akka.http.scaladsl.model.headers.`Content-Type`
 import akka.pattern.StatusReply
@@ -41,6 +37,12 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
             res <- Future(redis.withClient(c => c.hgetall[String, String](key)))
             all <- {
               logger.info(s"getting action from redis: ${res.getOrElse(Map.empty)}")
+              res.getOrElse(Map.empty).values.foreach { s =>
+                decode[Action](s).fold(
+                  error => logger.error(s"failed to parse action $s", error),
+                  a => PerformanceLogger.insert(userId, a.id, "got_from_redis", System.currentTimeMillis())
+                )
+              }
               Future.successful(res.getOrElse(Map.empty))
             }
             _ <- Future.traverse(all.keys)(actionId =>

@@ -215,6 +215,8 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
         state.triggers.foreach { case (k, v) =>
           logger.info(s"trigger: responding to ${k.actionId.getOrElse("none")}")
           logger.info(s"======== triggering event: ${k.payload}")
+          val actions = v.flatMap(_.performances).map(_.action)
+          actions.foreach(a => PerformanceLogger.insert(a.receiver, a.id, "triggered", System.currentTimeMillis()))
           logger.info(
             s"======== triggered actions: ${v.map(_.performances.map(_.action.description))}"
           )
@@ -307,6 +309,10 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
     if (created.scenario.id.isBlank) Left("empty user ID not allowed")
     else Right(actorContext.spawn(ub(created.scenario, actuatorRef), created.scenario.id))
 
+  def logPerf(action: Action, status: String) = {
+    PerformanceLogger.insert(action.receiver, action.id, status, System.currentTimeMillis())
+  }
+
   def sendMessage(
     action: Action
   )(implicit actorSystem: ActorSystem[_], encoder: Encoder[Action]): Future[Done] = {
@@ -315,7 +321,8 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
     val hashKey = action.id
     logger.info(s"saving action to redis: $redisKey $hashKey")
     redis.withClient(r => r.hset(redisKey, hashKey, actionJson))
-    FcmSender.send(action)
+    logPerf(action, "fcm_sending")
+    FcmSender.send(action, logPerf)
   }
 
   val scenarioBehavior: Behavior[Command] =
