@@ -1,18 +1,47 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
-import enumeratum.{ CirceEnum, Enum, EnumEntry }
+import enumeratum.{CirceEnum, Enum, EnumEntry}
 import enumeratum.EnumEntry.UpperSnakecase
 import io.circe.generic.extras.ConfiguredJsonCodec
 import json.schema.typeHint
 import tw.idv.idiotech.ghostspeak.agent.util.substitute
 import tw.idv.idiotech.ghostspeak.daqiaotou.BeaconType.findValues
 
+import java.time.{Clock, Instant, LocalDate, LocalDateTime, LocalTime, ZoneId, ZoneOffset, ZonedDateTime}
 import scala.collection.immutable
+import scala.concurrent.duration.Duration
+import scala.util.Random
 
 object GraphScript {
 
+
+  val defaultZone = ZoneId.of("Asia/Taipei")
   @ConfiguredJsonCodec
-  case class Performance(action: Action, delay: Long)
+  case class ActTime(target: Option[LocalTime], minAfter: Long, range: Long) {
+    def time(clock: Clock = Clock.system(defaultZone)): Long = {
+      println(s"calculating time for $this")
+      val baseline = clock.millis() + minAfter
+      val baselineLocalDataTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(baseline), defaultZone)
+      val exactTime = target.fold {
+        println(s"get baseline for $this: $baseline")
+        baseline
+      } { expectedLocalTime =>
+        ZonedDateTime.of(
+          LocalDateTime
+            .of(baselineLocalDataTime.toLocalDate, expectedLocalTime)
+            .plusDays(if (expectedLocalTime.isAfter(baselineLocalDataTime.toLocalTime)) 0 else 1),
+          defaultZone
+        ).toInstant.toEpochMilli
+      }
+      val ret = exactTime + (if (range > 0) Random.nextLong(range) else 0) * (if (Random.nextBoolean()) 1 else - 1)
+      println(s"calculating time for $this: $ret")
+      ret
+    }
+  }
+
+
+  @ConfiguredJsonCodec
+  case class Performance(action: Action, time: Option[ActTime] = None, delay: Long = 0)
 
   @typeHint[String]
   sealed trait Comparison extends EnumEntry
@@ -45,7 +74,7 @@ object GraphScript {
       Node(
         name,
         triggers.map(trigger => substitute(trigger, "?u", user)),
-        performances.map(p => Performance(substitute(p.action, "?u", user), p.delay)),
+        performances.map(p => Performance(substitute(p.action, "?u", user), p.time, p.delay)),
         preconditions,
         exclusiveWith,
         children

@@ -40,7 +40,7 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
               res.getOrElse(Map.empty).values.foreach { s =>
                 decode[Action](s).fold(
                   error => logger.error(s"failed to parse action $s", error),
-                  a => PerformanceLogger.insert(userId, a.id, "got_from_redis", System.currentTimeMillis())
+                  a => PerformanceLogger.insert(userId, a.id, "redis")
                 )
               }
               Future.successful(res.getOrElse(Map.empty))
@@ -109,6 +109,30 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
             complete(StatusCodes.InternalServerError -> e.getMessage)
         }
       }
+    },
+    pathPrefix("v1" / "perf-log") {
+      concat(
+        pathEnd {
+          concat(
+            post {
+              entity(as[PerfLog]) { perfLog =>
+                val result = Future {
+                  PerformanceLogger.insert(perfLog.user, perfLog.action, perfLog.stage)
+                }
+                val ret: Route = onComplete(result) {
+                  case Success(all) =>
+                    complete(StatusCodes.OK)
+                  case Failure(StatusReply.ErrorMessage(reason)) =>
+                    complete(StatusCodes.InternalServerError -> reason)
+                  case Failure(e) =>
+                    complete(StatusCodes.InternalServerError -> e.getMessage)
+                }
+                ret
+              }
+            }
+          )
+        }
+      )
     }
   ) ++ super.routes
 }

@@ -197,8 +197,10 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
                         .flatMap(_.performances.map(_.action.id))
                     )
                   )
-                val startTime = System.currentTimeMillis() + p.delay
-                logger.info(s"carrying out ${Perform(action, startTime)}")
+                val startTime = p.time.fold(
+                  System.currentTimeMillis() + p.delay
+                )(_.time())
+                logger.info(s"carrying out ${Perform(action, startTime)} ${p.time} ${p.time.map(_.time())}")
                 action.content.task match {
                   case vu: VariableUpdates => vu.updates
                   case _ =>
@@ -216,7 +218,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
           logger.info(s"trigger: responding to ${k.actionId.getOrElse("none")}")
           logger.info(s"======== triggering event: ${k.payload}")
           val actions = v.flatMap(_.performances).map(_.action)
-          actions.foreach(a => PerformanceLogger.insert(a.receiver, a.id, "triggered", System.currentTimeMillis()))
+          actions.foreach(a => PerformanceLogger.insert(a.receiver, a.id, "triggered"))
           logger.info(
             s"======== triggered actions: ${v.map(_.performances.map(_.action.description))}"
           )
@@ -310,7 +312,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
     else Right(actorContext.spawn(ub(created.scenario, actuatorRef), created.scenario.id))
 
   def logPerf(action: Action, status: String) = {
-    PerformanceLogger.insert(action.receiver, action.id, status, System.currentTimeMillis())
+    PerformanceLogger.insert(action.receiver, action.id, status)
   }
 
   def sendMessage(

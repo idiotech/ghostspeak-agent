@@ -289,4 +289,7 @@ package object daqiaotou {
   implicit lazy val contentDecoder = Action.decoder[Content]
   implicit lazy val messageEncoder = Message.encoder[EventPayload]
   implicit lazy val messageDecoder = Message.decoder[EventPayload]
+
+  @ConfiguredJsonCodec
+  case class PerfLog(user: String, action: String, stage: String)
 }
