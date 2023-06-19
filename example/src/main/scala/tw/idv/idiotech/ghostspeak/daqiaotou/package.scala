@@ -25,10 +25,21 @@ package object daqiaotou {
   case class IconConf(pending: String, arrived: String)
 
   @ConfiguredJsonCodec
-  case class MysqlConf(host: String, port: Int, username: String, password: String, database: String)
+  case class MysqlConf(
+    host: String,
+    port: Int,
+    username: String,
+    password: String,
+    database: String
+  )
 
   @ConfiguredJsonCodec
-  case class DaqiaotouConf(engine: String = "graphscript", redis: RedisConf, icon: IconConf, mysql: MysqlConf)
+  case class DaqiaotouConf(
+    engine: String = "graphscript",
+    redis: RedisConf,
+    icon: IconConf,
+    mysql: MysqlConf
+  )
 
   lazy val config: DaqiaotouConf = {
     ConfigFactory.load().as[DaqiaotouConf]("app").fold(throw _, identity)
@@ -145,7 +156,7 @@ package object daqiaotou {
       @title("Close alert popup after reply")
       closeAlertAfterReply: Boolean = true,
       @title("Clear dialog")
-      clearDialog : Boolean = false,
+      clearDialog: Boolean = false
     ) extends Task
 
     @title("Close popup message")

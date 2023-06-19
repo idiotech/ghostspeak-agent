@@ -5,11 +5,11 @@ import io.circe.syntax._
 import io.circe.parser.decode
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
-import tw.idv.idiotech.ghostspeak.agent.{Action => BaseAction, _}
-import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.{ActTime, Performance, defaultZone}
+import tw.idv.idiotech.ghostspeak.agent.{ Action => BaseAction, _ }
+import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.{ defaultZone, ActTime, Performance }
 
 import java.time.temporal.ChronoUnit
-import java.time.{Clock, Instant, LocalDateTime, LocalTime, ZonedDateTime}
+import java.time.{ Clock, Instant, LocalDateTime, LocalTime, ZonedDateTime }
 import scala.concurrent.duration._
 //import json.schema._
 import com.github.andyglow.jsonschema.AsCirce._
@@ -17,22 +17,22 @@ import json.schema.Version._
 
 class ModelTest extends AnyFlatSpec with Matchers {
 
-      val action = BaseAction[Content](
-        "action_1",
-        "Romeo",
-        "Juliet",
-        Content(
-          Task.Popup(
-            Some("Do you love me?"),
-            List("yes", "no"),
-            false,
-            List("https://cdn.pixabay.com/photo/2019/05/27/00/01/i-love-you-4231583_1280.jpg"),
-            Set(Destination.Notification)
-          ),
-          Condition.Geofence(Location(24.0, 120.0), 5)
-        ),
-        Session("romeo and juliet", Some("chapter 1"))
-      )
+  val action = BaseAction[Content](
+    "action_1",
+    "Romeo",
+    "Juliet",
+    Content(
+      Task.Popup(
+        Some("Do you love me?"),
+        List("yes", "no"),
+        false,
+        List("https://cdn.pixabay.com/photo/2019/05/27/00/01/i-love-you-4231583_1280.jpg"),
+        Set(Destination.Notification)
+      ),
+      Condition.Geofence(Location(24.0, 120.0), 5)
+    ),
+    Session("romeo and juliet", Some("chapter 1"))
+  )
 
   "time" must "be serialized" in {
 
@@ -46,9 +46,14 @@ class ModelTest extends AnyFlatSpec with Matchers {
     val clock = Clock.fixed(now.toInstant, defaultZone)
     val actTime = ActTime(Some(LocalTime.of(21, 10, 10, 10000)), 1.hours.toMillis, 0)
     println(actTime.asJson.toString())
-    ZonedDateTime.ofInstant(Instant.ofEpochMilli(actTime.time(clock)), defaultZone) mustBe now.withHour(21).withMinute(10)
+    ZonedDateTime.ofInstant(Instant.ofEpochMilli(actTime.time(clock)), defaultZone) mustBe now
+      .withHour(21)
+      .withMinute(10)
     val actTime2 = ActTime(Some(LocalTime.of(20, 10)), 1.hours.toMillis, 0)
-    ZonedDateTime.ofInstant(Instant.ofEpochMilli(actTime2.time(clock)), defaultZone) mustBe now.plusDays(1).withHour(20).withMinute(10)
+    ZonedDateTime.ofInstant(Instant.ofEpochMilli(actTime2.time(clock)), defaultZone) mustBe now
+      .plusDays(1)
+      .withHour(20)
+      .withMinute(10)
     for (_ <- 0 to 100) {
       val actTime3 = ActTime(Some(LocalTime.of(20, 10)), 1.hours.toMillis, 10.minutes.toMillis)
       val answer = now.plusDays(1).withHour(20).withMinute(10).toInstant.toEpochMilli

@@ -200,7 +200,9 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
                 val startTime = p.time.fold(
                   System.currentTimeMillis() + p.delay
                 )(_.time())
-                logger.info(s"carrying out ${Perform(action, startTime)} ${p.time} ${p.time.map(_.time())}")
+                logger.info(
+                  s"carrying out ${Perform(action, startTime)} ${p.time} ${p.time.map(_.time())}"
+                )
                 action.content.task match {
                   case vu: VariableUpdates => vu.updates
                   case _ =>
@@ -246,7 +248,9 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
                     }
                   case _ => false
                 }
-                .values.flatten.toList
+                .values
+                .flatten
+                .toList
             ).filter(_.nonEmpty)
 
             val nodes: List[Node] = state.triggers
@@ -311,9 +315,8 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
     if (created.scenario.id.isBlank) Left("empty user ID not allowed")
     else Right(actorContext.spawn(ub(created.scenario, actuatorRef), created.scenario.id))
 
-  def logPerf(action: Action, status: String) = {
+  def logPerf(action: Action, status: String) =
     PerformanceLogger.insert(action.receiver, action.id, status)
-  }
 
   def sendMessage(
     action: Action

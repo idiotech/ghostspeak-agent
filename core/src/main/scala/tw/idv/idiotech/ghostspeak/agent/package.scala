@@ -155,6 +155,11 @@ package object agent {
   }
 
   @ConfiguredJsonCodec
+  case class Metadata(
+    categories: List[String] = Nil
+  )
+
+  @ConfiguredJsonCodec
   case class Scenario(
     id: String,
     engine: String,
@@ -163,7 +168,8 @@ package object agent {
     displayName: Option[String] = None,
     public: Boolean = false,
     owner: Option[String] = None,
-    ordinal: Long = 9999999999999L
+    ordinal: Long = 9999999999999L,
+    metadata: Metadata = Metadata()
   )
 
 }

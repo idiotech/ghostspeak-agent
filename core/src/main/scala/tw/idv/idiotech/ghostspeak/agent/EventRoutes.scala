@@ -83,52 +83,58 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
       )
     },
     pathPrefix("v1" / "scenario" / Segment / Segment) { (engine, scenarioId) =>
-      parameters("overwrite".optional, "name".optional, "displayName".optional, "public".optional, "owner".optional, "ordinal".optional) {
-        (overwriteParam, name, displayName, public, owner, ordinal) =>
-          val overwrite = overwriteParam.fold(false)(_ == "true")
-          put {
-            entity(as[Json]) { template =>
-              logger.info(
-                s"############ HTTP PUT: /v1/scenario/$engine/$scenarioId?overwrite=$overwriteParam&name=$name&displayName=$displayName&public=$public"
-              )
-              val ret: Route = onComplete {
-                val deletion = if (overwrite) {
-                  logger.info("overwriting!")
-                  sensor.askWithStatus[String](x => Destroy[T](scenarioId, x)).recover { case e =>
-                    logger.error("failed to delete scenario", e)
-                  }
-                } else Future.unit
-                deletion.flatMap { _ =>
-                  sensor.askWithStatus[String](x =>
-                    Create[T](
-                      Scenario(
-                        scenarioId,
-                        engine,
-                        template.toString,
-                        name,
-                        displayName.filter(d => d != "null" && d != "undefined"),
-                        public.fold(false)(_ == "true"),
-                        owner,
-                        ordinal.map(_.toLong).getOrElse(9999999999999L)
-                      ),
-                      x
-                    )
-                  )
+      parameters(
+        "overwrite".optional,
+        "name".optional,
+        "displayName".optional,
+        "public".optional,
+        "owner".optional,
+        "ordinal".optional
+      ) { (overwriteParam, name, displayName, public, owner, ordinal) =>
+        val overwrite = overwriteParam.fold(false)(_ == "true")
+        put {
+          entity(as[Json]) { template =>
+            logger.info(
+              s"############ HTTP PUT: /v1/scenario/$engine/$scenarioId?overwrite=$overwriteParam&name=$name&displayName=$displayName&public=$public"
+            )
+            val ret: Route = onComplete {
+              val deletion = if (overwrite) {
+                logger.info("overwriting!")
+                sensor.askWithStatus[String](x => Destroy[T](scenarioId, x)).recover { case e =>
+                  logger.error("failed to delete scenario", e)
                 }
-              } {
-                case Success(msg) =>
-                  logger.info(
-                    s"############ Finished HTTP PUT: /v1/scenario/$engine/$scenarioId?overwrite=$overwriteParam&name=$name&displayName=$displayName&public=$public"
+              } else Future.unit
+              deletion.flatMap { _ =>
+                sensor.askWithStatus[String](x =>
+                  Create[T](
+                    Scenario(
+                      scenarioId,
+                      engine,
+                      template.toString,
+                      name,
+                      displayName.filter(d => d != "null" && d != "undefined"),
+                      public.fold(false)(_ == "true"),
+                      owner,
+                      ordinal.map(_.toLong).getOrElse(9999999999999L)
+                    ),
+                    x
                   )
-                  complete(msg)
-                case Failure(StatusReply.ErrorMessage(reason)) =>
-                  complete(StatusCodes.InternalServerError -> reason)
-                case Failure(e) =>
-                  complete(StatusCodes.InternalServerError -> e.getMessage)
+                )
               }
-              ret
+            } {
+              case Success(msg) =>
+                logger.info(
+                  s"############ Finished HTTP PUT: /v1/scenario/$engine/$scenarioId?overwrite=$overwriteParam&name=$name&displayName=$displayName&public=$public"
+                )
+                complete(msg)
+              case Failure(StatusReply.ErrorMessage(reason)) =>
+                complete(StatusCodes.InternalServerError -> reason)
+              case Failure(e) =>
+                complete(StatusCodes.InternalServerError -> e.getMessage)
             }
+            ret
           }
+        }
       }
     },
     pathPrefix("v1" / "scenario" / Segment / Segment) { (engine, scenarioId) =>
@@ -151,10 +157,10 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
       }
     },
     pathPrefix("v1" / "scenario") {
-      parameters("public".optional, "owner".optional) { (`public`, maybeOwner) =>
+      parameters("public".optional, "tag".optional) { (`public`, tag) =>
         get {
           val isPublic = `public`.map(_.toBoolean)
-          onComplete(sensor.askWithStatus[String](x => Query[T](x))) {
+          onComplete(sensor.askWithStatus[String](x => Query[T](isPublic, tag, None, x))) {
             case Success(msg) =>
               decode[List[Scenario]](msg).fold(
                 e => complete(StatusCodes.InternalServerError -> e.getMessage),
@@ -162,10 +168,7 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
                   complete(
                     StatusCodes.OK,
                     List(`Content-Type`(`application/json`)),
-                    maybeOwner.fold(
-                      isPublic
-                        .fold(scenarios)(p => scenarios.filter(s => if (p) s.public else !s.public))
-                    )( owner => scenarios.filter(_.owner.contains(owner)))
+                    scenarios
                       .sortBy(_.ordinal)
                       .map(_.asJson.mapObject(_.remove("template").remove("engine")))
                       .asJson

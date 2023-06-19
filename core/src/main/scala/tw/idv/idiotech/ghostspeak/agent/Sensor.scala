@@ -9,7 +9,7 @@ import com.typesafe.scalalogging.LazyLogging
 import io.circe.{ Decoder, Encoder }
 import io.circe.generic.extras.ConfiguredJsonCodec
 import io.circe.syntax._
-import tw.idv.idiotech.ghostspeak.agent.Sensor.Event.Created
+import tw.idv.idiotech.ghostspeak.agent.Sensor.Event.{ Created, Destroyed }
 
 import java.util.UUID
 
@@ -100,9 +100,22 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
             .persist[Event, State](Destroyed(id))
             .thenReply(replyTo)(_ => StatusReply.Success("destroying"))
         }
-    case Query(replyTo) =>
+    case Query(isPublic, tag, identifier, replyTo) =>
       Effect.reply(replyTo)(
-        StatusReply.success(state.scenarios.values.map(_.scenario).toList.sortBy(_.ordinal).asJson.toString())
+        StatusReply.success(
+          tag
+            .fold(state.scenarios.values.toList)(t => state.scenariosByCategory.getOrElse(t, Nil))
+            .filter(s => isPublic.fold(true)(_ == s.scenario.public))
+            .filter(s =>
+              identifier.fold(true)(i =>
+                i.scenarioId == s.scenario.id && i.engine == s.scenario.engine
+              )
+            )
+            .map(_.scenario)
+            .sortBy(_.ordinal)
+            .asJson
+            .toString()
+        )
       )
   }
 
@@ -112,10 +125,8 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
   ) => Reff
 
   def onEvent(state: State, evt: Event): State = evt match {
-    case c: Created =>
-      State(state.scenarios + (c.scenario.id -> c))
-    case d: Destroyed =>
-      State(state.scenarios - d.scenarioId)
+    case c: Created   => state.add(c)
+    case d: Destroyed => state.del(d)
   }
 
   def apply(
@@ -187,7 +198,28 @@ object Sensor {
   }
 
   @ConfiguredJsonCodec
-  case class State(scenarios: Map[String, Created] = Map.empty) extends EventBase
+  case class Identifier(engine: String, scenarioId: String)
+
+  @ConfiguredJsonCodec
+  case class State(
+    scenarios: Map[String, Created] = Map.empty,
+    scenariosByCategory: Map[String, List[Created]] = Map.empty
+  ) extends EventBase {
+
+    def add(c: Created): State =
+      State(
+        scenarios + (c.scenario.id -> c),
+        c.scenario.metadata.categories.foldLeft(scenariosByCategory)((sbt, t) =>
+          sbt + (t -> (c :: sbt.getOrElse(t, Nil).filterNot(s => s.scenario.id == c.scenario.id)))
+        )
+      )
+
+    def del(d: Destroyed): State =
+      State(
+        scenarios - d.scenarioId,
+        scenariosByCategory.view.mapValues(_.filterNot(_.scenario.id == d.scenarioId)).toMap
+      )
+  }
 
   sealed trait Command[P] extends CommandBase
 
@@ -204,7 +236,12 @@ object Sensor {
     case class Create[P](scenario: Scenario, replyTo: ActorRef[StatusReply[String]])
         extends Command[P]
 
-    case class Query[P](replyTo: ActorRef[StatusReply[String]]) extends Command[P]
+    case class Query[P](
+      isPublic: Option[Boolean],
+      tag: Option[String],
+      scenarioId: Option[Identifier],
+      replyTo: ActorRef[StatusReply[String]]
+    ) extends Command[P]
 
     case class Destroy[P](scenarioId: String, replyTo: ActorRef[StatusReply[String]])
         extends Command[P]
