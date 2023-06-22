@@ -157,10 +157,10 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
       }
     },
     pathPrefix("v1" / "scenario") {
-      parameters("public".optional, "tag".optional) { (`public`, tag) =>
+      parameters("public".optional, "tag".optional) { (`public`, category) =>
         get {
           val isPublic = `public`.map(_.toBoolean)
-          onComplete(sensor.askWithStatus[String](x => Query[T](isPublic, tag, None, x))) {
+          onComplete(sensor.askWithStatus[String](x => Query[T](isPublic, category, None, x))) {
             case Success(msg) =>
               decode[List[Scenario]](msg).fold(
                 e => complete(StatusCodes.InternalServerError -> e.getMessage),

@@ -1,5 +1,6 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
+import com.typesafe.scalalogging.LazyLogging
 import json._
 import io.circe.syntax._
 import io.circe.parser.decode
@@ -15,7 +16,7 @@ import scala.concurrent.duration._
 import com.github.andyglow.jsonschema.AsCirce._
 import json.schema.Version._
 
-class ModelTest extends AnyFlatSpec with Matchers {
+class ModelTest extends AnyFlatSpec with Matchers with LazyLogging {
 
   val action = BaseAction[Content](
     "action_1",
@@ -85,22 +86,23 @@ class ModelTest extends AnyFlatSpec with Matchers {
 //      ),
 //      Session("romeo and juliet", Some("chapter 1"))
 //    )
-//    val message = Message[EventPayload](
-//      "event_id",
-//      Some("action_1"),
-//      "Juliet",
-//      "Romeo",
-////      Right(Location(25.0, 121.0)),
+  val message = Message[EventPayload](
+    "event_id",
+    Some("action_1"),
+    "Juliet",
+    "Romeo",
+//      Right(Location(25.0, 121.0)),
+    Left(SystemPayload.Join),
 //      Left(SystemPayload.Modal(Modality.Done)),
-//      "romeo and juliet"
-//    )
+    "romeo and juliet"
+  )
 //    implicit val geofenceSchema = Json.schema[Condition.Geofence]("Geofence")
 //    implicit val contentSchema = Json.schema[Content]("Content")
 //    implicit val popupSchema = Json.schema[Content.Popup]("Popup")
 
 //    val schema = Json.schema[BaseAction[Content]]
 //    logger.info(schema.asCirce(Draft04()))
-//    logger.info(message.asJson)
+  logger.info(message.asJson.toString())
 //    logger.info(action.asJson)
 
 //    val messageSchema = Json.schema[Message[EventPayload]]

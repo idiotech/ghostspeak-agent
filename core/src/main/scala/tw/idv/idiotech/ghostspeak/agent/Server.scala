@@ -1,13 +1,16 @@
 package tw.idv.idiotech.ghostspeak.agent
 
+import akka.Done
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ ActorRef, ActorSystem, Behavior, PostStop }
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.Http
+import akka.persistence.jdbc.testkit.scaladsl.SchemaUtils
 import io.circe.Decoder
 import org.virtuslab.ash.annotation.SerializabilityTrait
 
-import scala.concurrent.Future
+import scala.concurrent.duration.Duration
+import scala.concurrent.{ Await, Future }
 import scala.util.{ Failure, Success }
 
 object Server {
@@ -26,7 +29,7 @@ object Server {
   ): Behavior[Msg] =
     Behaviors.setup { ctx =>
       implicit val system = ctx.system
-
+      Await.result(SchemaUtils.createIfNotExists(), Duration.Inf)
       val dummySensor: ActorRef[Sensor.Command[P]] = ctx.spawn(behavior, "RootSensor")
       val routes = routing(dummySensor, system)
 

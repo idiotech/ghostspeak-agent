@@ -320,7 +320,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
 
   def sendMessage(
     action: Action
-  )(implicit actorSystem: ActorSystem[_], encoder: Encoder[Action]): Future[Done] = {
+  )(implicit actorSystem: ActorSystem[_]): Future[Done] = {
     val actionJson = action.asJson.toString()
     val redisKey = s"action-${action.session.scenario}-${action.receiver}"
     val hashKey = action.id

@@ -8,6 +8,7 @@ val akkaVersion = "2.7.0"
 val akkaHttpVersion = "10.4.0"
 val enumeratumVersion = "1.7.0"
 val circeVersion = "0.13.0"
+val slickVersion = "3.4.1"
 
 import org.virtuslab.ash.AkkaSerializationHelperPlugin
 
@@ -62,6 +63,10 @@ libraryDependencies in ThisBuild ++= Seq(
   "com.hunorkovacs" %% "circe-config" % "0.10.0",
   "org.typelevel" %% "cats-core" % "2.8.0",
   "org.typelevel" %% "cats-effect" % "3.3.14",
+  "com.lightbend.akka" %% "akka-persistence-jdbc" % "5.2.1",
+  "com.typesafe.akka" %% "akka-persistence-query" % akkaVersion,
+  "com.typesafe.slick" %% "slick" % slickVersion,
+  "com.typesafe.slick" %% "slick-hikaricp" % slickVersion,
   "org.scalatest" %% "scalatest" % "3.1.0" % Test
 ) ++ log
 
