@@ -13,7 +13,7 @@ object ServerInstance extends App {
     ActorSystem(
       Server[EventPayload](
         scenarioCreator.scenarioBehavior,
-        (a, s) => new EventRoutes(a, s),
+        (a, c, s) => new EventRoutes(a, c, s),
         "0.0.0.0",
         8080
       ),
@@ -28,7 +28,7 @@ object ServerInstance extends App {
     ActorSystem(
       Server[SpotPayload](
         spotKeeper.spotKeeperBehavior,
-        (a, s) => new EventRoutes(a, s),
+        (a, c, s) => new EventRoutes(a, c, s),
         "0.0.0.0",
         8081
       ),

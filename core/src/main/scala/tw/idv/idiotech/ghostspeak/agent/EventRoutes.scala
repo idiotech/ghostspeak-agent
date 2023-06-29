@@ -21,8 +21,11 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{ Failure, Success }
 
-class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: ActorSystem[_])
-    extends FailFastCirceSupport
+class EventRoutes[T: Decoder](
+  sensor: ActorRef[Sensor.Command[T]],
+  categoryManager: ActorRef[CategoryManager.Command],
+  system: ActorSystem[_]
+) extends FailFastCirceSupport
     with LazyLogging {
 
   import akka.actor.typed.scaladsl.AskPattern.schedulerFromActorSystem
@@ -89,8 +92,9 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
         "displayName".optional,
         "public".optional,
         "owner".optional,
-        "ordinal".optional
-      ) { (overwriteParam, name, displayName, public, owner, ordinal) =>
+        "ordinal".optional,
+        "categories".optional
+      ) { (overwriteParam, name, displayName, public, owner, ordinal, categories) =>
         val overwrite = overwriteParam.fold(false)(_ == "true")
         put {
           entity(as[Json]) { template =>
@@ -115,7 +119,8 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
                       displayName.filter(d => d != "null" && d != "undefined"),
                       public.fold(false)(_ == "true"),
                       owner,
-                      ordinal.map(_.toLong).getOrElse(9999999999999L)
+                      ordinal.map(_.toLong).getOrElse(9999999999999L),
+                      Metadata(categories.map(_.split(",").toList).getOrElse(Nil))
                     ),
                     x
                   )
@@ -157,7 +162,7 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
       }
     },
     pathPrefix("v1" / "scenario") {
-      parameters("public".optional, "tag".optional) { (`public`, category) =>
+      parameters("public".optional, "category".optional) { (`public`, category) =>
         get {
           val isPublic = `public`.map(_.toBoolean)
           onComplete(sensor.askWithStatus[String](x => Query[T](isPublic, category, None, x))) {
@@ -181,6 +186,55 @@ class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: Actor
           }
         }
       }
+    },
+    pathPrefix("v1" / "category") {
+      parameters("public".optional) { `public` =>
+        get {
+          val isPublic = `public`.map(_.toBoolean)
+          onComplete(
+            categoryManager.askWithStatus[CategoryManager.State](x =>
+              CategoryManager.Command.GetAll(x)
+            )
+          ) {
+            case Success(state) =>
+              complete(
+                StatusCodes.OK,
+                List(`Content-Type`(`application/json`)),
+                CategoryManager.State(
+                  state.categories.sortBy(_.order)
+                )
+              )
+            case Failure(StatusReply.ErrorMessage(reason)) =>
+              complete(StatusCodes.InternalServerError -> reason)
+            case Failure(e) =>
+              complete(StatusCodes.InternalServerError -> e.getMessage)
+          }
+        }
+      }
+    },
+    pathPrefix("v1" / "category") {
+      concat(
+        pathEnd {
+          concat(
+            put {
+              entity(as[CategoryManager.State]) { state =>
+                onComplete(
+                  categoryManager.askWithStatus[String](x =>
+                    CategoryManager.Command.Upload(state, x)
+                  )
+                ) {
+                  case Success(msg) =>
+                    complete(msg)
+                  case Failure(StatusReply.ErrorMessage(reason)) =>
+                    complete(StatusCodes.InternalServerError -> reason)
+                  case Failure(e) =>
+                    complete(StatusCodes.InternalServerError -> e.getMessage)
+                }
+              }
+            }
+          )
+        }
+      )
     }
   )
 

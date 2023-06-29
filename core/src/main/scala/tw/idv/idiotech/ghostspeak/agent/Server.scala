@@ -1,6 +1,5 @@
 package tw.idv.idiotech.ghostspeak.agent
 
-import akka.Done
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ ActorRef, ActorSystem, Behavior, PostStop }
 import akka.http.scaladsl.Http.ServerBinding
@@ -23,7 +22,11 @@ object Server {
 
   def apply[P: Decoder](
     behavior: Behavior[Sensor.Command[P]],
-    routing: (ActorRef[Sensor.Command[P]], ActorSystem[_]) => EventRoutes[P],
+    routing: (
+      ActorRef[Sensor.Command[P]],
+      ActorRef[CategoryManager.Command],
+      ActorSystem[_]
+    ) => EventRoutes[P],
     host: String,
     port: Int
   ): Behavior[Msg] =
@@ -31,7 +34,9 @@ object Server {
       implicit val system = ctx.system
       Await.result(SchemaUtils.createIfNotExists(), Duration.Inf)
       val dummySensor: ActorRef[Sensor.Command[P]] = ctx.spawn(behavior, "RootSensor")
-      val routes = routing(dummySensor, system)
+      val categoryManager: ActorRef[CategoryManager.Command] =
+        ctx.spawn(CategoryManager(), "CategoryManager")
+      val routes = routing(dummySensor, categoryManager, system)
 
       val serverBinding: Future[Http.ServerBinding] =
         Http().newServerAt(host, port).bind(routes.theEventRoutes)

@@ -5,7 +5,7 @@ import akka.actor.typed.{ ActorRef, ActorSystem }
 import akka.http.scaladsl.server.Route
 import io.circe.{ Decoder, Json, ParsingFailure }
 import tw.idv.idiotech.ghostspeak.agent
-import tw.idv.idiotech.ghostspeak.agent.{ Scenario, Sensor }
+import tw.idv.idiotech.ghostspeak.agent.{ CategoryManager, Scenario, Sensor }
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ContentTypes._
@@ -21,8 +21,11 @@ import tw.idv.idiotech.ghostspeak.agent.Sensor.Identifier
 import scala.concurrent.Future
 import scala.util.{ Failure, Success }
 
-class EventRoutes[T: Decoder](sensor: ActorRef[Sensor.Command[T]], system: ActorSystem[_])
-    extends agent.EventRoutes[T](sensor, system) {
+class EventRoutes[T: Decoder](
+  sensor: ActorRef[Sensor.Command[T]],
+  cm: ActorRef[CategoryManager.Command],
+  system: ActorSystem[_]
+) extends agent.EventRoutes[T](sensor, cm, system) {
 
   import EventRoutes._
 

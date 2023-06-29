@@ -4,7 +4,7 @@ import akka.serialization.Serializer
 import io.circe.Json
 import io.circe.syntax._
 import io.circe.parser.decode
-import tw.idv.idiotech.ghostspeak.agent.EventBase
+import tw.idv.idiotech.ghostspeak.agent.{ CategoryManager, EventBase }
 import tw.idv.idiotech.ghostspeak.{ agent, daqiaotou }
 
 class CirceSerializer extends Serializer {
@@ -30,6 +30,8 @@ class CirceSerializer extends Serializer {
           case e: SpotKeeper.State         => e.asJson
           case e: spotKeeperActuator.Event => e.asJson
           case e: spotKeeperActuator.State => e.asJson
+          case e: CategoryManager.Event    => e.asJson
+          case e: CategoryManager.State    => e.asJson
         }
     }
     json.toString.getBytes("UTF-8")
@@ -46,6 +48,8 @@ class CirceSerializer extends Serializer {
     val sps = classOf[daqiaotou.SpotKeeper.State]
     val spae = classOf[spotKeeperActuator.Event]
     val spas = classOf[spotKeeperActuator.State]
+    val ce = classOf[CategoryManager.Event]
+    val cs = classOf[CategoryManager.State]
     val string = new String(bytes, "UTF-8")
     val result = manifest.map(c =>
       if (sce.isAssignableFrom(c)) decode[scenarioCreator.Event](string)
@@ -58,6 +62,8 @@ class CirceSerializer extends Serializer {
       else if (sps.isAssignableFrom(c)) decode[daqiaotou.SpotKeeper.State](string)
       else if (spae.isAssignableFrom(c)) decode[spotKeeperActuator.Event](string)
       else if (spas.isAssignableFrom(c)) decode[spotKeeperActuator.State](string)
+      else if (ce.isAssignableFrom(c)) decode[CategoryManager.Event](string)
+      else if (cs.isAssignableFrom(c)) decode[CategoryManager.State](string)
       else decode[agent.Sensor.State](string)
     )
     result.fold {
