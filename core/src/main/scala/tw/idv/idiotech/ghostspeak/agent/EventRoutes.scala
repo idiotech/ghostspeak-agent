@@ -16,6 +16,7 @@ import io.circe.Decoder
 import io.circe.Json
 import io.circe.parser.decode
 import io.circe.syntax._
+import tw.idv.idiotech.ghostspeak.agent.Sensor.Identifier
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -39,6 +40,32 @@ class EventRoutes[T: Decoder](
   // the ask is failed with a TimeoutException
   implicit val timeout: Timeout = 3.seconds
   implicit val ec = system.executionContext
+
+  private def getScenarios(
+    q: ActorRef[StatusReply[String]] => Query[T],
+    selector: Scenario => Json
+  ) =
+    get {
+      onComplete(sensor.askWithStatus[String](q)) {
+        case Success(msg) =>
+          decode[List[Scenario]](msg).fold(
+            e => complete(StatusCodes.InternalServerError -> e.getMessage),
+            scenarios =>
+              complete(
+                StatusCodes.OK,
+                List(`Content-Type`(`application/json`)),
+                scenarios
+                  .sortBy(_.ordinal)
+                  .map(selector)
+                  .asJson
+              )
+          )
+        case Failure(StatusReply.ErrorMessage(reason)) =>
+          complete(StatusCodes.InternalServerError -> reason)
+        case Failure(e) =>
+          complete(StatusCodes.InternalServerError -> e.getMessage)
+      }
+    }
 
   def routes: List[Route] = List(
     pathPrefix("v1" / "event") {
@@ -161,30 +188,18 @@ class EventRoutes[T: Decoder](
         ret
       }
     },
+    pathPrefix("v1" / "scenario" / Segment / Segment) { (engine, scenarioId) =>
+      get {
+        getScenarios(x => Query[T](None, None, Some(Identifier(engine, scenarioId)), x), _.asJson)
+      }
+    },
     pathPrefix("v1" / "scenario") {
       parameters("public".optional, "category".optional) { (`public`, category) =>
-        get {
-          val isPublic = `public`.map(_.toBoolean)
-          onComplete(sensor.askWithStatus[String](x => Query[T](isPublic, category, None, x))) {
-            case Success(msg) =>
-              decode[List[Scenario]](msg).fold(
-                e => complete(StatusCodes.InternalServerError -> e.getMessage),
-                scenarios =>
-                  complete(
-                    StatusCodes.OK,
-                    List(`Content-Type`(`application/json`)),
-                    scenarios
-                      .sortBy(_.ordinal)
-                      .map(_.asJson.mapObject(_.remove("template").remove("engine")))
-                      .asJson
-                  )
-              )
-            case Failure(StatusReply.ErrorMessage(reason)) =>
-              complete(StatusCodes.InternalServerError -> reason)
-            case Failure(e) =>
-              complete(StatusCodes.InternalServerError -> e.getMessage)
-          }
-        }
+        val isPublic = `public`.map(_.toBoolean)
+        getScenarios(
+          x => Query[T](isPublic, category, None, x),
+          _.asJson.mapObject(_.remove("template").remove("engine"))
+        )
       }
     },
     pathPrefix("v1" / "category") {
