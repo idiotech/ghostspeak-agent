@@ -14,8 +14,10 @@ import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.Decoder
 import io.circe.Json
+import io.circe.generic.extras.ConfiguredJsonCodec
 import io.circe.parser.decode
 import io.circe.syntax._
+import tw.idv.idiotech.ghostspeak.agent.EventRoutes.ScenarioPayload
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Identifier
 
 import scala.concurrent.Future
@@ -114,19 +116,13 @@ class EventRoutes[T: Decoder](
     },
     pathPrefix("v1" / "scenario" / Segment / Segment) { (engine, scenarioId) =>
       parameters(
-        "overwrite".optional,
-        "name".optional,
-        "displayName".optional,
-        "public".optional,
-        "owner".optional,
-        "ordinal".optional,
-        "categories".optional
-      ) { (overwriteParam, name, displayName, public, owner, ordinal, categories) =>
+        "overwrite".optional
+      ) { overwriteParam =>
         val overwrite = overwriteParam.fold(false)(_ == "true")
         put {
-          entity(as[Json]) { template =>
+          entity(as[ScenarioPayload]) { payload =>
             logger.info(
-              s"############ HTTP PUT: /v1/scenario/$engine/$scenarioId?overwrite=$overwriteParam&name=$name&displayName=$displayName&public=$public"
+              s"############ HTTP PUT: /v1/scenario/$engine/$scenarioId?overwrite=$overwriteParam"
             )
             val ret: Route = onComplete {
               val deletion = if (overwrite) {
@@ -141,13 +137,13 @@ class EventRoutes[T: Decoder](
                     Scenario(
                       scenarioId,
                       engine,
-                      template.toString,
-                      name,
-                      displayName.filter(d => d != "null" && d != "undefined"),
-                      public.fold(false)(_ == "true"),
-                      owner,
-                      ordinal.map(_.toLong).getOrElse(9999999999999L),
-                      Metadata(categories.map(_.split(",").toList).getOrElse(Nil))
+                      payload.template.toString,
+                      payload.metadata.name,
+                      payload.metadata.displayName.filter(d => d != "null" && d != "undefined"),
+                      payload.metadata.public,
+                      payload.metadata.owner,
+                      payload.metadata.ordinal,
+                      payload.metadata
                     ),
                     x
                   )
@@ -156,7 +152,7 @@ class EventRoutes[T: Decoder](
             } {
               case Success(msg) =>
                 logger.info(
-                  s"############ Finished HTTP PUT: /v1/scenario/$engine/$scenarioId?overwrite=$overwriteParam&name=$name&displayName=$displayName&public=$public"
+                  s"############ Finished HTTP PUT: /v1/scenario/$engine/$scenarioId?overwrite=$overwriteParam"
                 )
                 complete(msg)
               case Failure(StatusReply.ErrorMessage(reason)) =>
@@ -256,4 +252,10 @@ class EventRoutes[T: Decoder](
   lazy val theEventRoutes: Route = cors() {
     concat(routes: _*)
   }
+}
+
+object EventRoutes {
+
+  @ConfiguredJsonCodec
+  case class ScenarioPayload(template: Json, metadata: Metadata)
 }

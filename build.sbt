@@ -6,8 +6,8 @@ scalaVersion in ThisBuild := "2.13.10"
 
 val akkaVersion = "2.7.0"
 val akkaHttpVersion = "10.4.0"
-val enumeratumVersion = "1.7.0"
-val circeVersion = "0.13.0"
+val enumeratumVersion = "1.7.2"
+val circeVersion = "0.14.6"
 val slickVersion = "3.4.1"
 
 import org.virtuslab.ash.AkkaSerializationHelperPlugin
@@ -53,13 +53,13 @@ libraryDependencies in ThisBuild ++= Seq(
   "com.twitter" %% "chill-akka" % "0.10.0",
   "com.beachape" %% "enumeratum" % enumeratumVersion,
   "com.beachape" %% "enumeratum-circe" % enumeratumVersion,
-  "de.heikoseeberger" %% "akka-http-circe" % "1.31.0",
-  "com.github.idiotech.scala-jsonschema" %% "scala-jsonschema-circe-json" % "ordering-v0.6.1-g0f3353d-60",
+  "de.heikoseeberger" %% "akka-http-circe" % "1.40.0-RC3",
+  "com.github.andyglow" %% "scala-jsonschema-circe-json" % "0.7.11",
   "com.chuusai" %% "shapeless" % "2.3.9",
   "com.softwaremill.retry" %% "retry" % "0.3.6",
   "io.circe"        %% "circe-generic"       % circeVersion,
-  "io.circe"        %% "circe-generic-extras"       % "0.13.1-M4",
-  "com.typesafe" % "config" % "1.4.1",
+  "io.circe"        %% "circe-generic-extras"       % "0.14.3",
+  "com.typesafe" % "config" % "1.4.2",
   "com.hunorkovacs" %% "circe-config" % "0.10.0",
   "org.typelevel" %% "cats-core" % "2.8.0",
   "org.typelevel" %% "cats-effect" % "3.3.14",
@@ -67,6 +67,7 @@ libraryDependencies in ThisBuild ++= Seq(
   "com.typesafe.akka" %% "akka-persistence-query" % akkaVersion,
   "com.typesafe.slick" %% "slick" % slickVersion,
   "com.typesafe.slick" %% "slick-hikaricp" % slickVersion,
+  "com.typesafe" %% "ssl-config-core" % "0.6.1",
   "org.scalatest" %% "scalatest" % "3.1.0" % Test
 ) ++ log
 

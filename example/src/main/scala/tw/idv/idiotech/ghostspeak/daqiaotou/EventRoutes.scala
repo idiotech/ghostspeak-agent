@@ -176,6 +176,7 @@ object EventRoutes {
           case Task.MapStyle(url, satellite)                => r
           case Task.IntroImage(bgUrl, _, _, _, _, _)        => r
           case Task.ButtonStyle(bgColor, textColor)         => r
+          case Task.PopupStyle(alertTextColor)              => r
           case Task.VariableUpdates(_)                      => r
           case Task.EndGame                                 => r
           case Task.GuideImage(_)                           => r

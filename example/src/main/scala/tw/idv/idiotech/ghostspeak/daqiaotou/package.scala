@@ -228,6 +228,10 @@ package object daqiaotou {
     @description("The colors of a button")
     case class ButtonStyle(backgroundColor: String, textColor: String) extends Task
 
+    @title("Popup style")
+    @description("The colors of a popup window")
+    case class PopupStyle(alertTextColor: String) extends Task
+
     @title("Variable update")
     @description("The operation to update the value of a variable")
     case class VariableUpdates(updates: List[VariableUpdate]) extends Task

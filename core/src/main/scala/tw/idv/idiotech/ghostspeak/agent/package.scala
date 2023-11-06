@@ -156,7 +156,14 @@ package object agent {
 
   @ConfiguredJsonCodec
   case class Metadata(
-    categories: List[String] = Nil
+    name: Option[String] = None,
+    displayName: Option[String] = None,
+    public: Boolean = false,
+    owner: Option[String] = None,
+    ordinal: Long = 9999999999999L,
+    categories: List[String] = Nil,
+    details: Option[String] = None,
+    image: Option[String] = None
   )
 
   @ConfiguredJsonCodec

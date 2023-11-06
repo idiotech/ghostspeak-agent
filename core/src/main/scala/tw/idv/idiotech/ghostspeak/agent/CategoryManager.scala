@@ -6,9 +6,29 @@ import akka.pattern.StatusReply
 import akka.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior, ReplyEffect }
 import akka.actor.typed.scaladsl.ActorContext
 import akka.persistence.typed.PersistenceId
+import enumeratum.EnumEntry.UpperSnakecase
+import enumeratum._
 import io.circe.generic.extras.ConfiguredJsonCodec
+import json.schema.typeHint
+
+import scala.collection.immutable
 
 object CategoryManager {
+
+  @typeHint[String]
+  sealed trait DisplayType extends EnumEntry
+
+  object DisplayType extends Enum[DisplayType] with CirceEnum[DisplayType] {
+    val values: immutable.IndexedSeq[DisplayType] = findValues
+
+    case object Carousel extends DisplayType with UpperSnakecase
+
+    case object TwoInARow extends DisplayType with UpperSnakecase
+
+    case object OneInARow extends DisplayType with UpperSnakecase
+
+    case object LIST extends DisplayType with UpperSnakecase
+  }
 
   @ConfiguredJsonCodec
   sealed trait Event extends EventBase
@@ -27,7 +47,14 @@ object CategoryManager {
   }
 
   @ConfiguredJsonCodec
-  case class Category(id: String, name: String, order: Int, hidden: Boolean)
+  case class Category(
+    id: String,
+    name: String,
+    order: Int,
+    hidden: Boolean,
+    displayType: DisplayType = DisplayType.OneInARow,
+    displayCount: Int = 3
+  )
 
   @ConfiguredJsonCodec
   case class State(categories: List[Category]) extends EventBase
