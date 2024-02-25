@@ -100,19 +100,20 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
             .persist[Event, State](Destroyed(id))
             .thenReply(replyTo)(_ => StatusReply.Success("destroying"))
         }
-    case Query(isPublic, category, identifier, replyTo) =>
+    case Query(isPublic, isFeatured, category, identifier, replyTo) =>
       Effect.reply(replyTo)(
         StatusReply.success(
           category
             .fold(state.scenarios.values.toList)(t => state.scenariosByCategory.getOrElse(t, Nil))
             .filter(s => isPublic.fold(true)(_ == s.scenario.public))
+            .filter(s => isFeatured.fold(true)(_ == s.scenario.metadata.featured))
             .filter(s =>
               identifier.fold(true)(i =>
                 i.scenarioId == s.scenario.id && i.engine == s.scenario.engine
               )
             )
             .map(_.scenario)
-            .sortBy(_.ordinal)
+            .sortBy(- _.ordinal)
             .asJson
             .toString()
         )
@@ -238,6 +239,7 @@ object Sensor {
 
     case class Query[P](
       isPublic: Option[Boolean],
+      isFeatured: Option[Boolean],
       category: Option[String],
       scenarioId: Option[Identifier],
       replyTo: ActorRef[StatusReply[String]]

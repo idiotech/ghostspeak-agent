@@ -57,7 +57,6 @@ class EventRoutes[T: Decoder](
                 StatusCodes.OK,
                 List(`Content-Type`(`application/json`)),
                 scenarios
-                  .sortBy(_.ordinal)
                   .map(selector)
                   .asJson
               )
@@ -186,14 +185,15 @@ class EventRoutes[T: Decoder](
     },
     pathPrefix("v1" / "scenario" / Segment / Segment) { (engine, scenarioId) =>
       get {
-        getScenarios(x => Query[T](None, None, Some(Identifier(engine, scenarioId)), x), _.asJson)
+        getScenarios(x => Query[T](None, None, None, Some(Identifier(engine, scenarioId)), x), _.asJson)
       }
     },
     pathPrefix("v1" / "scenario") {
-      parameters("public".optional, "category".optional) { (`public`, category) =>
+      parameters("public".optional, "category".optional, "featured".optional) { (`public`, category, featured) =>
         val isPublic = `public`.map(_.toBoolean)
+        val isFeatured = `featured`.map(_.toBoolean)
         getScenarios(
-          x => Query[T](isPublic, category, None, x),
+          x => Query[T](isPublic, isFeatured, category, None, x),
           _.asJson.mapObject(_.remove("template").remove("engine"))
         )
       }

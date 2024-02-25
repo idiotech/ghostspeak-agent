@@ -158,6 +158,8 @@ package object agent {
   case class Metadata(
     name: Option[String] = None,
     displayName: Option[String] = None,
+    description: Option[String] = None,
+    featured: Boolean = false,
     public: Boolean = false,
     owner: Option[String] = None,
     ordinal: Long = 9999999999999L,
