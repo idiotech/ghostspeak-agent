@@ -57,6 +57,15 @@ class EventRoutes[T: Decoder](
                 StatusCodes.OK,
                 List(`Content-Type`(`application/json`)),
                 scenarios
+                  .map { s =>
+                    val m = s.metadata
+                    val m1 = m.copy(
+                      name = m.name orElse s.name,
+                      displayName = m.displayName orElse s.displayName,
+                      owner = m.owner orElse s.owner
+                    )
+                    s.copy(metadata = m1)
+                  }
                   .map(selector)
                   .asJson
               )
