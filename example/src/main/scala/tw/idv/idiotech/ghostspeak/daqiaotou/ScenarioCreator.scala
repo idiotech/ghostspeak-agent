@@ -163,8 +163,8 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
   def textMatches(reply: String, answer: String): Boolean =
     answer match {
       case regexPattern(text)    => text.r.matches(reply)
-      case containsPattern(text) => reply.contains(text)
-      case _                     => false
+      case containsPattern(text) => reply.filterNot(_.isWhitespace).contains(text.filterNot(_.isWhitespace))
+      case text => text.filterNot(_.isWhitespace) == reply.filterNot(_.isWhitespace)
     }
 
   def onCommand(
