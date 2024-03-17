@@ -75,6 +75,11 @@ object GraphScript {
   @ConfiguredJsonCodec
   case class Precondition(name: String, comparison: Comparison, value: Int)
 
+  // state
+  // 1. 劇本： node map HashMap<Id, Node>
+  // 2. HashMap<Event, Node>
+  // 3. Matching event -> Node
+
   @ConfiguredJsonCodec
   case class Node(
     name: String,
@@ -100,10 +105,9 @@ object GraphScript {
         .flatMap(name => map.get(name).map(_.replace(user)).map(n => n.triggers.map(_ -> n)))
         .flatten
         .groupBy(_._1)
-        .view
-        .mapValues(_.map(_._2))
-        .toMap
-
+        .map { case (k, v) =>
+          (k.forComparison, v.map(_._2))
+        }
   }
 
   object Node {

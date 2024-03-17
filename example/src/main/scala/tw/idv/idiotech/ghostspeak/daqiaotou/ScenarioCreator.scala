@@ -1,10 +1,10 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
-import akka.Done
-import akka.actor.typed.{ ActorRef, ActorSystem, Behavior }
-import akka.actor.typed.scaladsl.{ ActorContext, Behaviors }
-import akka.persistence.typed.PersistenceId
-import akka.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
+import org.apache.pekko.Done
+import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem, Behavior }
+import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors }
+import org.apache.pekko.persistence.typed.PersistenceId
+import org.apache.pekko.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
 import tw.idv.idiotech.ghostspeak.agent.Actuator.Command.Perform
 import tw.idv.idiotech.ghostspeak.agent.{
   Actuator,
@@ -162,8 +162,9 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
 
   def textMatches(reply: String, answer: String): Boolean =
     answer match {
-      case regexPattern(text)    => text.r.matches(reply)
-      case containsPattern(text) => reply.filterNot(_.isWhitespace).contains(text.filterNot(_.isWhitespace))
+      case regexPattern(text) => text.r.matches(reply)
+      case containsPattern(text) =>
+        reply.filterNot(_.isWhitespace).contains(text.filterNot(_.isWhitespace))
       case text => text.filterNot(_.isWhitespace) == reply.filterNot(_.isWhitespace)
     }
 
@@ -253,11 +254,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
                 .toList
             ).filter(_.nonEmpty)
 
-            val nodes: List[Node] = state.triggers
-              .get(message.forComparison)
-              .orElse(
-                findMatch(textMatches)
-              )
+            val nodes: List[Node] = findMatch(textMatches)
               .orElse(findMatch((_, a) => a == "fallback:"))
               .getOrElse(Nil)
               .map(_.replace(user))

@@ -1,16 +1,16 @@
 package tw.idv.idiotech.ghostspeak.agent
 
-import akka.Done
-import akka.actor.typed.ActorSystem
+import org.apache.pekko.Done
+import org.apache.pekko.actor.typed.ActorSystem
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.LazyLogging
 
 import scala.concurrent.duration._
-import akka.stream.alpakka.google.firebase.fcm.scaladsl.GoogleFcm
-import akka.stream.alpakka.google.firebase.fcm._
-import akka.stream.RestartSettings
-import akka.stream.alpakka.google.firebase.fcm.FcmNotificationModels.Token
-import akka.stream.scaladsl.{ RestartFlow, Sink, Source }
+import org.apache.pekko.stream.connectors.google.firebase.fcm.scaladsl.GoogleFcm
+import org.apache.pekko.stream.connectors.google.firebase.fcm._
+import org.apache.pekko.stream.RestartSettings
+import org.apache.pekko.stream.connectors.google.firebase.fcm.FcmNotificationModels.Token
+import org.apache.pekko.stream.scaladsl.{ RestartFlow, Sink, Source }
 import io.circe.Encoder
 import io.circe.generic.extras.{ Configuration, ConfiguredJsonCodec }
 import io.circe.syntax._

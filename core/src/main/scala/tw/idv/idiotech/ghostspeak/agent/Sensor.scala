@@ -1,10 +1,10 @@
 package tw.idv.idiotech.ghostspeak.agent
 
-import akka.actor.typed.scaladsl.{ ActorContext, Behaviors }
-import akka.actor.typed.{ ActorRef, Behavior }
-import akka.pattern.StatusReply
-import akka.persistence.typed.{ PersistenceId, RecoveryCompleted }
-import akka.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior, ReplyEffect }
+import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors }
+import org.apache.pekko.actor.typed.{ ActorRef, Behavior }
+import org.apache.pekko.pattern.StatusReply
+import org.apache.pekko.persistence.typed.{ PersistenceId, RecoveryCompleted }
+import org.apache.pekko.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior, ReplyEffect }
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.{ Decoder, Encoder }
 import io.circe.generic.extras.ConfiguredJsonCodec
@@ -113,7 +113,7 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
               )
             )
             .map(_.scenario)
-            .sortBy(- _.ordinal)
+            .sortBy(-_.ordinal)
             .asJson
             .toString()
         )

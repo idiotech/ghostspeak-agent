@@ -1,20 +1,20 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
 import cats.implicits._
-import akka.actor.typed.{ ActorRef, ActorSystem }
-import akka.http.scaladsl.server.Route
+import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem }
+import org.apache.pekko.http.scaladsl.server.Route
 import io.circe.{ Decoder, Json, ParsingFailure }
 import tw.idv.idiotech.ghostspeak.agent
 import tw.idv.idiotech.ghostspeak.agent.{ CategoryManager, Scenario, Sensor }
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.ContentTypes._
-import akka.http.scaladsl.model.headers.`Content-Type`
-import akka.pattern.StatusReply
+import org.apache.pekko.http.scaladsl.server.Directives._
+import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.model.ContentTypes._
+import org.apache.pekko.http.scaladsl.model.headers.`Content-Type`
+import org.apache.pekko.pattern.StatusReply
 import io.circe.parser.{ decode, parse }
 import io.circe.syntax._
-import akka.actor.typed.scaladsl.AskPattern.schedulerFromActorSystem
-import akka.actor.typed.scaladsl.AskPattern.Askable
+import org.apache.pekko.actor.typed.scaladsl.AskPattern.schedulerFromActorSystem
+import org.apache.pekko.actor.typed.scaladsl.AskPattern.Askable
 import io.circe.generic.JsonCodec
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Identifier
 

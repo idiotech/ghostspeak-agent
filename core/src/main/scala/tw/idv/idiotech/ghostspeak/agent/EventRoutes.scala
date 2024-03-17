@@ -1,22 +1,22 @@
 package tw.idv.idiotech.ghostspeak.agent
 
-import akka.actor.typed.{ ActorRef, ActorSystem }
-import akka.http.scaladsl.common.EntityStreamingSupport
-import akka.util.Timeout
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.Route
-import akka.http.scaladsl.model.ContentTypes._
-import akka.http.scaladsl.model.headers.`Content-Type`
-import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
-import akka.pattern.StatusReply
-import ch.megard.akka.http.cors.scaladsl.CorsDirectives.cors
+import com.github.pjfanning.pekkohttpcirce.FailFastCirceSupport
+import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem }
+import org.apache.pekko.http.scaladsl.common.EntityStreamingSupport
+import org.apache.pekko.util.Timeout
+import org.apache.pekko.http.scaladsl.server.Directives._
+import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.server.Route
+import org.apache.pekko.http.scaladsl.model.ContentTypes._
+import org.apache.pekko.http.scaladsl.model.headers.`Content-Type`
+import org.apache.pekko.pattern.StatusReply
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.Decoder
 import io.circe.Json
 import io.circe.generic.extras.ConfiguredJsonCodec
 import io.circe.parser.decode
 import io.circe.syntax._
+import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
 import tw.idv.idiotech.ghostspeak.agent.EventRoutes.ScenarioPayload
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Identifier
 
@@ -31,8 +31,8 @@ class EventRoutes[T: Decoder](
 ) extends FailFastCirceSupport
     with LazyLogging {
 
-  import akka.actor.typed.scaladsl.AskPattern.schedulerFromActorSystem
-  import akka.actor.typed.scaladsl.AskPattern.Askable
+  import org.apache.pekko.actor.typed.scaladsl.AskPattern.schedulerFromActorSystem
+  import org.apache.pekko.actor.typed.scaladsl.AskPattern.Askable
   implicit val jsonStreamingSupport = EntityStreamingSupport.json()
   implicit val decoder = Message.decoder[T]
   implicit val ac = system
@@ -194,17 +194,21 @@ class EventRoutes[T: Decoder](
     },
     pathPrefix("v1" / "scenario" / Segment / Segment) { (engine, scenarioId) =>
       get {
-        getScenarios(x => Query[T](None, None, None, Some(Identifier(engine, scenarioId)), x), _.asJson)
+        getScenarios(
+          x => Query[T](None, None, None, Some(Identifier(engine, scenarioId)), x),
+          _.asJson
+        )
       }
     },
     pathPrefix("v1" / "scenario") {
-      parameters("public".optional, "category".optional, "featured".optional) { (`public`, category, featured) =>
-        val isPublic = `public`.map(_.toBoolean)
-        val isFeatured = `featured`.map(_.toBoolean)
-        getScenarios(
-          x => Query[T](isPublic, isFeatured, category, None, x),
-          _.asJson.mapObject(_.remove("template").remove("engine"))
-        )
+      parameters("public".optional, "category".optional, "featured".optional) {
+        (`public`, category, featured) =>
+          val isPublic = `public`.map(_.toBoolean)
+          val isFeatured = `featured`.map(_.toBoolean)
+          getScenarios(
+            x => Query[T](isPublic, isFeatured, category, None, x),
+            _.asJson.mapObject(_.remove("template").remove("engine"))
+          )
       }
     },
     pathPrefix("v1" / "category") {

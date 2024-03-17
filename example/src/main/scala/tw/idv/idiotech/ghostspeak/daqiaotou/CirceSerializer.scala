@@ -1,6 +1,6 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
-import akka.serialization.Serializer
+import org.apache.pekko.serialization.Serializer
 import io.circe.Json
 import io.circe.syntax._
 import io.circe.parser.decode

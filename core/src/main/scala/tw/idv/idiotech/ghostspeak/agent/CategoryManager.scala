@@ -1,11 +1,11 @@
 package tw.idv.idiotech.ghostspeak.agent
 
-import akka.actor.typed.{ ActorRef, Behavior }
-import akka.actor.typed.scaladsl.Behaviors
-import akka.pattern.StatusReply
-import akka.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior, ReplyEffect }
-import akka.actor.typed.scaladsl.ActorContext
-import akka.persistence.typed.PersistenceId
+import org.apache.pekko.actor.typed.{ ActorRef, Behavior }
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.pattern.StatusReply
+import org.apache.pekko.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior, ReplyEffect }
+import org.apache.pekko.actor.typed.scaladsl.ActorContext
+import org.apache.pekko.persistence.typed.PersistenceId
 import enumeratum.EnumEntry.UpperSnakecase
 import enumeratum._
 import io.circe.generic.extras.ConfiguredJsonCodec

@@ -1,12 +1,11 @@
 package tw.idv.idiotech.ghostspeak.agent
 
-import akka.actor.typed.scaladsl.Behaviors
-import akka.actor.typed.{ ActorRef, ActorSystem, Behavior, PostStop }
-import akka.http.scaladsl.Http.ServerBinding
-import akka.http.scaladsl.Http
-import akka.persistence.jdbc.testkit.scaladsl.SchemaUtils
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem, Behavior, PostStop }
+import org.apache.pekko.http.scaladsl.Http.ServerBinding
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.persistence.jdbc.testkit.scaladsl.SchemaUtils
 import io.circe.Decoder
-import org.virtuslab.ash.annotation.SerializabilityTrait
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{ Await, Future }

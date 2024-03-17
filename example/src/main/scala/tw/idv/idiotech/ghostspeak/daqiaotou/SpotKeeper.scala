@@ -1,10 +1,10 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
-import akka.Done
-import akka.actor.typed.scaladsl.{ ActorContext, Behaviors }
-import akka.actor.typed.{ ActorRef, ActorSystem, Behavior }
-import akka.persistence.typed.PersistenceId
-import akka.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
+import org.apache.pekko.Done
+import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors }
+import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem, Behavior }
+import org.apache.pekko.persistence.typed.PersistenceId
+import org.apache.pekko.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.generic.extras.ConfiguredJsonCodec

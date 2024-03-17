@@ -4,13 +4,13 @@ version := "0.1"
 
 scalaVersion in ThisBuild := "2.13.10"
 
-val akkaVersion = "2.7.0"
-val akkaHttpVersion = "10.4.0"
+val pekkoVersion = "1.0.2"
+val pekkoHttpVersion = "1.0.0"
 val enumeratumVersion = "1.7.2"
 val circeVersion = "0.14.6"
-val slickVersion = "3.4.1"
+val slickVersion = "3.3.3"
 
-import org.virtuslab.ash.AkkaSerializationHelperPlugin
+//import org.virtuslab.ash.PekkoSerializationHelperPlugin
 
 scalacOptions in ThisBuild ++= Seq(
   "-Ybackend-parallelism",
@@ -36,24 +36,28 @@ def log = Seq(
   // log errors to Sentry
 )
 libraryDependencies in ThisBuild ++= Seq(
-  "com.typesafe.akka" %% "akka-actor-typed" % akkaVersion,
-  "com.typesafe.akka" %% "akka-stream" % akkaVersion,
-  "com.typesafe.akka" %% "akka-stream-typed" % akkaVersion,
-  "com.typesafe.akka" %% "akka-http" % akkaHttpVersion,
-  "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpVersion,
-  "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion % Test,
-  "com.typesafe.akka" %% "akka-persistence-typed" % akkaVersion,
-  "com.typesafe.akka" %% "akka-persistence-testkit" % akkaVersion % Test,
-  "com.typesafe.akka" %% "akka-serialization-jackson" % akkaVersion,
-  AkkaSerializationHelperPlugin.circeAkkaSerializer,
-  "ch.megard" %% "akka-http-cors" % "1.1.1",
-  "com.lightbend.akka" %% "akka-stream-alpakka-google-fcm" % "5.0.0",
+  "org.apache.pekko" %% "pekko-actor-typed" % pekkoVersion,
+  "org.apache.pekko" %% "pekko-stream" % pekkoVersion,
+  "org.apache.pekko" %% "pekko-stream-typed" % pekkoVersion,
+  "org.apache.pekko" %% "pekko-http" % pekkoHttpVersion,
+  "org.apache.pekko" %% "pekko-http-cors" % pekkoHttpVersion,
+  "org.apache.pekko" %% "pekko-http-spray-json" % pekkoHttpVersion,
+  "org.apache.pekko" %% "pekko-stream-testkit" % pekkoVersion % Test,
+  "org.apache.pekko" %% "pekko-persistence-typed" % pekkoVersion,
+  "org.apache.pekko" %% "pekko-persistence-testkit" % pekkoVersion % Test,
+  "org.apache.pekko" %% "pekko-serialization-jackson" % pekkoVersion,
+  "org.apache.pekko" %% "pekko-serialization-jackson" % pekkoVersion,
+//  PekkoSerializationHelperPlugin.circePekkoSerializer,
+  "org.virtuslab.psh" %% "circe-pekko-serializer" % "0.8.0",
+  "org.virtuslab.psh" %% "annotation" % "0.8.0",
+  "org.apache.pekko" %% "pekko-connectors-google-fcm" % pekkoVersion,
   "net.debasishg" %% "redisclient" % "3.41",
-  "com.twitter" %% "chill" % "0.10.0",
-  "com.twitter" %% "chill-akka" % "0.10.0",
+//  "com.twitter" %% "chill" % "0.10.0",
+//  "com.twitter" %% "chill-pekko" % "0.10.0",
+//  "io.altoo" %% "pekko-kryo-serialization" && "",
   "com.beachape" %% "enumeratum" % enumeratumVersion,
   "com.beachape" %% "enumeratum-circe" % enumeratumVersion,
-  "de.heikoseeberger" %% "akka-http-circe" % "1.40.0-RC3",
+  "com.github.pjfanning" %% "pekko-http-circe" % "2.4.0",
   "com.github.andyglow" %% "scala-jsonschema-circe-json" % "0.7.11",
   "com.chuusai" %% "shapeless" % "2.3.9",
   "com.softwaremill.retry" %% "retry" % "0.3.6",
@@ -63,24 +67,28 @@ libraryDependencies in ThisBuild ++= Seq(
   "com.hunorkovacs" %% "circe-config" % "0.10.0",
   "org.typelevel" %% "cats-core" % "2.8.0",
   "org.typelevel" %% "cats-effect" % "3.3.14",
-  "com.lightbend.akka" %% "akka-persistence-jdbc" % "5.2.1",
-  "com.typesafe.akka" %% "akka-persistence-query" % akkaVersion,
+  "org.apache.pekko" %% "pekko-persistence-jdbc" % "1.0.0",
+  "org.apache.pekko" %% "pekko-persistence-query" % pekkoVersion,
+  "org.apache.pekko" %% "pekko-connectors-slick" % "1.0.0",
   "com.typesafe.slick" %% "slick" % slickVersion,
   "com.typesafe.slick" %% "slick-hikaricp" % slickVersion,
   "com.typesafe" %% "ssl-config-core" % "0.6.1",
+  "org.openapitools" % "onesignal-java-client" % "1.2.2",
   "org.scalatest" %% "scalatest" % "3.1.0" % Test
 ) ++ log
 
 
 resolvers in ThisBuild ++= List(
   Resolver.sonatypeRepo("releases"),
+  Resolver.mavenLocal,
   "jitpack" at "https://jitpack.io"
 )
 
 def project(projectName: String) = Project(projectName, new File(projectName)).settings(
   name := projectName,
   version := "0.1"
-).enablePlugins(AkkaSerializationHelperPlugin)
+)
+//  .enablePlugins(PekkoSerializationHelperPlugin)
 
 val core = project("core")
 val example = project("example").dependsOn(core)
