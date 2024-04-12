@@ -5,7 +5,7 @@ import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem }
 import org.apache.pekko.http.scaladsl.common.EntityStreamingSupport
 import org.apache.pekko.util.Timeout
 import org.apache.pekko.http.scaladsl.server.Directives._
-import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.model.{ HttpMethods, StatusCodes }
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.http.scaladsl.model.ContentTypes._
 import org.apache.pekko.http.scaladsl.model.headers.`Content-Type`
@@ -17,6 +17,8 @@ import io.circe.generic.extras.ConfiguredJsonCodec
 import io.circe.parser.decode
 import io.circe.syntax._
 import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
+import org.apache.pekko.http.cors.scaladsl.model.HttpOriginMatcher
+import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 import tw.idv.idiotech.ghostspeak.agent.EventRoutes.ScenarioPayload
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Identifier
 
@@ -262,7 +264,13 @@ class EventRoutes[T: Decoder](
     }
   )
 
-  lazy val theEventRoutes: Route = cors() {
+  cors()
+
+  val corsSettings = CorsSettings(system.classicSystem)
+    .withAllowedMethods(Seq(HttpMethods.GET, HttpMethods.PUT, HttpMethods.DELETE, HttpMethods.POST))
+    .withAllowedOrigins(HttpOriginMatcher.Default(agentConfig.corsDomainList))
+
+  lazy val theEventRoutes: Route = cors(corsSettings) {
     concat(routes: _*)
   }
 }

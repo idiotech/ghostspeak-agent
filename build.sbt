@@ -5,7 +5,7 @@ version := "0.1"
 scalaVersion in ThisBuild := "2.13.10"
 
 val pekkoVersion = "1.0.2"
-val pekkoHttpVersion = "1.0.0"
+val pekkoHttpVersion = "1.0.1"
 val enumeratumVersion = "1.7.2"
 val circeVersion = "0.14.6"
 val slickVersion = "3.3.3"

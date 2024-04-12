@@ -1,13 +1,16 @@
 package tw.idv.idiotech.ghostspeak
 
+import com.typesafe.config.ConfigFactory
 import enumeratum.EnumEntry.UpperSnakecase
 import enumeratum.{ CirceEnum, Enum, EnumEntry }
 import io.circe.{ Decoder, Encoder, Json }
 import io.circe.generic.extras.{ Configuration, ConfiguredJsonCodec }
 import io.circe.generic.extras.semiauto._
+import io.circe.config.syntax._
 
 import scala.collection.immutable
 import json.schema._
+import org.apache.pekko.http.scaladsl.model.headers.HttpOrigin
 package object agent {
 
   implicit val configuration = Configuration.default
@@ -181,4 +184,13 @@ package object agent {
     metadata: Metadata = Metadata()
   )
 
+  @ConfiguredJsonCodec
+  case class AgentConf(corsDomains: String) {
+    println(s"++++++++ ${corsDomains.split(",").toList}")
+    val corsDomainList: Array[HttpOrigin] = corsDomains.split(",").map(HttpOrigin.apply)
+  }
+
+  lazy val agentConfig: AgentConf = {
+    ConfigFactory.load().as[AgentConf]("app").fold(throw _, identity)
+  }
 }

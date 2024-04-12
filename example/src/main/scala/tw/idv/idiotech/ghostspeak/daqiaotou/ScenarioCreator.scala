@@ -4,7 +4,11 @@ import org.apache.pekko.Done
 import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem, Behavior }
 import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors }
 import org.apache.pekko.persistence.typed.PersistenceId
-import org.apache.pekko.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
+import org.apache.pekko.persistence.typed.scaladsl.{
+  Effect,
+  EventSourcedBehavior,
+  RetentionCriteria
+}
 import tw.idv.idiotech.ghostspeak.agent.Actuator.Command.Perform
 import tw.idv.idiotech.ghostspeak.agent.{
   Actuator,
@@ -301,7 +305,9 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
         emptyState = State(initial.triggers.map(_ -> List(initial)).toMap, Map.empty, Map.empty),
         commandHandler = onCommand(user, actuator),
         eventHandler = onEvent(user)
-      )
+      ).snapshotWhen { case (state, event, sequenceNumber) =>
+        true
+      }.withRetention(RetentionCriteria.snapshotEvery(100, 2))
     }
 
   def createUserScenario(
