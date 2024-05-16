@@ -57,7 +57,7 @@ class EventRoutes[T: Decoder](
             scenarios =>
               complete(
                 StatusCodes.OK,
-                List(`Content-Type`(`application/json`)),
+                List(),
                 scenarios
                   .map { s =>
                     val m = s.metadata
@@ -225,7 +225,7 @@ class EventRoutes[T: Decoder](
             case Success(state) =>
               complete(
                 StatusCodes.OK,
-                List(`Content-Type`(`application/json`)),
+                List(),
                 CategoryManager.State(
                   state.categories.sortBy(_.order)
                 )

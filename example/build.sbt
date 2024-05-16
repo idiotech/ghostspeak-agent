@@ -11,7 +11,7 @@ dockerBaseImage := "openjdk:15.0.2-slim"
 dockerVersion := Some(DockerVersion(20, 10, 7, None))
 Docker / packageName := "urbanbaker/ghostspeak-agent"
 Docker / version := scala.sys.env.getOrElse("IMAGE_TAG", "localtest")
-Docker / dockerRepository := Some("docker.floraland.tw")
+Docker / dockerRepository := Some("docker.urbanbaker.tw")
 Docker / daemonUser := "root"
 Docker / daemonUserUid := Some("0")
 enablePlugins(JavaAppPackaging)

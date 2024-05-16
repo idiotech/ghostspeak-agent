@@ -66,7 +66,7 @@ class EventRoutes[T: Decoder](
                 actions =>
                   complete(
                     StatusCodes.OK,
-                    List(`Content-Type`(`application/json`)),
+                    List(),
                     actions
                   )
               )
@@ -106,7 +106,7 @@ class EventRoutes[T: Decoder](
                         nodes =>
                           complete(
                             StatusCodes.OK,
-                            List(`Content-Type`(`application/json`)),
+                            List(),
                             Resources(nodes).asJson
                           )
                       )
