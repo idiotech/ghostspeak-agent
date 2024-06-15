@@ -13,8 +13,8 @@ object PerformanceLogger {
   )
 
   def insert(user: String, action: String, stage: String): Unit = {
-    val shortId = user.take(5)
-    sql"insert into action_events (username, action, stage) values ($shortId, $action, $stage)".update
-      .apply()
+//    val shortId = user.take(5)
+//    sql"insert into action_events (username, action, stage) values ($shortId, $action, $stage)".update
+//      .apply()
   }
 }

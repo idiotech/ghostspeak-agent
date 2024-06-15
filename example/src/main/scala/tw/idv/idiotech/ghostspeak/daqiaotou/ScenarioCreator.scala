@@ -31,7 +31,25 @@ import tw.idv.idiotech.ghostspeak.daqiaotou.Task.VariableUpdates
 import java.util.UUID
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+import org.apache.pekko.persistence.Persistence
+import tw.idv.idiotech.ghostspeak.agent.Sensor.Command
+import tw.idv.idiotech.ghostspeak.daqiaotou.ScenarioCreator.{
+  commandTime,
+  eventTime,
+  getEffectTime,
+  logTime,
+  performTime
+}
+
 import scala.util.Try
+
+object ScenarioCreator {
+  var commandTime = 0L
+  var getEffectTime = 0L
+  var logTime = 0L
+  var performTime = 0L
+  var eventTime = 0L
+}
 
 class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, EventPayload])
     extends LazyLogging {
@@ -97,7 +115,8 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
 
   def onEvent(
     user: String
-  )(state: State, event: Event)(implicit script: Map[String, Node]): State =
+  )(state: State, event: Event)(implicit script: Map[String, Node]): State = {
+    val time = System.nanoTime()
     if (event.nodes == List(Node.leave)) {
       val initial = script("initial").replace(user)
       State(initial.triggers.map(_ -> List(initial)).toMap, Map.empty, Map.empty)
@@ -156,8 +175,12 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
             state.variables
           )
         }
+      val elapsedTime = System.nanoTime() - time
+      eventTime += elapsedTime
+//      logger.warn(s"Event time: total = $eventTime; single = $elapsedTime")
       result.apply(event.variableUpdates)
     }
+  }
 
   def fakeTextPayload = Right(EventPayload.Text("fake_text"))
 
@@ -175,20 +198,26 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
   def onCommand(
     user: String,
     actuator: ActorRef[Actuator.Command[Content]]
-  )(state: State, command: Command)(implicit script: Map[String, Node]): Effect[Event, State] =
-    command match {
+  )(state: State, command: Command)(implicit script: Map[String, Node]): Effect[Event, State] = {
+    val commandName = getCommandName(command)
+    val time = System.nanoTime()
+    if (commandName.nonEmpty) logger.warn("START: " + getCommandName(command));
+    val ret: Effect[Event, State] = command match {
       case Sensor.Command.Sense(message, replyTo) =>
         def simplyPerform(action: Action) = {
+          val performStart = System.nanoTime()
           val a = action
             .copy(
               session = Session(message.scenarioId, None),
               receiver = user
             )
-          logger.info(s"carrying out ${Perform(action, System.currentTimeMillis())}")
+          logger.debug(s"carrying out ${Perform(action, System.currentTimeMillis())}")
           actuator ! Perform(a, System.currentTimeMillis())
+          performTime += (System.nanoTime() - performStart)
         }
         def getEffect(nodes: List[Node]): Effect[Event, State] = {
-          logger.info(s"triggered nodes: ${nodes.map(_.name)}")
+          logger.debug(s"triggered nodes: ${nodes.map(_.name)}")
+          val effectStart = System.nanoTime()
           val variableUpdates: List[VariableUpdate] =
             nodes.filter(n => state.check(n.preconditions)).flatMap { n =>
 //              logger.info(s"effects: ${n.performances}")
@@ -205,7 +234,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
                 val startTime = p.time.fold(
                   System.currentTimeMillis() + p.delay
                 )(_.time())
-                logger.info(
+                logger.debug(
                   s"carrying out ${Perform(action, startTime)} ${p.time} ${p.time.map(_.time())}"
                 )
                 action.content.task match {
@@ -218,23 +247,27 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
               logger.info(s"transition to ${n.name}")
               vus
             }
-          Effect.persist(Event(nodes, message, variableUpdates))
+          val ret: Effect[Event, State] = Effect.persist(Event(nodes, message, variableUpdates))
+          getEffectTime += (System.nanoTime() - effectStart)
+          ret
         }
 
-        state.triggers.foreach { case (k, v) =>
-          logger.info(s"trigger: responding to ${k.actionId.getOrElse("none")}")
-          logger.info(s"======== triggering event: ${k.payload}")
-          val actions = v.flatMap(_.performances).map(_.action)
-          actions.foreach(a => PerformanceLogger.insert(a.receiver, a.id, "triggered"))
-          logger.info(
-            s"======== triggered actions: ${v.map(_.performances.map(_.action.description))}"
-          )
-        }
+//        val logStart = System.currentTimeMillis()
+//        state.triggers.foreach { case (k, v) =>
+//          logger.info(s"trigger: responding to ${k.actionId.getOrElse("none")}")
+//          logger.info(s"======== triggering event: ${k.payload}")
+//          val actions = v.flatMap(_.performances).map(_.action)
+//          actions.foreach(a => PerformanceLogger.insert(a.receiver, a.id, "triggered"))
+//          logger.info(
+//            s"======== triggered actions: ${v.map(_.performances.map(_.action.description))}"
+//          )
+//        }
+//        logTime += System.currentTimeMillis() - logStart
         message.payload match {
           case Left(SystemPayload.Leave) =>
             logger.info(s"user $user left")
             val redisKey = s"action-${message.scenarioId}-$user"
-            logger.info(s"deleting user from redis: $redisKey")
+            logger.debug(s"deleting user from redis: $redisKey")
             redis.withClient(r => r.del(redisKey))
             Effect.persist(Event(List(Node.leave), message, Nil))
           case Right(EventPayload.PerformDirectly(action)) =>
@@ -266,14 +299,14 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
           case Right(EventPayload.GoldenFinger) =>
             getEffect(state.triggers.values.toList.flatten)
           case _ =>
-            logger.info(s"message: $message")
+            logger.debug(s"message: $message")
             val node = state.triggers
               .get(message.forComparison)
               .map(_.map(_.replace(user)))
               .filter(_.nonEmpty)
               .getOrElse(Nil)
             if (node.nonEmpty) {
-              logger.info(s"match: $node")
+              logger.debug(s"match: $node")
             }
             getEffect(node)
         }
@@ -281,14 +314,32 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
       case Sensor.Command.Destroy(scenarioId, replyTo) => Effect.none
       case _                                           => Effect.none
     }
+    val elapsedTime = System.nanoTime() - time
+    commandTime += elapsedTime
+//    logger.warn(s"Command time ${command} : total = $commandTime; single = $elapsedTime; get effect = $getEffectTime; perform = $performTime; log = $logTime; command = ${command}")
+    if (commandName.nonEmpty) logger.warn("FINISH: " + getCommandName(command));
+    ret
+  }
+
+  def getCommandName(command: Command): String =
+    command match {
+      case Command.Sense(message, replyTo) =>
+        if (message.sender != "!you123")
+          s"COMMAND: ${message.sender}, ${message.actionId.getOrElse("")}"
+        else ""
+      case Command.Broadcast(message, replyTo)                                => "braodcast"
+      case Command.Create(scenario, replyTo)                                  => "create"
+      case Command.Query(isPublic, isFeatured, category, scenarioId, replyTo) => "query"
+//      case Command.Destroy(scenarioId, replyTo) => "destroy"
+    }
 
   def createScript(scenario: Scenario) = {
-    logger.info(s"new template: ${scenario.template}")
+    logger.debug(s"new template: ${scenario.template}")
     val ret = decode[List[Node]](scenario.template)
       .fold(throw _, identity)
       .map(n => n.name -> n)
       .toMap
-    logger.info(s"new template to case class: $ret")
+    logger.debug(s"new template to case class: $ret")
     ret
   }
 
@@ -298,16 +349,25 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
     Behaviors.setup[Command] { ctx =>
       val user = userScenario.id
       val initial: Node = script("initial").replace(user)
-      logger.info(s"initial before = ${script("initial")}")
-      logger.info(s"initial after = $initial")
+      logger.debug(s"initial before = ${script("initial")}")
+      logger.debug(s"initial after = $initial")
       EventSourcedBehavior[Command, Event, State](
         persistenceId = PersistenceId.ofUniqueId(s"scn-$user"),
         emptyState = State(initial.triggers.map(_ -> List(initial)).toMap, Map.empty, Map.empty),
         commandHandler = onCommand(user, actuator),
         eventHandler = onEvent(user)
-      ).snapshotWhen { case (state, event, sequenceNumber) =>
-        true
-      }.withRetention(RetentionCriteria.snapshotEvery(100, 2))
+      )
+        .snapshotWhen { case (state, event, sequenceNumber) =>
+          event.message.payload match {
+            case Left(value) =>
+              value match {
+                case SystemPayload.Leave => true
+                case _                   => false
+              }
+            case Right(_) => false
+          }
+        }
+        .withRetention(RetentionCriteria.snapshotEvery(100, 2))
     }
 
   def createUserScenario(
@@ -327,25 +387,20 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
     val actionJson = action.asJson.toString()
     val redisKey = s"action-${action.session.scenario}-${action.receiver}"
     val hashKey = action.id
-    logger.info(s"saving action to redis: $redisKey $hashKey")
+    logger.debug(s"saving action to redis: $redisKey $hashKey")
     redis.withClient(r => r.hset(redisKey, hashKey, actionJson))
     logPerf(action, "fcm_sending")
     FcmSender.send(action, logPerf)
   }
+
+  var spawnTime = 0L;
 
   val scenarioBehavior: Behavior[Command] =
     Behaviors.setup[Command] { ctx =>
       val sensorRef = ctx.self
       val actuatorBehavior = Behaviors.setup[Actuator.Command[Content]] { actx =>
         implicit val system = ctx.system
-
-        def fcm(root: ActorRef[Actuator.Command[Content]]) =
-          actuator.fromFuture(sendMessage, root)
-
-        def discover(c: ActorContext[_], a: Action, r: ActorRef[Actuator.Command[Content]]) = Some {
-          c.spawnAnonymous(fcm(actx.self))
-        }
-        actuator.behavior("graphscript", discover, sensorRef)
+        actuator.behaviorFromFuture("graphscript", sensorRef, sendMessage)
       }
       val actuatorRef: ActorRef[Actuator.Command[Content]] =
         ctx.spawn(actuatorBehavior, UUID.randomUUID().toString)

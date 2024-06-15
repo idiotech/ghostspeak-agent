@@ -56,7 +56,7 @@ object FcmSender extends LazyLogging {
           logPerf(action, "fcm_sent")
           res
         case res @ FcmErrorResponse(errorMessage) =>
-          logger.info(s"Send error $errorMessage")
+          logger.info(s"Send error $errorMessage $fcmConfig")
           logPerf(action, "fcm_error")
           res
       }

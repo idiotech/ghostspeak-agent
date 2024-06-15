@@ -86,10 +86,10 @@ class EventRoutes[T: Decoder](
           concat(
             post {
               entity(as[Message[T]]) { message =>
-                logger.info(s"############ HTTP POST: /v1/event with content $message")
+                logger.debug(s"############ HTTP POST: /v1/event with content $message")
                 onComplete(sensor.askWithStatus[String](x => Sense[T](message, Some(x)))) {
                   case Success(msg) =>
-                    logger.info(s"############ Finished HTTP POST: /v1/event")
+                    logger.debug(s"############ Finished HTTP POST: /v1/event")
                     complete(msg)
                   case Failure(StatusReply.ErrorMessage(reason)) =>
                     complete(StatusCodes.InternalServerError -> reason)
@@ -131,12 +131,12 @@ class EventRoutes[T: Decoder](
         val overwrite = overwriteParam.fold(false)(_ == "true")
         put {
           entity(as[ScenarioPayload]) { payload =>
-            logger.info(
+            logger.debug(
               s"############ HTTP PUT: /v1/scenario/$engine/$scenarioId?overwrite=$overwriteParam"
             )
             val ret: Route = onComplete {
               val deletion = if (overwrite) {
-                logger.info("overwriting!")
+                logger.debug("overwriting!")
                 sensor.askWithStatus[String](x => Destroy[T](scenarioId, x)).recover { case e =>
                   logger.error("failed to delete scenario", e)
                 }
@@ -161,7 +161,7 @@ class EventRoutes[T: Decoder](
               }
             } {
               case Success(msg) =>
-                logger.info(
+                logger.debug(
                   s"############ Finished HTTP PUT: /v1/scenario/$engine/$scenarioId?overwrite=$overwriteParam"
                 )
                 complete(msg)
@@ -177,14 +177,14 @@ class EventRoutes[T: Decoder](
     },
     pathPrefix("v1" / "scenario" / Segment / Segment) { (engine, scenarioId) =>
       delete {
-        logger.info(s"############ HTTP DELETE: /v1/scenario/$engine/$scenarioId")
+        logger.debug(s"############ HTTP DELETE: /v1/scenario/$engine/$scenarioId")
         val ret: Route = onComplete {
           sensor.askWithStatus[String](x => Destroy[T](scenarioId, x)).recover { case e =>
             logger.error("failed to delete scenario", e)
           }
         } {
           case Success(msg) =>
-            logger.info(s"############ Finished HTTP DELETE: /v1/scenario/$engine/$scenarioId")
+            logger.debug(s"############ Finished HTTP DELETE: /v1/scenario/$engine/$scenarioId")
             complete("DELETED")
           case Failure(StatusReply.ErrorMessage(reason)) =>
             complete(StatusCodes.InternalServerError -> reason)

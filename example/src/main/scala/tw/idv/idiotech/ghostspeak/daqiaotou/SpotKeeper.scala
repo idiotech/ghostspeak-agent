@@ -126,7 +126,7 @@ class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPa
     val actionJson = action.asJson.printWith(Printer.spaces2)
     val redisKey = s"action-${action.session.scenario}-${action.receiver}"
     val hashKey = action.id
-    logger.info(s"saving action to redis: $redisKey $hashKey")
+    logger.debug(s"saving action to redis: $redisKey $hashKey")
     redis.withClient(r => r.hset(redisKey, hashKey, actionJson))
     FcmSender.send(action)
   }
@@ -136,18 +136,7 @@ class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPa
       val sensorRef: ActorRef[Command] = ctx.self
       val actuatorBehavior = Behaviors.setup[Actuator.Command[Content]] { actx =>
         implicit val system = ctx.system
-
-        def fcm(root: ActorRef[Actuator.Command[Content]]) =
-          actuator.fromFuture(sendMessage, root)
-
-        def discover(
-          c: ActorContext[_],
-          a: Action[Content],
-          r: ActorRef[Actuator.Command[Content]]
-        ) = Some {
-          c.spawnAnonymous(fcm(actx.self))
-        }
-        actuator.behavior("spotkeeper", discover, sensorRef)
+        actuator.behaviorFromFuture("spotkeeper", sensorRef, sendMessage)
       }
       val actuatorRef: ActorRef[Actuator.Command[Content]] =
         ctx.spawn(actuatorBehavior, s"actuator-${UUID.randomUUID().toString}")

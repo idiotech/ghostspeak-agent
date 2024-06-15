@@ -2,7 +2,7 @@ name := "ghostspeak-agent"
 
 version := "0.1"
 
-scalaVersion in ThisBuild := "2.13.10"
+scalaVersion in ThisBuild := "2.13.14"
 
 val pekkoVersion = "1.0.2"
 val pekkoHttpVersion = "1.0.1"

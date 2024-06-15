@@ -33,62 +33,63 @@ class EventRoutes[T: Decoder](
     pathPrefix("v1" / "scenario" / Segment / Segment / "user" / Segment / "actions") {
       (engine, scenarioId, userId) =>
         val key = s"action-$scenarioId-$userId"
-        val ret: Route = delete {
-          logger.info(
-            s"############ HTTP DELETE: /v1/scenario/$engine/$scenarioId/user/$userId/actions"
-          )
-          val fetch: Future[Map[String, String]] =
-            for {
-              res <- Future(redis.withClient(c => c.hgetall[String, String](key)))
-              all <- {
-                logger.info(s"getting action from redis: ${res.getOrElse(Map.empty)}")
-                res.getOrElse(Map.empty).values.foreach { s =>
-                  decode[Action](s).fold(
-                    error => logger.error(s"failed to parse action $s", error),
-                    a => PerformanceLogger.insert(userId, a.id, "redis")
-                  )
+        val ret: Route =
+          delete {
+//          logger.info(
+//            s"############ HTTP DELETE: /v1/scenario/$engine/$scenarioId/user/$userId/actions"
+//          )
+            val fetch: Future[Map[String, String]] =
+              for {
+                res <- Future(redis.withClient(c => c.hgetall[String, String](key)))
+                all <- {
+//                logger.info(s"getting action from redis: ${res.getOrElse(Map.empty)}")
+                  res.getOrElse(Map.empty).values.foreach { s =>
+                    decode[Action](s).fold(
+                      error => logger.error(s"failed to parse action $s", error),
+                      a => PerformanceLogger.insert(userId, a.id, "redis")
+                    )
+                  }
+                  Future.successful(res.getOrElse(Map.empty))
                 }
-                Future.successful(res.getOrElse(Map.empty))
-              }
-              _ <- Future.traverse(all.keys)(actionId =>
-                Future(redis.withClient(c => c.hdel(key, actionId)))
-              )
-            } yield all
-          onComplete(fetch) {
-            case Success(all) =>
+                _ <- Future.traverse(all.keys)(actionId =>
+                  Future(redis.withClient(c => c.hdel(key, actionId)))
+                )
+              } yield all
+            onComplete(fetch) {
+              case Success(all) =>
 //              logger.info(
 //                s"############ Finished HTTP DELETE: /v1/scenario/$engine/$scenarioId/user/$userId/actions"
 //              )
-              val parseResults: Either[ParsingFailure, Json] =
-                all.values.map(parse).toList.sequence.map(_.asJson)
-              parseResults.fold(
-                e => complete(StatusCodes.InternalServerError -> e.getMessage()),
-                actions =>
-                  complete(
-                    StatusCodes.OK,
-                    List(),
-                    actions
-                  )
-              )
-            case Failure(StatusReply.ErrorMessage(reason)) =>
-              complete(StatusCodes.InternalServerError -> reason)
-            case Failure(e) =>
-              complete(StatusCodes.InternalServerError -> e.getMessage)
+                val parseResults: Either[ParsingFailure, Json] =
+                  all.values.map(parse).toList.sequence.map(_.asJson)
+                parseResults.fold(
+                  e => complete(StatusCodes.InternalServerError -> e.getMessage()),
+                  actions =>
+                    complete(
+                      StatusCodes.OK,
+                      List(),
+                      actions
+                    )
+                )
+              case Failure(StatusReply.ErrorMessage(reason)) =>
+                complete(StatusCodes.InternalServerError -> reason)
+              case Failure(e) =>
+                complete(StatusCodes.InternalServerError -> e.getMessage)
+            }
           }
-        }
         ret
 
     },
     pathPrefix("v1" / "scenario" / Segment / Segment / "resources") { (engine, scenarioId) =>
       get {
-        logger.info(s"############ HTTP GET: /v1/scenario/$engine/$scenarioId/resources")
+        logger.debug(s"############ HTTP GET: /v1/scenario/$engine/$scenarioId/resources")
         onComplete(
           sensor.askWithStatus[String](x =>
             Sensor.Command.Query[T](None, None, None, Some(Identifier(engine, scenarioId)), x)
           )
         ) {
           case Success(msg) =>
-            logger.info(
+            logger.debug(
               s"############ Finished HTTP GET: /v1/scenario/$engine/$scenarioId/resources"
             )
             parse(msg).fold(

@@ -52,18 +52,23 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
     ActorRef[Command[T]]
   ) => Option[ActorRef[Command[T]]]
 
-  def commandHandler(
-    ctx: ActorContext[Command[T]],
-    discover: Discover,
+  type GenCommandHandler[ActuatorType, SensorType] =
+    (
+      ActorContext[Command[ActuatorType]],
+      ActorRef[Sensor.Command[SensorType]],
+      TimerScheduler[Command[ActuatorType]]
+    ) => (State, Command[ActuatorType]) => Effect[Event, State]
+
+  private def commandHandler(
     sensor: ActorRef[Sensor.Command[P]],
     timer: TimerScheduler[Command[T]]
+  )(
+    performAction: Action[T] => Unit
   )(state: State, cmd: Command[T]): Effect[Event, State] = {
-    def sendAction(action: Action[T]): Unit = discover(ctx, action, ctx.self).foreach { a =>
-      logger.info(s"send action to child actuator: ${action.id} to actor ${a.path}")
-      a ! Perform(action, System.currentTimeMillis())
+    def sendAction(action: Action[T]): Unit = {
+      performAction(action)
       sensor ! Sense(action.toMessage(Modality.Doing))
     }
-
     cmd match {
       case p @ Perform(action, startTime) =>
         val remainingTime = startTime - System.currentTimeMillis()
@@ -116,52 +121,62 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
 
   def eventHandler(state: State, event: Event): State = event match {
     case p: Performance =>
-      logger.info(s"adding to state: ${p.action.id}")
+      logger.debug(s"adding to state: ${p.action.id}")
       val ret = State(state.pendingActions ++ Set(p))
-      logger.info(s"latest state: ${state.pendingActions.map(_.action.id)}")
+      logger.debug(s"latest state: ${state.pendingActions.map(_.action.id)}")
       ret
     case ActionDone(actions) =>
-      logger.info(s"removing from to state: ${actions.map(_.action.id)}}")
+      logger.debug(s"removing from to state: ${actions.map(_.action.id)}}")
       val ret = State(state.pendingActions diff actions)
-      logger.info(s"latest state: ${state.pendingActions.map(_.action.id)}")
+      logger.debug(s"latest state: ${state.pendingActions.map(_.action.id)}")
       ret
     case _ =>
       logger.error(s"match error for $event")
       state
   }
 
-  def behavior(
-    name: String,
-    discover: Discover,
-    sensor: ActorRef[Sensor.Command[P]]
+  private def behavior(name: String, sensor: ActorRef[Sensor.Command[P]])(
+    commandHandlerFrom: GenCommandHandler[T, P]
   ): Behavior[Command[T]] = Behaviors.withTimers { timer =>
     Behaviors.setup { ctx =>
+      val commandHandler = commandHandlerFrom(ctx, sensor, timer)
       EventSourcedBehavior[Command[T], Event, State](
         persistenceId = PersistenceId.ofUniqueId(s"actuator-$name"),
         emptyState = State(),
-        commandHandler = commandHandler(ctx, discover, sensor, timer),
+        commandHandler = commandHandler,
         eventHandler = eventHandler
       )
     }
   }
 
-  def fromFuture(
-    send: Action[T] => Future[_],
-    replyTo: ActorRef[Command[T]]
+  def behaviorFromChild(
+    name: String,
+    sensor: ActorRef[Sensor.Command[P]],
+    discover: Discover
   ): Behavior[Command[T]] =
-    Behaviors.setup { ctx =>
-      implicit val system: ActorSystem[Nothing] = ctx.system
-      Behaviors.receiveMessage {
-        case Perform(action, _) =>
-          val future = send(action)
-          ctx.pipeToSelf(future) {
-            case Success(_) => OK(action)
-            case Failure(e) => KO(action, e.getMessage)
-          }
-          Behaviors.same
-        case m =>
-          replyTo ! m
-          Behaviors.stopped
+    behavior(name, sensor) { (ctx, sensor, timer) =>
+      commandHandler(sensor, timer) { action =>
+        discover(ctx, action, ctx.self).foreach { a =>
+          a ! Perform(action, System.currentTimeMillis())
+        }
+      }
+    }
+
+  def behaviorFromFuture(
+    name: String,
+    sensor: ActorRef[Sensor.Command[P]],
+    performFuture: Action[T] => Future[_]
+  ): Behavior[Command[T]] =
+    behavior(name, sensor) { (ctx, sensor, timer) =>
+      commandHandler(sensor, timer) { action =>
+        ctx.pipeToSelf(performFuture(action)) {
+          case Success(_) =>
+            if (action.receiver == "you123")
+              logger.warn(s"SEND DONE: ${action.receiver} ${action.id}")
+            OK(action)
+          case Failure(e) =>
+            KO(action, e.getMessage)
+        }
       }
     }
 }
