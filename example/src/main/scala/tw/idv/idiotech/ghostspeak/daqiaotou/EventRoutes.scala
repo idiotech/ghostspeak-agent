@@ -85,7 +85,7 @@ class EventRoutes[T: Decoder](
         logger.debug(s"############ HTTP GET: /v1/scenario/$engine/$scenarioId/resources")
         onComplete(
           sensor.askWithStatus[String](x =>
-            Sensor.Command.Query[T](None, None, None, Some(Identifier(engine, scenarioId)), x)
+            Sensor.Command.Query[T](None, None, None, Some(Identifier(engine, scenarioId)), None, x)
           )
         ) {
           case Success(msg) =>

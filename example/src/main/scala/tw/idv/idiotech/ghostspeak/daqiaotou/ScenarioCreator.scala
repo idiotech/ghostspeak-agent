@@ -327,9 +327,9 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
         if (message.sender != "!you123")
           s"COMMAND: ${message.sender}, ${message.actionId.getOrElse("")}"
         else ""
-      case Command.Broadcast(message, replyTo)                                => "braodcast"
-      case Command.Create(scenario, replyTo)                                  => "create"
-      case Command.Query(isPublic, isFeatured, category, scenarioId, replyTo) => "query"
+      case Command.Broadcast(message, replyTo)                                         => "braodcast"
+      case Command.Create(scenario, replyTo)                                           => "create"
+      case Command.Query(isPublic, isFeatured, category, scenarioId, passode, replyTo) => "query"
 //      case Command.Destroy(scenarioId, replyTo) => "destroy"
     }
 

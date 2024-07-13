@@ -164,6 +164,7 @@ package object agent {
     description: Option[String] = None,
     featured: Boolean = false,
     public: Boolean = false,
+    passcode: Option[String] = None,
     owner: Option[String] = None,
     ordinal: Long = 9999999999999L,
     categories: List[String] = Nil,

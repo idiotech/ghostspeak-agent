@@ -197,18 +197,18 @@ class EventRoutes[T: Decoder](
     pathPrefix("v1" / "scenario" / Segment / Segment) { (engine, scenarioId) =>
       get {
         getScenarios(
-          x => Query[T](None, None, None, Some(Identifier(engine, scenarioId)), x),
+          x => Query[T](None, None, None, Some(Identifier(engine, scenarioId)), None, x),
           _.asJson
         )
       }
     },
     pathPrefix("v1" / "scenario") {
-      parameters("public".optional, "category".optional, "featured".optional) {
-        (`public`, category, featured) =>
+      parameters("public".optional, "category".optional, "featured".optional, "passcode".optional) {
+        (`public`, category, featured, passcode) =>
           val isPublic = `public`.map(_.toBoolean)
           val isFeatured = `featured`.map(_.toBoolean)
           getScenarios(
-            x => Query[T](isPublic, isFeatured, category, None, x),
+            x => Query[T](isPublic, isFeatured, category, None, passcode, x),
             _.asJson.mapObject(_.remove("template").remove("engine"))
           )
       }
