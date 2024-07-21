@@ -4,7 +4,7 @@ version := "0.1"
 
 scalaVersion in ThisBuild := "2.13.14"
 
-val pekkoVersion = "1.0.2"
+val pekkoVersion = "1.1.0-M1"
 val pekkoHttpVersion = "1.0.1"
 val enumeratumVersion = "1.7.2"
 val circeVersion = "0.14.6"
@@ -50,7 +50,7 @@ libraryDependencies in ThisBuild ++= Seq(
 //  PekkoSerializationHelperPlugin.circePekkoSerializer,
   "org.virtuslab.psh" %% "circe-pekko-serializer" % "0.8.0",
   "org.virtuslab.psh" %% "annotation" % "0.8.0",
-  "org.apache.pekko" %% "pekko-connectors-google-fcm" % pekkoVersion,
+  "org.apache.pekko" %% "pekko-connectors-google-fcm" % "1.0.2",
   "net.debasishg" %% "redisclient" % "3.41",
 //  "com.twitter" %% "chill" % "0.10.0",
 //  "com.twitter" %% "chill-pekko" % "0.10.0",
@@ -67,13 +67,14 @@ libraryDependencies in ThisBuild ++= Seq(
   "com.hunorkovacs" %% "circe-config" % "0.10.0",
   "org.typelevel" %% "cats-core" % "2.8.0",
   "org.typelevel" %% "cats-effect" % "3.3.14",
-  "org.apache.pekko" %% "pekko-persistence-jdbc" % "1.0.0",
+  "org.apache.pekko" %% "pekko-persistence-jdbc" % "1.1.0-M1",
   "org.apache.pekko" %% "pekko-persistence-query" % pekkoVersion,
-  "org.apache.pekko" %% "pekko-connectors-slick" % "1.0.0",
-  "com.typesafe.slick" %% "slick" % slickVersion,
-  "com.typesafe.slick" %% "slick-hikaricp" % slickVersion,
+  "org.apache.pekko" %% "pekko-connectors-slick" % "1.1.0-M1",
   "com.typesafe" %% "ssl-config-core" % "0.6.1",
   "org.openapitools" % "onesignal-java-client" % "1.2.2",
+  "org.apache.logging.log4j" % "log4j-slf4j2-impl" % "2.23.1",
+  "org.apache.logging.log4j" % "log4j-core" % "2.23.1",
+  "org.apache.logging.log4j" % "log4j-api" % "2.23.1",
   "org.scalatest" %% "scalatest" % "3.1.0" % Test
 ) ++ log
 

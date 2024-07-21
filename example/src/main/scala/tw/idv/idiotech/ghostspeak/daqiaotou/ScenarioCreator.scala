@@ -352,7 +352,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
       logger.debug(s"initial before = ${script("initial")}")
       logger.debug(s"initial after = $initial")
       EventSourcedBehavior[Command, Event, State](
-        persistenceId = PersistenceId.ofUniqueId(s"scn-$user"),
+        persistenceId = PersistenceId.ofUniqueId(s"scn-${userScenario.engine}-$user"),
         emptyState = State(initial.triggers.map(_ -> List(initial)).toMap, Map.empty, Map.empty),
         commandHandler = onCommand(user, actuator),
         eventHandler = onEvent(user)
@@ -371,7 +371,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
     }
 
   def createUserScenario(
-    actuatorRef: ActorRef[Actuator.Command[Content]]
+    actuatorRef: ActorRef[Actuator.Command[Content]],
   )(actorContext: ActorContext[_], created: Sensor.Event.Created)(implicit
     script: Map[String, Node]
   ): Either[String, ActorRef[Command]] =
