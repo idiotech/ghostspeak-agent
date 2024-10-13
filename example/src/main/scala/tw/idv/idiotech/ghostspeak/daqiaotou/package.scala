@@ -294,7 +294,7 @@ package object daqiaotou {
 
   object EventPayload {
 
-    case class Text(text: String) extends EventPayload
+    case class Text(text: String, asVariable: Option[String] = None) extends EventPayload
     case object GoldenFinger extends EventPayload
     case class PerformDirectly(action: Action) extends EventPayload
 

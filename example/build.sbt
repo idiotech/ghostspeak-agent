@@ -1,6 +1,7 @@
 
 import com.typesafe.sbt.packager.docker.DockerVersion
 libraryDependencies ++= Seq(
+  "com.softwaremill.quicklens" %% "quicklens" % "1.9.9",
   "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8",
   "com.github.kolotaev" %% "ride" % "1.1.1",
   "com.google.cloud" % "google-cloud-texttospeech" % "2.0.3",

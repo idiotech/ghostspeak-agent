@@ -1,5 +1,6 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
+import com.softwaremill.quicklens._
 import org.apache.pekko.Done
 import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem, Behavior }
 import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors }
@@ -32,6 +33,7 @@ import java.util.UUID
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import org.apache.pekko.persistence.Persistence
+import tw.idv.idiotech.ghostspeak.agent
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Command
 import tw.idv.idiotech.ghostspeak.daqiaotou.ScenarioCreator.{
   commandTime,
@@ -41,6 +43,7 @@ import tw.idv.idiotech.ghostspeak.daqiaotou.ScenarioCreator.{
   performTime
 }
 
+import scala.annotation.unused
 import scala.util.Try
 
 object ScenarioCreator {
@@ -67,7 +70,8 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
   case class State(
     triggers: Map[Message, List[Node]],
     exclusions: Map[ActionId, List[NodeId]],
-    variables: Map[String, Int] = Map.empty
+    variables: Map[String, Int] = Map.empty,
+    strings: Map[String, String] = Map.empty
   ) extends EventBase {
 
     def apply(update: VariableUpdate): State = {
@@ -110,49 +114,53 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
   }
 
   @ConfiguredJsonCodec
-  case class Event(nodes: List[Node], message: Message, variableUpdates: List[VariableUpdate])
-      extends EventBase
+  case class Event(
+    nodes: List[Node],
+    message: Message,
+    variableUpdates: List[VariableUpdate],
+    strings: List[StringVariable] = Nil
+  ) extends EventBase
 
   def onEvent(
     user: String
   )(state: State, event: Event)(implicit script: Map[String, Node]): State = {
+    val currentNodes = event.nodes
+    lazy val triggeredNodes: Map[Message, List[Node]] =
+      currentNodes
+        .map(_.childMap(user))
+        .reduceOption(_ |+| _)
+        .getOrElse(Map.empty)
+        .toList
+        .foldLeft(state.triggers) { (s, trigger) =>
+          val nodes = (s.getOrElse(trigger._1, Nil) ++ trigger._2).distinct
+          if (nodes.nonEmpty) s + (trigger._1 -> nodes) else s - trigger._1
+        }
+
+    lazy val remainingNodesBeforeExclusion =
+      currentNodes
+        .flatMap(n => n.triggers.map(_ -> n))
+        .groupBy(_._1)
+        .map(p => p._1 -> p._2.map(_._2))
+        .toList
+        .foldLeft(triggeredNodes) { (s, trigger) =>
+          val nodes = s.getOrElse(trigger._1, Nil).filterNot(trigger._2.toSet.contains).distinct
+          if (nodes.nonEmpty) s + (trigger._1 -> nodes) else s - trigger._1
+        }
+
+    lazy val remainingNodes: Map[Message, List[Node]] =
+      currentNodes
+        .foldLeft(remainingNodesBeforeExclusion) { (s, node) =>
+          if (node.exclusiveWith.nonEmpty) {
+            s.view.mapValues(_.filterNot(n => node.exclusiveWith.contains(n.name))).toMap
+          } else s
+        }
+        .filter(_._2.nonEmpty)
+
     val time = System.nanoTime()
     if (event.nodes == List(Node.leave)) {
       val initial = script("initial").replace(user)
       State(initial.triggers.map(_ -> List(initial)).toMap, Map.empty, Map.empty)
     } else {
-      val currentNodes = event.nodes
-      val removalMap =
-        currentNodes
-          .flatMap(n => n.triggers.map(_ -> n))
-          .groupBy(_._1)
-          .map(p => p._1 -> p._2.map(_._2))
-      val triggerMap: Map[Message, List[Node]] =
-        if (currentNodes.isEmpty) Map.empty else currentNodes.map(_.childMap(user)).reduce(_ |+| _)
-      val ret: Map[Message, List[Node]] =
-        if (triggerMap.isEmpty) state.triggers
-        else
-          triggerMap.toList.foldLeft(state.triggers) { (s, trigger) =>
-            val nodes = (s.getOrElse(trigger._1, Nil) ++ trigger._2).distinct
-            if (nodes.nonEmpty) s + (trigger._1 -> nodes) else s - trigger._1
-          }
-      val removed =
-        if (ret.isEmpty) ret
-        else
-          removalMap.toList.foldLeft(ret) { (s, trigger) =>
-            val nodes = s.getOrElse(trigger._1, Nil).filterNot(trigger._2.toSet.contains).distinct
-            if (nodes.nonEmpty) s + (trigger._1 -> nodes) else s - trigger._1
-          }
-      val excluded =
-        if (currentNodes.isEmpty) removed
-        else
-          currentNodes
-            .foldLeft(removed) { (s, node) =>
-              if (node.exclusiveWith.nonEmpty) {
-                s.view.mapValues(_.filterNot(n => node.exclusiveWith.contains(n.name))).toMap
-              } else s
-            }
-            .filter(_._2.nonEmpty)
       val exclusions: Map[ActionId, List[NodeId]] = currentNodes.flatMap { n =>
         n.exclusiveWith
           .flatMap(name => script.get(name))
@@ -167,18 +175,19 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
         .filter(_ => event.message.payload.fold(_ == SystemPayload.Start, _ => false))
         .flatMap(state.exclusions.get)
         .fold(
-          State(excluded, exclusions, state.variables)
+          state.copy(triggers = remainingNodes, exclusions = exclusions)
         ) { nodeId =>
-          State(
-            excluded.view.mapValues(_.filterNot(n => nodeId.contains(n.name))).toMap,
-            exclusions.filterNot(_._2 == nodeId),
-            state.variables
+          state.copy(
+            triggers =
+              remainingNodes.view.mapValues(_.filterNot(n => nodeId.contains(n.name))).toMap,
+            exclusions = exclusions.filterNot(_._2 == nodeId)
           )
         }
+        .apply(event.variableUpdates)
       val elapsedTime = System.nanoTime() - time
       eventTime += elapsedTime
 //      logger.warn(s"Event time: total = $eventTime; single = $elapsedTime")
-      result.apply(event.variableUpdates)
+      result.copy(strings = result.strings ++ (event.strings.map(p => p.name -> p.value)))
     }
   }
 
@@ -195,6 +204,22 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
       case text => text.filterNot(_.isWhitespace) == reply.filterNot(_.isWhitespace)
     }
 
+  @ConfiguredJsonCodec
+  case class StringVariable(name: String, value: String)
+  private case class NodesAndVariables(nodes: List[Node], variable: Option[StringVariable])
+
+  private def updateAction(action: Action, strings: Map[String, String]) =
+    action.content.task match {
+      case popup @ Task.Popup(text, _, _, _, _, _, _) =>
+        val updatedText = strings.toList.foldLeft(text)((text, string) =>
+          string match {
+            case (name, value) => text.map(_.replace(s"{$name}", value))
+          }
+        )
+        action.modify(_.content.task).setTo(popup.copy(text = updatedText))
+      case _ => action
+    }
+
   def onCommand(
     user: String,
     actuator: ActorRef[Actuator.Command[Content]]
@@ -206,31 +231,37 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
       case Sensor.Command.Sense(message, replyTo) =>
         def simplyPerform(action: Action) = {
           val performStart = System.nanoTime()
-          val a = action
-            .copy(
-              session = Session(message.scenarioId, None),
-              receiver = user
-            )
+          val a = updateAction(
+            action
+              .copy(
+                session = Session(message.scenarioId, None),
+                receiver = user
+              ),
+            state.strings
+          )
           logger.debug(s"carrying out ${Perform(action, System.currentTimeMillis())}")
           actuator ! Perform(a, System.currentTimeMillis())
           performTime += (System.nanoTime() - performStart)
         }
-        def getEffect(nodes: List[Node]): Effect[Event, State] = {
+        def getEffect(nodes: List[Node], strings: List[StringVariable]): Effect[Event, State] = {
           logger.debug(s"triggered nodes: ${nodes.map(_.name)}")
           val effectStart = System.nanoTime()
           val variableUpdates: List[VariableUpdate] =
             nodes.filter(n => state.check(n.preconditions)).flatMap { n =>
 //              logger.info(s"effects: ${n.performances}")
               val vus: List[VariableUpdate] = n.performances.flatMap { p =>
-                val action = p.action
-                  .copy(
-                    session = Session(message.scenarioId, None),
-                    content = p.action.content.copy(exclusiveWith =
-                      n.exclusiveWith.toList
-                        .flatMap(e => script.get(e))
-                        .flatMap(_.performances.map(_.action.id))
-                    )
-                  )
+                val action = updateAction(
+                  p.action
+                    .copy(
+                      session = Session(message.scenarioId, None),
+                      content = p.action.content.copy(exclusiveWith =
+                        n.exclusiveWith.toList
+                          .flatMap(e => script.get(e))
+                          .flatMap(_.performances.map(_.action.id))
+                      )
+                    ),
+                  state.strings ++ strings.map(v => v.name -> v.value)
+                )
                 val startTime = p.time.fold(
                   System.currentTimeMillis() + p.delay
                 )(_.time())
@@ -247,7 +278,8 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
               logger.info(s"transition to ${n.name}")
               vus
             }
-          val ret: Effect[Event, State] = Effect.persist(Event(nodes, message, variableUpdates))
+          val ret: Effect[Event, State] =
+            Effect.persist(Event(nodes, message, variableUpdates, strings))
           getEffectTime += (System.nanoTime() - effectStart)
           ret
         }
@@ -273,31 +305,39 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
           case Right(EventPayload.PerformDirectly(action)) =>
             simplyPerform(action)
             Effect.none
-          case Right(EventPayload.Text(reply)) =>
+          case Right(EventPayload.Text(reply, _)) =>
             val forComparison = message.forComparison.copy(payload = fakeTextPayload)
-            def findMatch(matcher: (String, String) => Boolean): Option[List[Node]] = Option(
-              state.triggers
-                .filter {
-                  case (k, _) =>
+            def findMatch(matcher: (String, String) => Boolean): Option[List[NodesAndVariables]] =
+              Option(
+                state.triggers.flatMap {
+                  case (k, v) =>
                     k.payload match {
-                      case Right(EventPayload.Text(answer)) =>
-                        k.copy(payload = fakeTextPayload) == forComparison && matcher(reply, answer)
-                      case Left(_) => false
+                      case Right(EventPayload.Text(answer, asVariable)) =>
+                        if (
+                          k.copy(payload = fakeTextPayload) == forComparison && matcher(
+                            reply,
+                            answer
+                          )
+                        ) {
+                          Some(NodesAndVariables(v, asVariable.map(n => StringVariable(n, reply))))
+                        } else None
+                      case Left(_) => None
                     }
-                  case _ => false
-                }
-                .values
-                .flatten
-                .toList
-            ).filter(_.nonEmpty)
+                  case _ => None
+                }.toList
+              ).filter(_.nonEmpty)
 
-            val nodes: List[Node] = findMatch(textMatches)
-              .orElse(findMatch((_, a) => a == "fallback:"))
+            val matches: Option[List[NodesAndVariables]] =
+              findMatch(textMatches).orElse(findMatch((_, a) => a == "fallback:"))
+            val variables: List[StringVariable] = matches.toList.flatten.flatMap(nv => nv.variable)
+
+            val nodes: List[Node] = matches
+              .map(_.flatMap(_.nodes))
               .getOrElse(Nil)
               .map(_.replace(user))
-            getEffect(nodes)
+            getEffect(nodes, variables)
           case Right(EventPayload.GoldenFinger) =>
-            getEffect(state.triggers.values.toList.flatten)
+            getEffect(state.triggers.values.toList.flatten, Nil)
           case _ =>
             logger.debug(s"message: $message")
             val node = state.triggers
@@ -308,7 +348,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
             if (node.nonEmpty) {
               logger.debug(s"match: $node")
             }
-            getEffect(node)
+            getEffect(node, Nil)
         }
       case Sensor.Command.Create(scenario, replyTo)    => Effect.none
       case Sensor.Command.Destroy(scenarioId, replyTo) => Effect.none
@@ -371,7 +411,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
     }
 
   def createUserScenario(
-    actuatorRef: ActorRef[Actuator.Command[Content]],
+    actuatorRef: ActorRef[Actuator.Command[Content]]
   )(actorContext: ActorContext[_], created: Sensor.Event.Created)(implicit
     script: Map[String, Node]
   ): Either[String, ActorRef[Command]] =
