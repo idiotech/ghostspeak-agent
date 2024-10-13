@@ -208,15 +208,21 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
   case class StringVariable(name: String, value: String)
   private case class NodesAndVariables(nodes: List[Node], variable: Option[StringVariable])
 
+  private def replaceString(text: String, strings: Map[String, String]): String =
+    strings.toList.foldLeft(text)((text, string) =>
+      string match {
+        case (name, value) => text.replace(s"{$name}", value)
+      }
+    )
+
   private def updateAction(action: Action, strings: Map[String, String]) =
     action.content.task match {
-      case popup @ Task.Popup(text, _, _, _, _, _, _) =>
-        val updatedText = strings.toList.foldLeft(text)((text, string) =>
-          string match {
-            case (name, value) => text.map(_.replace(s"{$name}", value))
-          }
-        )
-        action.modify(_.content.task).setTo(popup.copy(text = updatedText))
+      case popup @ Task.Popup(text, choices, _, _, _, _, _) =>
+        val updatedText = text.map(t => replaceString(t, strings))
+        val updatedChoices = choices.map(t => replaceString(t, strings))
+        action
+          .modify(_.content.task)
+          .setTo(popup.copy(text = updatedText, choices = updatedChoices))
       case _ => action
     }
 
