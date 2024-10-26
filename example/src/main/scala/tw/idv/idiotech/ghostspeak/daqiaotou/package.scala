@@ -108,16 +108,40 @@ package object daqiaotou {
   case class Location(lat: Double, lon: Double) extends EventPayload
 
   @ConfiguredJsonCodec
-  sealed trait Volume
+  case class MainVolume(
+    speechLength: Int,
+    fadeOutSeconds: Int,
+    fadeInSeconds: Int = 0
+  )
+
+  @ConfiguredJsonCodec
+  sealed trait Volume {
+    val mainVolume: Option[MainVolume]
+  }
 
   object Volume {
 
     case class StaticVolume(
-      speechLength: Option[Int],
+      speechLength: Option[Int] = None,
       fadeOutSeconds: Int = 10,
-      fadeInSeconds: Int = 0
+      fadeInSeconds: Int = 0,
+      mainVolume: Option[MainVolume]
     ) extends Volume
-    case class DynamicVolume(center: Location, radius: Int, minVolume: Double) extends Volume
+
+    case class DynamicVolume(
+      center: Location,
+      radius: Int,
+      minVolume: Double,
+      mainVolume: Option[MainVolume]
+    ) extends Volume
+
+    case class BeaconVolume(
+      beaconId: String,
+      minValue: Int,
+      minVolume: Double,
+      maxValue: Int,
+      mainVolume: Option[MainVolume]
+    ) extends Volume
   }
 
   @typeHint[String]
