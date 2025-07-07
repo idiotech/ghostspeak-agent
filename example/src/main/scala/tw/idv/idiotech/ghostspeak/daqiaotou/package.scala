@@ -180,7 +180,7 @@ package object daqiaotou {
       @title("Close alert popup after reply")
       closeAlertAfterReply: Boolean = true,
       @title("Clear dialog")
-      clearDialog: Boolean = false
+      clearDialog: Boolean = false,
     ) extends Task
 
     @title("Close popup message")
@@ -275,6 +275,10 @@ package object daqiaotou {
     @title("Silence a sound")
     @description("Make a sound by the ID stop")
     case class Silence(id: String, fadeOutSeconds: Int) extends Task
+
+    @title("Add a friend")
+    @description("Add a person with name and icon")
+    case class Friend(id: String, name: String, icon: Option[String]) extends Task
   }
 
   @ConfiguredJsonCodec

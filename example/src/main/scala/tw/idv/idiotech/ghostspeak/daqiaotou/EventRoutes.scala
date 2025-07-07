@@ -183,6 +183,7 @@ object EventRoutes {
           case Task.GuideImage(_)                           => r
           case Task.GuideImageRemoval                       => r
           case Task.Silence(_, _)                           => r
+          case Task.Friend(_, _, _)                         => r
         }
       )
     }
