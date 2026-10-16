@@ -25,8 +25,9 @@ import io.circe.syntax._
 import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.{ Comparison, Node, Precondition }
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
-import io.circe.{ Decoder, Encoder }
-import io.circe.generic.extras.ConfiguredJsonCodec
+import io.circe.{ Codec, Decoder, Encoder }
+import io.circe.generic.extras.{ Configuration, ConfiguredJsonCodec }
+import io.circe.generic.extras.semiauto.deriveConfiguredCodec
 import tw.idv.idiotech.ghostspeak.daqiaotou.Task.VariableUpdates
 
 import java.util.UUID
@@ -64,8 +65,18 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
   @ConfiguredJsonCodec
   case class Trigger(message: Message, nodes: List[Node])
 
-  @ConfiguredJsonCodec
-  case class StateStorage(triggers: List[Trigger], exclusions: Map[ActionId, List[NodeId]])
+  case class StateStorage(
+    triggers: List[Trigger],
+    exclusions: Map[ActionId, List[NodeId]],
+    variables: Map[String, Int] = Map.empty,
+    strings: Map[String, String] = Map.empty
+  )
+
+  object StateStorage {
+    // withDefaults so snapshots written before variables/strings were stored still decode
+    private implicit val configuration: Configuration = Configuration.default.withDefaults
+    implicit val codec: Codec[StateStorage] = deriveConfiguredCodec[StateStorage]
+  }
 
   case class State(
     triggers: Map[Message, List[Node]],
@@ -104,12 +115,18 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
       State(
         ss.triggers.map(t => t.message -> t.nodes).toMap,
         ss.exclusions,
-        Map.empty
+        ss.variables,
+        ss.strings
       )
     )
 
     implicit val encoder = implicitly[Encoder[StateStorage]].contramap[State](s =>
-      StateStorage(s.triggers.toList.map(t => Trigger(t._1, t._2)), s.exclusions)
+      StateStorage(
+        s.triggers.toList.map(t => Trigger(t._1, t._2)),
+        s.exclusions,
+        s.variables,
+        s.strings
+      )
     )
   }
 
@@ -413,7 +430,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
             case Right(_) => false
           }
         }
-        .withRetention(RetentionCriteria.snapshotEvery(100, 2))
+        .withRetention(RetentionCriteria.snapshotEvery(50, 2))
     }
 
   def createUserScenario(

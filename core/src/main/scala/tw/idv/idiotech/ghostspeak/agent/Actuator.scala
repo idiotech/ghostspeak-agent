@@ -2,7 +2,11 @@ package tw.idv.idiotech.ghostspeak.agent
 
 import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors, TimerScheduler }
 import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem, Behavior }
-import org.apache.pekko.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
+import org.apache.pekko.persistence.typed.scaladsl.{
+  Effect,
+  EventSourcedBehavior,
+  RetentionCriteria
+}
 import org.apache.pekko.persistence.typed.PersistenceId
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.generic.JsonCodec
@@ -109,7 +113,7 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
             )
             timer.startSingleTimer(TimerKey, Timeout(), (p.startTime - current).millis)
           }
-        Effect.persist(ActionDone(toExecute))
+        if (toExecute.isEmpty) Effect.none else Effect.persist(ActionDone(toExecute))
       case OK(action) =>
         sensor ! Sense(action.toMessage(Modality.Done))
         Effect.none
@@ -145,7 +149,7 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
         emptyState = State(),
         commandHandler = commandHandler,
         eventHandler = eventHandler
-      )
+      ).withRetention(RetentionCriteria.snapshotEvery(100, 2))
     }
   }
 

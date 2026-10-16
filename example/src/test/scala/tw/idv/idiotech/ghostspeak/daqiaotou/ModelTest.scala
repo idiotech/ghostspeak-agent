@@ -50,6 +50,7 @@ class ModelTest extends AnyFlatSpec with Matchers with LazyLogging {
     ZonedDateTime.ofInstant(Instant.ofEpochMilli(actTime.time(clock)), defaultZone) mustBe now
       .withHour(21)
       .withMinute(10)
+      .withSecond(10)
     val actTime2 = ActTime(Some(LocalTime.of(20, 10)), 1.hours.toMillis, 0)
     ZonedDateTime.ofInstant(Instant.ofEpochMilli(actTime2.time(clock)), defaultZone) mustBe now
       .plusDays(1)
