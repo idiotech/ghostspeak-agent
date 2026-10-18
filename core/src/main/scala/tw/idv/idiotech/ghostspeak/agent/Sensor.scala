@@ -4,7 +4,12 @@ import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors }
 import org.apache.pekko.actor.typed.{ ActorRef, Behavior }
 import org.apache.pekko.pattern.StatusReply
 import org.apache.pekko.persistence.typed.{ PersistenceId, RecoveryCompleted }
-import org.apache.pekko.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior, ReplyEffect }
+import org.apache.pekko.persistence.typed.scaladsl.{
+  Effect,
+  EventSourcedBehavior,
+  ReplyEffect,
+  RetentionCriteria
+}
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.{ Decoder, Encoder }
 import io.circe.generic.extras.ConfiguredJsonCodec
@@ -131,10 +136,13 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
     case d: Destroyed => state.del(d)
   }
 
+  // eagerChildren = false leaves children unspawned after recovery; the command handler
+  // must then spawn them on demand (see onCommandPerUser)
   def apply(
     name: String,
     createScenario: CreatorScenarioActor,
-    handle: OnCommand = onCommand _
+    handle: OnCommand = onCommand _,
+    eagerChildren: Boolean = true
   ): Behavior[Command[P]] =
     Behaviors.setup { context: ActorContext[Command[P]] =>
       EventSourcedBehavior
@@ -144,11 +152,15 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
           commandHandler = handle(context, createScenario),
           eventHandler = onEvent
         )
+        .withRetention(RetentionCriteria.snapshotEvery(100, 2))
         .receiveSignal { case (state, RecoveryCompleted) =>
-          val scns = state.scenarios.values.map(s => createScenario(context, s))
-          logger.info(s"====== recovery complete for $name")
-          scns.foreach(println)
-
+          if (eagerChildren) {
+            val scns = state.scenarios.values.map(s => createScenario(context, s))
+            scns.foreach(println)
+          }
+          logger.info(
+            s"====== recovery complete for $name (${state.scenarios.size} children, eager = $eagerChildren)"
+          )
         }
     }
 
@@ -157,21 +169,25 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
     create: CreatorScenarioActor
   )(state: State, cmd: Command[P]): Reff = {
     val general = onCommand(ctx, create) _
+    // spawns the actor of a user already recorded in state, if it is not running yet
+    def wake(user: String): Option[ActorRef[Command[P]]] =
+      getChild(ctx, user).orElse(state.scenarios.get(user).flatMap(c => create(ctx, c).toOption))
     cmd match {
       case Sense(message, _) =>
         val scenario = Scenario(message.sender, message.scenarioId, "")
-        val existingActor = if (message.sender.isBlank) None else getChild(ctx, message.sender)
-        val maybeActor = existingActor.toRight("no such user").orElse {
+        val knownActor = if (message.sender.isBlank) None else wake(message.sender)
+        val maybeActor = knownActor.toRight("no such user").orElse {
           create(ctx, Created(scenario, ""))
         }
         maybeActor.foreach(_ ! Sense(message))
-        if (existingActor.isEmpty) {
+        if (knownActor.isEmpty) {
           maybeActor.fold[Reff](
             e => Effect.noReply,
             s => Effect.persist(Created(scenario)).thenNoReply()
           )
         } else Effect.noReply
       case Broadcast(message, _) =>
+        state.scenarios.keys.foreach(wake)
         val children: Iterable[ActorRef[Command[P]]] = getChildren(ctx)
         children.foreach(c =>
           c ! Sense(
