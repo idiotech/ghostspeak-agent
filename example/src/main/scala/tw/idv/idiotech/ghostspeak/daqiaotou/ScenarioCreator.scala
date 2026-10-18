@@ -340,7 +340,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
             logger.info(s"user $user left")
             val redisKey = s"action-${message.scenarioId}-$user"
             logger.debug(s"deleting user from redis: $redisKey")
-            redis.withClient(r => r.del(redisKey))
+            redis.del(redisKey)
             Effect.persist(Event(List(Node.leave), message, Nil))
           case Right(EventPayload.PerformDirectly(action)) =>
             simplyPerform(action)
@@ -468,7 +468,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
     val redisKey = s"action-${action.session.scenario}-${action.receiver}"
     val hashKey = action.id
     logger.debug(s"saving action to redis: $redisKey $hashKey")
-    redis.withClient(r => r.hset(redisKey, hashKey, actionJson))
+    redis.hset(redisKey, hashKey, actionJson)
     logPerf(action, "fcm_sending")
     FcmSender.send(action, logPerf)
   }

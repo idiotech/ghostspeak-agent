@@ -42,19 +42,19 @@ class EventRoutes[T: Decoder](
 //          )
             val fetch: Future[Map[String, String]] =
               for {
-                res <- Future(redis.withClient(c => c.hgetall[String, String](key)))
+                res <- Future(redis.hgetAll(key))
                 all <- {
 //                logger.info(s"getting action from redis: ${res.getOrElse(Map.empty)}")
-                  res.getOrElse(Map.empty).values.foreach { s =>
+                  res.values.foreach { s =>
                     decode[Action](s).fold(
                       error => logger.error(s"failed to parse action $s", error),
                       a => PerformanceLogger.insert(userId, a.id, "redis")
                     )
                   }
-                  Future.successful(res.getOrElse(Map.empty))
+                  Future.successful(res)
                 }
                 _ <- Future.traverse(all.keys)(actionId =>
-                  Future(redis.withClient(c => c.hdel(key, actionId)))
+                  Future(redis.hdel(key, actionId))
                 )
               } yield all
             onComplete(fetch) {

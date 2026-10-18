@@ -7,7 +7,6 @@ import enumeratum.EnumEntry.UpperSnakecase
 import enumeratum.{ CirceEnum, Enum, EnumEntry }
 import io.circe.generic.extras.Configuration
 import json.schema.{ description, title, typeHint }
-import com.redis._
 import com.typesafe.config.ConfigFactory
 import tw.idv.idiotech.ghostspeak.agent.{ Action, Message }
 import io.circe.config.syntax._
@@ -62,7 +61,7 @@ package object daqiaotou {
     ConfigFactory.load().as[DaqiaotouConf]("app").fold(throw _, identity)
   }
 
-  val redis = new RedisClientPool(config.redis.host, config.redis.port)
+  lazy val redis = new RedisStore(config.redis.host, config.redis.port)
 
   @typeHint[String]
   sealed trait Destination extends EnumEntry
