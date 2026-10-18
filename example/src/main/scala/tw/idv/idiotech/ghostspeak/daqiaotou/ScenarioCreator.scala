@@ -448,6 +448,8 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
           }
         }
         .withRetention(RetentionCriteria.snapshotEvery(100, 2))
+        // see jdbc-snapshot-store-replay-on-error in application.conf
+        .withSnapshotPluginId("jdbc-snapshot-store-replay-on-error")
     }
 
   def createUserScenario(

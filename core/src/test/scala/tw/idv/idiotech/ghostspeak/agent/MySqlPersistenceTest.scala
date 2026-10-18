@@ -5,6 +5,8 @@ import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem }
 import org.apache.pekko.pattern.StatusReply
+import org.apache.pekko.persistence.typed.{ PersistenceId, RecoveryCompleted, RecoveryFailed }
+import org.apache.pekko.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
 import org.apache.pekko.persistence.jdbc.db.SlickExtension
 import org.apache.pekko.persistence.jdbc.testkit.scaladsl.SchemaUtils
 import org.scalatest.BeforeAndAfterAll
@@ -190,19 +192,56 @@ class MySqlPersistenceTest extends AnyWordSpec with Matchers with BeforeAndAfter
     }
   }
 
+  // a sensor-shaped actor that reports how its recovery ended
+  private def recovering(
+    name: String,
+    snapshotPluginId: Option[String],
+    report: ActorRef[Either[String, Set[String]]]
+  ) = {
+    val behavior = EventSourcedBehavior[String, Sensor.Event, Sensor.State](
+      PersistenceId.ofUniqueId(s"sensor-$name"),
+      Sensor.State(),
+      (_, _) => Effect.none,
+      (state, event) =>
+        event match {
+          case c: Sensor.Event.Created   => state.add(c)
+          case d: Sensor.Event.Destroyed => state.del(d)
+        }
+    ).receiveSignal {
+      case (state, RecoveryCompleted) => report ! Right(state.scenarios.keySet)
+      case (_, RecoveryFailed(e))     => report ! Left(e.getMessage)
+    }
+    snapshotPluginId.fold(behavior)(behavior.withSnapshotPluginId)
+  }
+
+  // five Created events, then a snapshot at 5 that fails to decode, like a user-scenario
+  // snapshot written before variables and strings were stored
+  private def journalWithUnreadableSnapshot(name: String): Unit = {
+    val ref = spawnSensor(name)
+    (1 to 5).foreach(i => create(ref, Scenario(s"s$i", "e", "[]")))
+    stop(ref)
+    sql(s"""INSERT INTO $database.snapshot
+        (persistence_id, sequence_number, created, snapshot_ser_id, snapshot_ser_manifest,
+         snapshot_payload)
+        VALUES ('sensor-$name', 5, 0, 5567, '${classOf[Sensor.State].getName}',
+                '{"not":"a sensor state"}')""")
+  }
+
   "an unreadable snapshot" should {
-    "be skipped, and the state rebuilt from the whole journal" in {
+    "fail recovery in the default snapshot store" in {
       requireMySql()
-      val ref = spawnSensor("corrupt")
-      (1 to 5).foreach(i => create(ref, Scenario(s"s$i", "e", "[]")))
-      stop(ref)
-      // a snapshot that fails to decode, like a pre-fix user-scenario snapshot
-      sql(s"""INSERT INTO $database.snapshot
-          (persistence_id, sequence_number, created, snapshot_ser_id, snapshot_ser_manifest,
-           snapshot_payload)
-          VALUES ('sensor-corrupt', 5, 0, 5567, '${classOf[Sensor.State].getName}',
-                  '{"not":"a sensor state"}')""")
-      scenarioIds(spawnSensor("corrupt")) shouldBe (1 to 5).map(i => s"s$i").toSet
+      journalWithUnreadableSnapshot("strict")
+      val report = testKit.createTestProbe[Either[String, Set[String]]]()
+      testKit.spawn(recovering("strict", None, report.ref))
+      report.expectMessageType[Either[String, Set[String]]](30.seconds).isLeft shouldBe true
+    }
+
+    "be skipped in the replay-on-error store, and the state rebuilt from the whole journal" in {
+      requireMySql()
+      journalWithUnreadableSnapshot("lenient")
+      val report = testKit.createTestProbe[Either[String, Set[String]]]()
+      testKit.spawn(recovering("lenient", Some("jdbc-snapshot-store-replay-on-error"), report.ref))
+      report.expectMessage(30.seconds, Right((1 to 5).map(i => s"s$i").toSet))
     }
   }
 }

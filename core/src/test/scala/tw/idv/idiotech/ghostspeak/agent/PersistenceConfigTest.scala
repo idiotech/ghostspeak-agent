@@ -15,6 +15,14 @@ class PersistenceConfigTest extends AnyFlatSpec with Matchers {
       .withFallback(ConfigFactory.parseString(env.map { case (k, v) => s"$k = $v" }.mkString("\n")))
       .resolve(ConfigResolveOptions.noSystem())
 
+  // as ConfigFactory.load does at runtime: application.conf over the libraries' reference.conf,
+  // resolved together
+  def loadWithReference(): Config =
+    ConfigFactory
+      .parseResources("application.conf")
+      .withFallback(ConfigFactory.defaultReference())
+      .resolve(ConfigResolveOptions.noSystem())
+
   "the persistence plugins" must "all use the one shared database" in {
     val config = load()
     for (plugin <- Seq("jdbc-journal", "jdbc-snapshot-store", "jdbc-read-journal")) {
@@ -45,7 +53,19 @@ class PersistenceConfigTest extends AnyFlatSpec with Matchers {
     config.getInt("pekko-persistence-jdbc.shared-databases.slick.db.maxConnections") mustBe 30
   }
 
-  "snapshots" must "be optional, so an unreadable snapshot falls back to a journal replay" in {
-    load().getBoolean("jdbc-snapshot-store.snapshot-is-optional") mustBe true
+  "the default snapshot store" must "treat an unreadable snapshot as an error" in {
+    // not set on the store, so Pekko's plugin fallback (false) applies
+    val config = loadWithReference()
+    config.hasPath("jdbc-snapshot-store.snapshot-is-optional") mustBe false
+    config.getBoolean("pekko.persistence.snapshot-store-plugin-fallback.snapshot-is-optional") mustBe
+      false
+  }
+
+  "the replay-on-error snapshot store" must "be the same store, skipping unreadable snapshots" in {
+    val config = loadWithReference()
+    val store = config.getConfig("jdbc-snapshot-store-replay-on-error")
+    store.getBoolean("snapshot-is-optional") mustBe true
+    store.getString("use-shared-db") mustBe "slick"
+    store.getString("class") mustBe config.getString("jdbc-snapshot-store.class")
   }
 }
