@@ -1,5 +1,8 @@
 package tw.idv.idiotech.ghostspeak.agent
 
+import io.circe.Codec
+import io.circe.generic.extras.semiauto.deriveConfiguredCodec
+
 import com.github.pjfanning.pekkohttpcirce.FailFastCirceSupport
 import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem }
 import org.apache.pekko.http.scaladsl.common.EntityStreamingSupport
@@ -13,7 +16,6 @@ import org.apache.pekko.pattern.StatusReply
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.Decoder
 import io.circe.Json
-import io.circe.generic.extras.ConfiguredJsonCodec
 import io.circe.parser.decode
 import io.circe.syntax._
 import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
@@ -277,6 +279,11 @@ class EventRoutes[T: Decoder](
 
 object EventRoutes {
 
-  @ConfiguredJsonCodec
   case class ScenarioPayload(template: Json, metadata: Metadata)
+
+  object ScenarioPayload {
+
+    implicit val codecForScenarioPayload: Codec.AsObject[ScenarioPayload] =
+      deriveConfiguredCodec[ScenarioPayload]
+  }
 }

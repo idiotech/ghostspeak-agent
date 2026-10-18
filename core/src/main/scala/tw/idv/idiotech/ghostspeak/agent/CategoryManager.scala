@@ -1,5 +1,8 @@
 package tw.idv.idiotech.ghostspeak.agent
 
+import io.circe.Codec
+import io.circe.generic.extras.semiauto.deriveConfiguredCodec
+
 import org.apache.pekko.actor.typed.{ ActorRef, Behavior }
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.pattern.StatusReply
@@ -8,7 +11,6 @@ import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.persistence.typed.PersistenceId
 import enumeratum.EnumEntry.UpperSnakecase
 import enumeratum._
-import io.circe.generic.extras.ConfiguredJsonCodec
 import json.schema.typeHint
 
 import scala.collection.immutable
@@ -30,13 +32,16 @@ object CategoryManager {
     case object LIST extends DisplayType with UpperSnakecase
   }
 
-  @ConfiguredJsonCodec
   sealed trait Event extends EventBase
 
   object Event {
-
-    @ConfiguredJsonCodec
     case class Uploaded(state: State) extends Event
+
+    object Uploaded {
+      implicit val codecForUploaded: Codec.AsObject[Uploaded] = deriveConfiguredCodec[Uploaded]
+    }
+
+    implicit val codecForEvent: Codec.AsObject[Event] = deriveConfiguredCodec[Event]
   }
 
   sealed trait Command extends CommandBase
@@ -46,7 +51,6 @@ object CategoryManager {
     case class GetAll(replyTo: ActorRef[StatusReply[State]]) extends Command
   }
 
-  @ConfiguredJsonCodec
   case class Category(
     id: String,
     name: String,
@@ -56,8 +60,15 @@ object CategoryManager {
     displayCount: Int = 3
   )
 
-  @ConfiguredJsonCodec
+  object Category {
+    implicit val codecForCategory: Codec.AsObject[Category] = deriveConfiguredCodec[Category]
+  }
+
   case class State(categories: List[Category]) extends EventBase
+
+  object State {
+    implicit val codecForState: Codec.AsObject[State] = deriveConfiguredCodec[State]
+  }
 
   private def onCommand(state: State, command: Command): ReplyEffect[Event, State] = command match {
     case Command.Upload(state, replyTo) =>

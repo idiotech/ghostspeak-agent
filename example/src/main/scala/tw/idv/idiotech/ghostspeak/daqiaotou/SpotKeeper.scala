@@ -1,5 +1,8 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
+import io.circe.Codec
+import io.circe.generic.extras.semiauto.deriveConfiguredCodec
+
 import org.apache.pekko.Done
 import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors }
 import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem, Behavior }
@@ -7,7 +10,6 @@ import org.apache.pekko.persistence.typed.PersistenceId
 import org.apache.pekko.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
-import io.circe.generic.extras.ConfiguredJsonCodec
 import io.circe.syntax._
 import io.circe.{ Decoder, Encoder, Printer }
 import tw.idv.idiotech.ghostspeak.agent.Actuator.Command.Perform
@@ -174,7 +176,6 @@ class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPa
 
 object SpotKeeper {
 
-  @ConfiguredJsonCodec
   case class Spot(
     id: String = s"SPOT-${UUID.randomUUID()}",
     title: String,
@@ -233,7 +234,10 @@ object SpotKeeper {
     )
   }
 
-  @ConfiguredJsonCodec
+  object Spot {
+    implicit val codecForSpot: Codec.AsObject[Spot] = deriveConfiguredCodec[Spot]
+  }
+
   sealed trait SpotPayload
 
   // need to maintain an outer instance
@@ -242,16 +246,23 @@ object SpotKeeper {
     case class Upload(spot: Spot) extends SpotPayload
     case class Show(spot: Spot) extends SpotPayload
     case class Dump(user: String) extends SpotPayload
+
+    implicit val codecForSpotPayload: Codec.AsObject[SpotPayload] =
+      deriveConfiguredCodec[SpotPayload]
   }
 
-  @ConfiguredJsonCodec
   case class State(spots: List[Spot]) extends EventBase
 
-  @ConfiguredJsonCodec
+  object State {
+    implicit val codecForState: Codec.AsObject[State] = deriveConfiguredCodec[State]
+  }
+
   sealed trait Event extends EventBase
 
   object Event {
     case class Uploaded(spot: Spot) extends Event
+
+    implicit val codecForEvent: Codec.AsObject[Event] = deriveConfiguredCodec[Event]
   }
 
 }

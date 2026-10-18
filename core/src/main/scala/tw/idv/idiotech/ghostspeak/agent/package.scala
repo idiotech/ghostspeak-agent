@@ -1,10 +1,12 @@
 package tw.idv.idiotech.ghostspeak
 
+import io.circe.Codec
+
 import com.typesafe.config.ConfigFactory
 import enumeratum.EnumEntry.UpperSnakecase
 import enumeratum.{ CirceEnum, Enum, EnumEntry }
 import io.circe.{ Decoder, Encoder, Json }
-import io.circe.generic.extras.{ Configuration, ConfiguredJsonCodec }
+import io.circe.generic.extras.Configuration
 import io.circe.generic.extras.semiauto._
 import io.circe.config.syntax._
 
@@ -20,8 +22,11 @@ package object agent {
 
   trait CirceSerializable
 
-  @ConfiguredJsonCodec
   case class Session(scenario: String, chapter: Option[String]) extends CirceSerializable
+
+  object Session {
+    implicit val codecForSession: Codec.AsObject[Session] = deriveConfiguredCodec[Session]
+  }
 
   @typeHint[String]
   sealed trait Modality extends EnumEntry
@@ -89,7 +94,6 @@ package object agent {
     }
   }
 
-  @ConfiguredJsonCodec
   sealed trait SystemPayload {
     def asPayload[T] = Left[SystemPayload, T](this)
   }
@@ -120,13 +124,15 @@ package object agent {
         case _            => false
       }
     }
+
+    implicit val codecForSystemPayload: Codec.AsObject[SystemPayload] =
+      deriveConfiguredCodec[SystemPayload]
   }
 
   @title("Events for server to process")
   @description(
     "An event represents something to process on the server. It is sent from the client to the server."
   )
-//  @ConfiguredJsonCodec
   case class Message[T](
     @description("Unique ID for an event instance")
     id: String,
@@ -157,7 +163,6 @@ package object agent {
     }
   }
 
-  @ConfiguredJsonCodec
   case class Metadata(
     name: Option[String] = None,
     displayName: Option[String] = None,
@@ -172,7 +177,10 @@ package object agent {
     image: Option[String] = None
   )
 
-  @ConfiguredJsonCodec
+  object Metadata {
+    implicit val codecForMetadata: Codec.AsObject[Metadata] = deriveConfiguredCodec[Metadata]
+  }
+
   case class Scenario(
     id: String,
     engine: String,
@@ -185,10 +193,17 @@ package object agent {
     metadata: Metadata = Metadata()
   )
 
-  @ConfiguredJsonCodec
+  object Scenario {
+    implicit val codecForScenario: Codec.AsObject[Scenario] = deriveConfiguredCodec[Scenario]
+  }
+
   case class AgentConf(corsDomains: String) {
     println(s"++++++++ ${corsDomains.split(",").toList}")
     val corsDomainList: Array[HttpOrigin] = corsDomains.split(",").map(HttpOrigin.apply)
+  }
+
+  object AgentConf {
+    implicit val codecForAgentConf: Codec.AsObject[AgentConf] = deriveConfiguredCodec[AgentConf]
   }
 
   lazy val agentConfig: AgentConf = {

@@ -1,5 +1,8 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
+import io.circe.Codec
+import io.circe.generic.extras.semiauto.deriveConfiguredCodec
+
 import com.softwaremill.quicklens._
 import org.apache.pekko.Done
 import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem, Behavior }
@@ -26,7 +29,6 @@ import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.{ Comparison, Node, Prec
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.{ Decoder, Encoder }
-import io.circe.generic.extras.ConfiguredJsonCodec
 import tw.idv.idiotech.ghostspeak.daqiaotou.Task.VariableUpdates
 
 import java.util.UUID
@@ -61,21 +63,29 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
   type NodeId = String
   type ActionId = String
 
-  @ConfiguredJsonCodec
   case class Trigger(message: Message, nodes: List[Node])
+
+  object Trigger {
+    implicit val codecForTrigger: Codec.AsObject[Trigger] = deriveConfiguredCodec[Trigger]
+  }
 
   // variables and strings are required, with no defaults, on purpose. Snapshots written before
   // they were stored lack both fields, so they fail to decode instead of silently coming back
   // empty. With jdbc-snapshot-store.snapshot-is-optional = true, Pekko then skips such a
   // snapshot and rebuilds the state by replaying the user's whole journal (events are never
   // deleted), which restores the real variables and strings.
-  @ConfiguredJsonCodec
   case class StateStorage(
     triggers: List[Trigger],
     exclusions: Map[ActionId, List[NodeId]],
     variables: Map[String, Int],
     strings: Map[String, String]
   )
+
+  object StateStorage {
+
+    implicit val codecForStateStorage: Codec.AsObject[StateStorage] =
+      deriveConfiguredCodec[StateStorage]
+  }
 
   case class State(
     triggers: Map[Message, List[Node]],
@@ -129,13 +139,16 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
     )
   }
 
-  @ConfiguredJsonCodec
   case class Event(
     nodes: List[Node],
     message: Message,
     variableUpdates: List[VariableUpdate],
     strings: List[StringVariable] = Nil
   ) extends EventBase
+
+  object Event {
+    implicit val codecForEvent: Codec.AsObject[Event] = deriveConfiguredCodec[Event]
+  }
 
   def onEvent(
     user: String
@@ -220,8 +233,13 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
       case text => text.filterNot(_.isWhitespace) == reply.filterNot(_.isWhitespace)
     }
 
-  @ConfiguredJsonCodec
   case class StringVariable(name: String, value: String)
+
+  object StringVariable {
+
+    implicit val codecForStringVariable: Codec.AsObject[StringVariable] =
+      deriveConfiguredCodec[StringVariable]
+  }
   private case class NodesAndVariables(nodes: List[Node], variable: Option[StringVariable])
 
   private def replaceString(text: String, strings: Map[String, String]): String =

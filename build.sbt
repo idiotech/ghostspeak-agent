@@ -22,7 +22,6 @@ scalacOptions in ThisBuild ++= Seq(
   "-feature",
   "-Ywarn-unused:imports",
   "-Yrangepos",
-  "-Ymacro-annotations",
   "-language:implicitConversions",
   "-language:higherKinds"
 )

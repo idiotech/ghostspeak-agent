@@ -1,5 +1,8 @@
 package tw.idv.idiotech.ghostspeak.agent
 
+import io.circe.Codec
+import io.circe.generic.extras.semiauto.deriveConfiguredCodec
+
 import org.apache.pekko.Done
 import org.apache.pekko.actor.typed.ActorSystem
 import com.typesafe.config.ConfigFactory
@@ -12,7 +15,7 @@ import org.apache.pekko.stream.RestartSettings
 import org.apache.pekko.stream.connectors.google.firebase.fcm.FcmNotificationModels.Token
 import org.apache.pekko.stream.scaladsl.{ RestartFlow, Sink, Source }
 import io.circe.Encoder
-import io.circe.generic.extras.{ Configuration, ConfiguredJsonCodec }
+import io.circe.generic.extras.Configuration
 import io.circe.syntax._
 import io.circe.parser.decode
 
@@ -21,9 +24,12 @@ import scala.concurrent.Future
 object FcmSender extends LazyLogging {
   private implicit val configuration = Configuration.default.withSnakeCaseMemberNames
 
-  @ConfiguredJsonCodec
   case class FcmConfig(projectId: String, privateKey: String, clientEmail: String) {
     def toFcmSettngs = FcmSettings(clientEmail, privateKey, projectId)
+  }
+
+  object FcmConfig {
+    implicit val codecForFcmConfig: Codec.AsObject[FcmConfig] = deriveConfiguredCodec[FcmConfig]
   }
 
   val fcmConfig = decode[FcmConfig](

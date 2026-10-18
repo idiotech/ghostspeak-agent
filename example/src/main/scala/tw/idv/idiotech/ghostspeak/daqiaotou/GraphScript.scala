@@ -1,8 +1,10 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
+import io.circe.Codec
+import io.circe.generic.extras.semiauto.deriveConfiguredCodec
+
 import enumeratum.{ CirceEnum, Enum, EnumEntry }
 import enumeratum.EnumEntry.UpperSnakecase
-import io.circe.generic.extras.ConfiguredJsonCodec
 import json.schema.typeHint
 import tw.idv.idiotech.ghostspeak.agent.util.substitute
 import tw.idv.idiotech.ghostspeak.daqiaotou.BeaconType.findValues
@@ -25,7 +27,6 @@ object GraphScript {
 
   val defaultZone = ZoneId.of("Asia/Taipei")
 
-  @ConfiguredJsonCodec
   case class ActTime(target: Option[LocalTime], minAfter: Long, range: Long) {
 
     def time(clock: Clock = Clock.system(defaultZone)): Long = {
@@ -55,8 +56,17 @@ object GraphScript {
     }
   }
 
-  @ConfiguredJsonCodec
+  object ActTime {
+    implicit val codecForActTime: Codec.AsObject[ActTime] = deriveConfiguredCodec[ActTime]
+  }
+
   case class Performance(action: Action, time: Option[ActTime] = None, delay: Long = 0)
+
+  object Performance {
+
+    implicit val codecForPerformance: Codec.AsObject[Performance] =
+      deriveConfiguredCodec[Performance]
+  }
 
   @typeHint[String]
   sealed trait Comparison extends EnumEntry
@@ -72,15 +82,19 @@ object GraphScript {
 
   }
 
-  @ConfiguredJsonCodec
   case class Precondition(name: String, comparison: Comparison, value: Int)
+
+  object Precondition {
+
+    implicit val codecForPrecondition: Codec.AsObject[Precondition] =
+      deriveConfiguredCodec[Precondition]
+  }
 
   // state
   // 1. 劇本： node map HashMap<Id, Node>
   // 2. HashMap<Event, Node>
   // 3. Matching event -> Node
 
-  @ConfiguredJsonCodec
   case class Node(
     name: String,
     triggers: List[Message],
@@ -111,6 +125,8 @@ object GraphScript {
   }
 
   object Node {
+    implicit val codecForNode: Codec.AsObject[Node] = deriveConfiguredCodec[Node]
+
     val leave = Node("leave", Nil, Nil, Nil, Set.empty, Nil)
   }
 }

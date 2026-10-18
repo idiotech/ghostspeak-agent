@@ -1,5 +1,8 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
+import io.circe.Codec
+import io.circe.generic.semiauto.deriveCodec
+
 import cats.implicits._
 import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem }
 import org.apache.pekko.http.scaladsl.server.Route
@@ -15,7 +18,6 @@ import io.circe.parser.{ decode, parse }
 import io.circe.syntax._
 import org.apache.pekko.actor.typed.scaladsl.AskPattern.schedulerFromActorSystem
 import org.apache.pekko.actor.typed.scaladsl.AskPattern.Askable
-import io.circe.generic.JsonCodec
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Identifier
 
 import scala.concurrent.Future
@@ -150,10 +152,10 @@ class EventRoutes[T: Decoder](
 
 object EventRoutes {
 
-  @JsonCodec
   case class Resources(images: List[String], sounds: List[String])
 
   object Resources {
+    implicit val codecForResources: Codec.AsObject[Resources] = deriveCodec[Resources]
 
     def apply(nodes: List[GraphScript.Node]): Resources = {
       val tasks: List[Task] = nodes.flatMap(_.performances.map(_.action.content.task))

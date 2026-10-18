@@ -1,5 +1,9 @@
 package tw.idv.idiotech.ghostspeak.agent
 
+import io.circe.Codec
+import io.circe.generic.extras.semiauto.deriveConfiguredCodec
+import io.circe.generic.semiauto.deriveCodec
+
 import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors, TimerScheduler }
 import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem, Behavior }
 import org.apache.pekko.persistence.typed.scaladsl.{
@@ -9,8 +13,6 @@ import org.apache.pekko.persistence.typed.scaladsl.{
 }
 import org.apache.pekko.persistence.typed.PersistenceId
 import com.typesafe.scalalogging.LazyLogging
-import io.circe.generic.JsonCodec
-import io.circe.generic.extras.ConfiguredJsonCodec
 import io.circe.{ Decoder, Encoder }
 import org.virtuslab.psh.annotation.SerializabilityTrait
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Command.Sense
@@ -26,25 +28,35 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
 
   import Actuator._
 
-  @ConfiguredJsonCodec
   sealed trait Event extends EventBase
 
   object Event {
 
-    @JsonCodec
     case class Performance(action: Action[T], startTime: Long)
         extends Event
         with Ordered[Performance] {
       override def compare(that: Performance): Int = startTime.compare(that.startTime)
     }
 
-    @JsonCodec
+    object Performance {
+      implicit val codecForPerformance: Codec.AsObject[Performance] = deriveCodec[Performance]
+    }
+
     case class ActionDone(actions: Set[Performance] = Set.empty) extends Event
+
+    object ActionDone {
+      implicit val codecForActionDone: Codec.AsObject[ActionDone] = deriveCodec[ActionDone]
+    }
+
+    implicit val codecForEvent: Codec.AsObject[Event] = deriveConfiguredCodec[Event]
   }
   type PendingAction = Event.Performance
 
-  @JsonCodec
   case class State(pendingActions: Set[PendingAction] = Set.empty) extends EventBase
+
+  object State {
+    implicit val codecForState: Codec.AsObject[State] = deriveCodec[State]
+  }
 
   case object TimerKey extends SerializabilityTrait
   import Command._

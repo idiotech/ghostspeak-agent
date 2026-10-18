@@ -1,8 +1,11 @@
 package tw.idv.idiotech.ghostspeak
 
+import io.circe.Codec
+import io.circe.generic.extras.semiauto.deriveConfiguredCodec
+
 import enumeratum.EnumEntry.UpperSnakecase
 import enumeratum.{ CirceEnum, Enum, EnumEntry }
-import io.circe.generic.extras.{ Configuration, ConfiguredJsonCodec }
+import io.circe.generic.extras.Configuration
 import json.schema.{ description, title, typeHint }
 import com.redis._
 import com.typesafe.config.ConfigFactory
@@ -18,13 +21,18 @@ package object daqiaotou {
     .withScreamingSnakeCaseConstructorNames
     .withDefaults
 
-  @ConfiguredJsonCodec
   case class RedisConf(host: String, port: Int)
 
-  @ConfiguredJsonCodec
+  object RedisConf {
+    implicit val codecForRedisConf: Codec.AsObject[RedisConf] = deriveConfiguredCodec[RedisConf]
+  }
+
   case class IconConf(pending: String, arrived: String)
 
-  @ConfiguredJsonCodec
+  object IconConf {
+    implicit val codecForIconConf: Codec.AsObject[IconConf] = deriveConfiguredCodec[IconConf]
+  }
+
   case class MysqlConf(
     host: String,
     port: Int,
@@ -33,13 +41,22 @@ package object daqiaotou {
     database: String
   )
 
-  @ConfiguredJsonCodec
+  object MysqlConf {
+    implicit val codecForMysqlConf: Codec.AsObject[MysqlConf] = deriveConfiguredCodec[MysqlConf]
+  }
+
   case class DaqiaotouConf(
     engine: String = "graphscript",
     redis: RedisConf,
     icon: IconConf,
     mysql: MysqlConf
   )
+
+  object DaqiaotouConf {
+
+    implicit val codecForDaqiaotouConf: Codec.AsObject[DaqiaotouConf] =
+      deriveConfiguredCodec[DaqiaotouConf]
+  }
 
   lazy val config: DaqiaotouConf = {
     ConfigFactory.load().as[DaqiaotouConf]("app").fold(throw _, identity)
@@ -104,17 +121,22 @@ package object daqiaotou {
 
   }
 
-  @ConfiguredJsonCodec
   case class Location(lat: Double, lon: Double) extends EventPayload
 
-  @ConfiguredJsonCodec
+  object Location {
+    implicit val codecForLocation: Codec.AsObject[Location] = deriveConfiguredCodec[Location]
+  }
+
   case class MainVolume(
     speechLength: Int,
     fadeOutSeconds: Int,
     fadeInSeconds: Int = 0
   )
 
-  @ConfiguredJsonCodec
+  object MainVolume {
+    implicit val codecForMainVolume: Codec.AsObject[MainVolume] = deriveConfiguredCodec[MainVolume]
+  }
+
   sealed trait Volume {
     val mainVolume: Option[MainVolume]
   }
@@ -142,6 +164,8 @@ package object daqiaotou {
       maxValue: Int,
       mainVolume: Option[MainVolume]
     ) extends Volume
+
+    implicit val codecForVolume: Codec.AsObject[Volume] = deriveConfiguredCodec[Volume]
   }
 
   @typeHint[String]
@@ -154,10 +178,14 @@ package object daqiaotou {
     case object `=` extends Operation with UpperSnakecase
   }
 
-  @ConfiguredJsonCodec
   case class VariableUpdate(name: String, operation: Operation, value: Int) extends Task
 
-  @ConfiguredJsonCodec
+  object VariableUpdate {
+
+    implicit val codecForVariableUpdate: Codec.AsObject[VariableUpdate] =
+      deriveConfiguredCodec[VariableUpdate]
+  }
+
   sealed trait Task
 
   object Task {
@@ -180,7 +208,7 @@ package object daqiaotou {
       @title("Close alert popup after reply")
       closeAlertAfterReply: Boolean = true,
       @title("Clear dialog")
-      clearDialog: Boolean = false,
+      clearDialog: Boolean = false
     ) extends Task
 
     @title("Close popup message")
@@ -279,9 +307,10 @@ package object daqiaotou {
     @title("Add a friend")
     @description("Add a person with name and icon")
     case class Friend(id: String, name: String, icon: Option[String]) extends Task
+
+    implicit val codecForTask: Codec.AsObject[Task] = deriveConfiguredCodec[Task]
   }
 
-  @ConfiguredJsonCodec
   sealed trait Condition
 
   object Condition {
@@ -309,23 +338,27 @@ package object daqiaotou {
       mode: BeaconType
     ) extends Condition
 
+    implicit val codecForCondition: Codec.AsObject[Condition] = deriveConfiguredCodec[Condition]
   }
 
-  @ConfiguredJsonCodec
   case class Content(task: Task, condition: Condition, exclusiveWith: List[String] = Nil)
+
+  object Content {
+    implicit val codecForContent: Codec.AsObject[Content] = deriveConfiguredCodec[Content]
+  }
 
   type Action = tw.idv.idiotech.ghostspeak.agent.Action[Content]
   type Message = tw.idv.idiotech.ghostspeak.agent.Message[EventPayload]
 
-  @ConfiguredJsonCodec
   sealed trait EventPayload
 
   object EventPayload {
-
     case class Text(text: String, asVariable: Option[String] = None) extends EventPayload
     case object GoldenFinger extends EventPayload
     case class PerformDirectly(action: Action) extends EventPayload
 
+    implicit val codecForEventPayload: Codec.AsObject[EventPayload] =
+      deriveConfiguredCodec[EventPayload]
   }
 
   implicit lazy val contentEncoder = Action.encoder[Content]
@@ -333,6 +366,9 @@ package object daqiaotou {
   implicit lazy val messageEncoder = Message.encoder[EventPayload]
   implicit lazy val messageDecoder = Message.decoder[EventPayload]
 
-  @ConfiguredJsonCodec
   case class PerfLog(user: String, action: String, stage: String)
+
+  object PerfLog {
+    implicit val codecForPerfLog: Codec.AsObject[PerfLog] = deriveConfiguredCodec[PerfLog]
+  }
 }

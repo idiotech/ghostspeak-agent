@@ -1,5 +1,8 @@
 package tw.idv.idiotech.ghostspeak.agent
 
+import io.circe.Codec
+import io.circe.generic.extras.semiauto.deriveConfiguredCodec
+
 import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors }
 import org.apache.pekko.actor.typed.{ ActorRef, Behavior }
 import org.apache.pekko.pattern.StatusReply
@@ -12,7 +15,6 @@ import org.apache.pekko.persistence.typed.scaladsl.{
 }
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.{ Decoder, Encoder }
-import io.circe.generic.extras.ConfiguredJsonCodec
 import io.circe.syntax._
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Event.{ Created, Destroyed }
 
@@ -195,19 +197,26 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
 
 object Sensor {
 
-  @ConfiguredJsonCodec
   sealed trait Event extends EventBase
 
   object Event {
     case class Destroyed(scenarioId: String) extends Event
 
-    @ConfiguredJsonCodec
     case class Created(scenario: Scenario, uniqueId: String = UUID.randomUUID().toString)
         extends Event
+
+    object Created {
+      implicit val codecForCreated: Codec.AsObject[Created] = deriveConfiguredCodec[Created]
+    }
+
+    implicit val codecForEvent: Codec.AsObject[Event] = deriveConfiguredCodec[Event]
   }
 
-  @ConfiguredJsonCodec
   case class Identifier(engine: String, scenarioId: String)
+
+  object Identifier {
+    implicit val codecForIdentifier: Codec.AsObject[Identifier] = deriveConfiguredCodec[Identifier]
+  }
 
   case class State(
     scenarios: Map[String, Created] = Map.empty,
