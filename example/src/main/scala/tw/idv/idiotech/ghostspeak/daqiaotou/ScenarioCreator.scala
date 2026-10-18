@@ -460,12 +460,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
               val scn = created.scenario
               implicit val script: Map[String, Node] = createScript(scn)
               val actor: Behavior[Sensor.Command[EventPayload]] =
-                sensor.apply(
-                  scn.id,
-                  createUserScenario(actuatorRef),
-                  sensor.onCommandPerUser,
-                  eagerChildren = false
-                )
+                sensor.apply(scn.id, createUserScenario(actuatorRef), sensor.onCommandPerUser)
               ctx.spawn(
                 actor,
                 if (created.uniqueId.nonEmpty) created.uniqueId else UUID.randomUUID().toString

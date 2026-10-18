@@ -158,9 +158,7 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
             val scns = state.scenarios.values.map(s => createScenario(context, s))
             scns.foreach(println)
           }
-          logger.info(
-            s"====== recovery complete for $name (${state.scenarios.size} children, eager = $eagerChildren)"
-          )
+          logger.info(s"====== recovery complete for $name")
         }
     }
 

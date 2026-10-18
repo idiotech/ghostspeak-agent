@@ -151,8 +151,7 @@ class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPa
                 sensor.apply(
                   scn.id,
                   createUserScenario(created.scenario.id, sensorRef, actuatorRef),
-                  sensor.onCommandPerUser,
-                  eagerChildren = false
+                  sensor.onCommandPerUser
                 )
               ctx.spawn(
                 actor,
