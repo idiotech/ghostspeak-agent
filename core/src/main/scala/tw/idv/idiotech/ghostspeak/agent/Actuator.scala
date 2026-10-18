@@ -5,7 +5,7 @@ import tw.idv.idiotech.ghostspeak.agent.jsoncodec.semiauto.deriveConfiguredCodec
 import io.circe.generic.semiauto.deriveCodec
 
 import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors, TimerScheduler }
-import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem, Behavior }
+import org.apache.pekko.actor.typed.{ ActorRef, Behavior }
 import org.apache.pekko.persistence.typed.scaladsl.{
   Effect,
   EventSourcedBehavior,
@@ -22,44 +22,22 @@ import scala.util.{ Failure, Success }
 
 class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
 
-  implicit def actionDecoder: Decoder[Action[T]] = Action.decoder[T]
-  implicit def actionEncoder: Encoder[Action[T]] = Action.encoder[T]
-
   import Actuator._
 
-  sealed trait Event extends EventBase
+  // Events and state are the same types for every actuator (see the companion), so any
+  // actuator, whatever its engine, can decode what another one persisted.
+  type Event = Actuator.Event[T]
+  type State = Actuator.State[T]
+  type PendingAction = Actuator.Event.Performance[T]
+  val Event: Actuator.Event.type = Actuator.Event
+  val State: Actuator.State.type = Actuator.State
 
-  object Event {
-
-    case class Performance(action: Action[T], startTime: Long)
-        extends Event
-        with Ordered[Performance] {
-      override def compare(that: Performance): Int = startTime.compare(that.startTime)
-    }
-
-    object Performance {
-      implicit val codecForPerformance: Codec.AsObject[Performance] = deriveCodec[Performance]
-    }
-
-    case class ActionDone(actions: Set[Performance] = Set.empty) extends Event
-
-    object ActionDone {
-      implicit val codecForActionDone: Codec.AsObject[ActionDone] = deriveCodec[ActionDone]
-    }
-
-    implicit val codecForEvent: Codec.AsObject[Event] = deriveConfiguredCodec[Event]
-  }
-  type PendingAction = Event.Performance
-
-  case class State(pendingActions: Set[PendingAction] = Set.empty) extends EventBase
-
-  object State {
-    implicit val codecForState: Codec.AsObject[State] = deriveCodec[State]
-  }
+  implicit val eventCodec: Codec.AsObject[Event] = Actuator.Event.codecForEvent[T]
+  implicit val stateCodec: Codec.AsObject[State] = Actuator.State.codecForState[T]
 
   case object TimerKey
   import Command._
-  import Event._
+  import Actuator.Event._
 
   type Discover = (
     ActorContext[_],
@@ -141,7 +119,7 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
       .getOrElse(Long.MaxValue)
 
   def eventHandler(state: State, event: Event): State = event match {
-    case p: Performance =>
+    case p: Performance[T] =>
       logger.debug(s"adding to state: ${p.action.id}")
       val ret = State(state.pendingActions ++ Set(p))
       logger.debug(s"latest state: ${state.pendingActions.map(_.action.id)}")
@@ -151,9 +129,6 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
       val ret = State(state.pendingActions diff actions)
       logger.debug(s"latest state: ${state.pendingActions.map(_.action.id)}")
       ret
-    case _ =>
-      logger.error(s"match error for $event")
-      state
   }
 
   private def behavior(name: String, sensor: ActorRef[Sensor.Command[P]])(
@@ -163,7 +138,7 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
       val commandHandler = commandHandlerFrom(ctx, sensor, timer)
       EventSourcedBehavior[Command[T], Event, State](
         persistenceId = PersistenceId.ofUniqueId(s"actuator-$name"),
-        emptyState = State(),
+        emptyState = State[T](),
         commandHandler = commandHandler,
         eventHandler = eventHandler
       ).withRetention(RetentionCriteria.snapshotEvery(100, 2))
@@ -203,6 +178,41 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
 }
 
 object Actuator {
+
+  sealed trait Event[T] extends EventBase
+
+  object Event {
+
+    case class Performance[T](action: Action[T], startTime: Long)
+        extends Event[T]
+        with Ordered[Performance[T]] {
+      override def compare(that: Performance[T]): Int = startTime.compare(that.startTime)
+    }
+
+    object Performance {
+      implicit def codecForPerformance[T: Encoder: Decoder]: Codec.AsObject[Performance[T]] = {
+        implicit val actionCodec: Codec[Action[T]] = Codec.from(Action.decoder[T], Action.encoder[T])
+        deriveCodec[Performance[T]]
+      }
+    }
+
+    case class ActionDone[T](actions: Set[Performance[T]] = Set.empty[Performance[T]]) extends Event[T]
+
+    object ActionDone {
+      implicit def codecForActionDone[T: Encoder: Decoder]: Codec.AsObject[ActionDone[T]] =
+        deriveCodec[ActionDone[T]]
+    }
+
+    implicit def codecForEvent[T: Encoder: Decoder]: Codec.AsObject[Event[T]] =
+      deriveConfiguredCodec[Event[T]]
+  }
+
+  case class State[T](pendingActions: Set[Event.Performance[T]] = Set.empty[Event.Performance[T]]) extends EventBase
+
+  object State {
+    implicit def codecForState[T: Encoder: Decoder]: Codec.AsObject[State[T]] =
+      deriveCodec[State[T]]
+  }
 
   sealed trait Command[T] extends CommandBase
 

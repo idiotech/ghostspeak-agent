@@ -12,15 +12,7 @@ class CirceSerializer extends Serializer {
 
   override def includeManifest: Boolean = true
 
-  // Only one engine runs per server, and only its actuator persists anything. The graphscript
-  // and spotkeeper actuators are instances of the same Actuator class, so their Event and State
-  // classes are the same at runtime and the manifest cannot tell them apart: decode with the
-  // actuator of the engine that is running, so restored Performances belong to that actuator.
-  private lazy val codec = new CirceCodec(
-    ServerInstance.scenarioCreator,
-    if (config.engine == "spotkeeper") ServerInstance.spotKeeperActuator
-    else ServerInstance.actuator
-  )
+  private lazy val codec = new CirceCodec(ServerInstance.scenarioCreator)
 
   override def toBinary(o: AnyRef): Array[Byte] = codec.toBinary(o)
 
@@ -28,7 +20,9 @@ class CirceSerializer extends Serializer {
     codec.fromBinary(bytes, manifest)
 }
 
-class CirceCodec(val scenarioCreator: ScenarioCreator, val actuator: Actuator[Content, _]) {
+// Actuator events and state are Actuator.Event[Content] / Actuator.State[Content] for every
+// engine, so they decode the same way whichever engine persisted them.
+class CirceCodec(val scenarioCreator: ScenarioCreator) {
 
   def toBinary(o: AnyRef): Array[Byte] = {
     val json: Json = o match {
@@ -36,8 +30,8 @@ class CirceCodec(val scenarioCreator: ScenarioCreator, val actuator: Actuator[Co
         eb match {
           case e: scenarioCreator.Event => e.asJson
           case e: scenarioCreator.State => e.asJson
-          case e: actuator.Event        => e.asJson
-          case e: actuator.State        => e.asJson
+          case e: Actuator.Event[_]     => e.asInstanceOf[Actuator.Event[Content]].asJson
+          case e: Actuator.State[_]     => e.asInstanceOf[Actuator.State[Content]].asJson
           case e: agent.Sensor.Event    => e.asJson
           case e: agent.Sensor.State    => e.asJson
           case e: SpotKeeper.Event      => e.asJson
@@ -52,8 +46,8 @@ class CirceCodec(val scenarioCreator: ScenarioCreator, val actuator: Actuator[Co
   def fromBinary(bytes: Array[Byte], manifest: Option[Class[_]]): AnyRef = {
     val sce = classOf[scenarioCreator.Event]
     val scs = classOf[scenarioCreator.State]
-    val ae = classOf[actuator.Event]
-    val as = classOf[actuator.State]
+    val ae = classOf[Actuator.Event[_]]
+    val as = classOf[Actuator.State[_]]
     val se = classOf[agent.Sensor.Event]
     val ss = classOf[agent.Sensor.State]
     val spe = classOf[daqiaotou.SpotKeeper.Event]
@@ -64,8 +58,8 @@ class CirceCodec(val scenarioCreator: ScenarioCreator, val actuator: Actuator[Co
     val result = manifest.map(c =>
       if (sce.isAssignableFrom(c)) decode[scenarioCreator.Event](string)
       else if (scs.isAssignableFrom(c)) decode[scenarioCreator.State](string)
-      else if (ae.isAssignableFrom(c)) decode[actuator.Event](string)
-      else if (as.isAssignableFrom(c)) decode[actuator.State](string)
+      else if (ae.isAssignableFrom(c)) decode[Actuator.Event[Content]](string)
+      else if (as.isAssignableFrom(c)) decode[Actuator.State[Content]](string)
       else if (se.isAssignableFrom(c)) decode[agent.Sensor.Event](string)
       else if (ss.isAssignableFrom(c)) decode[agent.Sensor.State](string)
       else if (spe.isAssignableFrom(c)) decode[daqiaotou.SpotKeeper.Event](string)
