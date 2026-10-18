@@ -4,7 +4,7 @@ import io.circe.parser.decode
 import io.circe.syntax._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
-import tw.idv.idiotech.ghostspeak.agent.{ Actuator, Sensor }
+import tw.idv.idiotech.ghostspeak.agent.{ Actuator, Sensor, SystemPayload, Message => BaseMessage }
 
 class ScenarioStateTest extends AnyFlatSpec with Matchers {
 
@@ -16,6 +16,27 @@ class ScenarioStateTest extends AnyFlatSpec with Matchers {
       Map("action-1" -> List("node-1", "node-2")),
       Map("score"    -> 3, "visits" -> 0),
       Map("name"     -> "Juliet")
+    )
+    decode[creator.State](state.asJson.noSpaces) mustBe Right(state)
+  }
+
+  it must "keep triggers keyed by message" in {
+    val start =
+      BaseMessage[EventPayload]("", None, "ghost", "user-1", Left(SystemPayload.Start), "")
+    val reply = BaseMessage[EventPayload](
+      "",
+      Some("ask"),
+      "ghost",
+      "user-1",
+      Right(EventPayload.Text("yes")),
+      ""
+    )
+    val node = GraphScript.Node("n1", List(start), Nil, Nil, Set("n2"), List("n2"))
+    val state = creator.State(
+      Map(start -> List(node), reply -> List(node, node.copy(name = "n2"))),
+      Map.empty,
+      Map("score"  -> 1),
+      Map("answer" -> "yes")
     )
     decode[creator.State](state.asJson.noSpaces) mustBe Right(state)
   }
