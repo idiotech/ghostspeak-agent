@@ -10,16 +10,17 @@ import scala.util.Using
   * ("action-<scenario>-<user>"), mapping action IDs to the action JSON not yet fetched by the
   * client.
   */
-class RedisStore(host: String, port: Int) {
+class RedisStore(host: String, port: Int, timeoutMs: Int = 0) {
 
-  // Like the redisclient pool this replaces: no cap on connections, up to 8 kept idle.
+  // Like the redisclient pool this replaces: no cap on connections, up to 8 kept idle, and by
+  // default (timeoutMs = 0) no connect or read timeout.
   private val poolConfig = {
     val c = new JedisPoolConfig()
     c.setMaxTotal(-1)
     c.setMaxIdle(8)
     c
   }
-  private val pool = new JedisPool(poolConfig, host, port)
+  private val pool = new JedisPool(poolConfig, host, port, timeoutMs)
 
   private def withClient[A](f: Jedis => A): A = Using.resource(pool.getResource)(f)
 
@@ -30,8 +31,9 @@ class RedisStore(host: String, port: Int) {
   def hgetAll(key: String): Map[String, String] =
     withClient(_.hgetAll(key).asScala.toMap)
 
-  def hdel(key: String, field: String): Unit =
-    withClient(_.hdel(key, field))
+  /** Deletes the given fields of the hash, in one command. */
+  def hdel(key: String, fields: String*): Unit =
+    if (fields.nonEmpty) withClient(_.hdel(key, fields: _*))
 
   def del(key: String): Unit =
     withClient(_.del(key))

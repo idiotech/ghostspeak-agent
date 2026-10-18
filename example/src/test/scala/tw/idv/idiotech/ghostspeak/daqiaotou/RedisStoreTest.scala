@@ -97,7 +97,7 @@ class RedisStoreTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
   }
 
   it must "serve many concurrent operations" in {
-    // EventRoutes deletes every fetched action in parallel; the pool must not cap them at 8
+    // many clients fetching their actions at once; the pool must not cap them at 8
     requireRedis()
     import scala.concurrent.{ Await, Future }
     import scala.concurrent.duration._
@@ -111,6 +111,53 @@ class RedisStoreTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     store.hgetAll(k).size mustBe 50
     Await.result(Future.traverse((1 to 50).toList)(i => Future(store.hdel(k, s"a$i"))), 10.seconds)
     store.hgetAll(k) mustBe empty
+  }
+
+  it must "delete several fields in one call, and do nothing for none" in {
+    requireRedis()
+    val k = key("batch")
+    (1 to 5).foreach(i => store.hset(k, s"a$i", s"v$i"))
+    store.hdel(k, "a1", "a2", "a3")
+    store.hgetAll(k) mustBe Map("a4" -> "v4", "a5" -> "v5")
+    store.hdel(k)
+    store.hgetAll(k).size mustBe 2
+    store.del(k)
+  }
+
+  it must "time out a call when a timeout is set and Redis does not answer" in {
+    requireRedis()
+    // a server that accepts the connection but never replies
+    val silent = new java.net.ServerSocket(0)
+    val accepted = new Thread(() => { scala.util.Try(silent.accept()); () })
+    accepted.setDaemon(true)
+    accepted.start()
+    val timed = new RedisStore("127.0.0.1", silent.getLocalPort, timeoutMs = 300)
+    try {
+      val start = System.nanoTime()
+      an[Exception] must be thrownBy timed.hgetAll("anything")
+      (System.nanoTime() - start) / 1000000 must be < 5000L
+    } finally {
+      timed.close()
+      silent.close()
+    }
+  }
+
+  it must "by default keep waiting past Jedis's own 2 s timeout, as redisclient did" in {
+    requireRedis()
+    val silent = new java.net.ServerSocket(0)
+    val accepted = new Thread(() => { scala.util.Try(silent.accept()); () })
+    accepted.setDaemon(true)
+    accepted.start()
+    val untimed = new RedisStore("127.0.0.1", silent.getLocalPort)
+    val call = new Thread(() => { scala.util.Try(untimed.hgetAll("anything")); () })
+    call.setDaemon(true)
+    call.start()
+    call.join(3000)
+    try call.isAlive mustBe true // still waiting after 3 s
+    finally {
+      silent.close() // ends the call
+      untimed.close()
+    }
   }
 
   it must "delete one field, then the whole key" in {

@@ -53,7 +53,8 @@ class EventRoutes[T: Decoder](
                   }
                   Future.successful(res)
                 }
-                _ <- Future.traverse(all.keys)(actionId => Future(redis.hdel(key, actionId)))
+                // one HDEL for all the fetched actions
+                _ <- Future(redis.hdel(key, all.keys.toSeq: _*))
               } yield all
             onComplete(fetch) {
               case Success(all) =>

@@ -19,7 +19,8 @@ package object daqiaotou {
     .withScreamingSnakeCaseConstructorNames
     .withDefaults
 
-  case class RedisConf(host: String, port: Int)
+  // timeoutMs: connect and read timeout; 0 waits indefinitely, like the redisclient it replaced
+  case class RedisConf(host: String, port: Int, timeoutMs: Int = 0)
 
   object RedisConf {
     implicit val codecForRedisConf: Codec.AsObject[RedisConf] = deriveConfiguredCodec[RedisConf]
@@ -59,7 +60,7 @@ package object daqiaotou {
   lazy val config: DaqiaotouConf =
     ConfigFactory.load().as[DaqiaotouConf]("app").fold(throw _, identity)
 
-  lazy val redis = new RedisStore(config.redis.host, config.redis.port)
+  lazy val redis = new RedisStore(config.redis.host, config.redis.port, config.redis.timeoutMs)
 
   sealed trait Destination extends EnumEntry
 

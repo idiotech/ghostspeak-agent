@@ -19,6 +19,11 @@ class ConfigTest extends AnyFlatSpec with Matchers {
     c.getInt("app.redis.port") mustBe 6379
   }
 
+  they must "wait indefinitely by default, as before, unless REDIS_TIMEOUT_MS is set" in {
+    load("").getInt("app.redis.timeoutMs") mustBe 0
+    load("REDIS_TIMEOUT_MS = 1500").getInt("app.redis.timeoutMs") mustBe 1500
+  }
+
   they must "take REDIS_HOST and REDIS_PORT separately" in {
     val c = load("REDIS_HOST = redis.internal\nREDIS_PORT = 6380")
     c.getString("app.redis.host") mustBe "redis.internal"
