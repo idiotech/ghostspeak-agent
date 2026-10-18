@@ -5,9 +5,10 @@ version := "0.1"
 val scala2 = "2.13.14"
 val scala3 = "3.3.4"
 
-// Cross-built during the move to Scala 3: the same sources compile with both. `++3.3.4 test`
-// runs the tests on Scala 3; version-specific code lives in src/main/scala-2 and scala-3.
-scalaVersion in ThisBuild := scala2
+// Scala 3 by default. Still cross-built with 2.13 as a fallback while Scala 3 settles in:
+// `++2.13.14 stage` builds the 2.13 server, `+test` tests both. Version-specific code lives in
+// src/main/scala-2 and src/main/scala-3.
+scalaVersion in ThisBuild := scala3
 crossScalaVersions in ThisBuild := Seq(scala2, scala3)
 
 val pekkoVersion = "1.1.0-M1"
