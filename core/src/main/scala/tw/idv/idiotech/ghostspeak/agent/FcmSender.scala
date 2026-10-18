@@ -22,7 +22,7 @@ import io.circe.parser.decode
 import scala.concurrent.Future
 
 object FcmSender extends LazyLogging {
-  private implicit val configuration = Configuration.default.withSnakeCaseMemberNames
+  private implicit val configuration: Configuration = Configuration.default.withSnakeCaseMemberNames
 
   case class FcmConfig(projectId: String, privateKey: String, clientEmail: String) {
     def toFcmSettngs = FcmSettings(clientEmail, privateKey, projectId)

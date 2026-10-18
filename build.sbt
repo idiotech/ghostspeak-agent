@@ -23,7 +23,9 @@ scalacOptions in ThisBuild ++= Seq(
   "-Ywarn-unused:imports",
   "-Yrangepos",
   "-language:implicitConversions",
-  "-language:higherKinds"
+  "-language:higherKinds",
+  // report code that Scala 3 compiles differently, as errors
+  "-Xsource:3"
 )
 val log4jVersion = "2.13.0"
 

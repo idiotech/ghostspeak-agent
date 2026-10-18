@@ -1,6 +1,6 @@
 package tw.idv.idiotech.ghostspeak
 
-import io.circe.Codec
+import io.circe.{ Codec, Decoder, Encoder }
 import io.circe.generic.extras.semiauto.deriveConfiguredCodec
 
 import enumeratum.EnumEntry.UpperSnakecase
@@ -14,7 +14,7 @@ import scala.collection.immutable
 
 package object daqiaotou {
 
-  implicit val configuration = Configuration.default
+  implicit val configuration: Configuration = Configuration.default
     .withDiscriminator("type")
     .withScreamingSnakeCaseConstructorNames
     .withDefaults
@@ -351,10 +351,10 @@ package object daqiaotou {
       deriveConfiguredCodec[EventPayload]
   }
 
-  implicit lazy val contentEncoder = Action.encoder[Content]
-  implicit lazy val contentDecoder = Action.decoder[Content]
-  implicit lazy val messageEncoder = Message.encoder[EventPayload]
-  implicit lazy val messageDecoder = Message.decoder[EventPayload]
+  implicit lazy val contentEncoder: Encoder.AsObject[Action] = Action.encoder[Content]
+  implicit lazy val contentDecoder: Decoder[Action] = Action.decoder[Content]
+  implicit lazy val messageEncoder: Encoder.AsObject[Message] = Message.encoder[EventPayload]
+  implicit lazy val messageDecoder: Decoder[Message] = Message.decoder[EventPayload]
 
   case class PerfLog(user: String, action: String, stage: String)
 

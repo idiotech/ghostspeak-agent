@@ -129,7 +129,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
       )
     )
 
-    implicit val encoder = implicitly[Encoder[StateStorage]].contramap[State](s =>
+    implicit val encoder: Encoder[State] = implicitly[Encoder[StateStorage]].contramap[State](s =>
       StateStorage(
         s.triggers.toList.map(t => Trigger(t._1, t._2)),
         s.exclusions,

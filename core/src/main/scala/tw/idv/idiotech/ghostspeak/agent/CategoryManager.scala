@@ -81,7 +81,7 @@ object CategoryManager {
     case Event.Uploaded(s) => s
   }
 
-  def apply(): Behavior[Command] = Behaviors.setup { context: ActorContext[Command] =>
+  def apply(): Behavior[Command] = Behaviors.setup { (context: ActorContext[Command]) =>
     EventSourcedBehavior.withEnforcedReplies[Command, Event, State](
       persistenceId = PersistenceId.ofUniqueId("category-manager"),
       emptyState = State(Nil),

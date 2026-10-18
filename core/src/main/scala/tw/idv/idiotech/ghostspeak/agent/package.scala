@@ -14,7 +14,7 @@ import scala.collection.immutable
 import org.apache.pekko.http.scaladsl.model.headers.HttpOrigin
 package object agent {
 
-  implicit val configuration = Configuration.default
+  implicit val configuration: Configuration = Configuration.default
     .withDiscriminator("type")
     .withScreamingSnakeCaseConstructorNames
     .withDefaults

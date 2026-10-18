@@ -144,7 +144,7 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
     handle: OnCommand = onCommand _,
     snapshotEvery: Int = Sensor.SnapshotEvery
   ): Behavior[Command[P]] =
-    Behaviors.setup { context: ActorContext[Command[P]] =>
+    Behaviors.setup { (context: ActorContext[Command[P]]) =>
       EventSourcedBehavior
         .withEnforcedReplies[Command[P], Event, State](
           persistenceId = PersistenceId.ofUniqueId(s"sensor-$name"),
