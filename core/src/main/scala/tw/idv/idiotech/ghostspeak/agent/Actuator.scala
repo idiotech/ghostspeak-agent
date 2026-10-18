@@ -110,6 +110,15 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
             timer.startSingleTimer(TimerKey, Timeout(), (p.startTime - current).millis)
           }
         Effect.persist(ActionDone(toExecute))
+      case Cancel(receiver, scenario) =>
+        // a user who left a scenario must not get the actions still scheduled for it, e.g. after a restart
+        val cancelled = state.pendingActions.filter(p =>
+          p.action.receiver == receiver && p.action.session.scenario == scenario
+        )
+        logger.info(s"cancelling for $receiver in $scenario: ${cancelled.map(_.action.id)}")
+        if (cancelled.isEmpty) Effect.none
+        // removed like executed actions; a timer set for one of them finds nothing to execute
+        else Effect.persist(ActionDone(cancelled))
       case OK(action) =>
         sensor ! Sense(action.toMessage(Modality.Done))
         Effect.none
@@ -195,5 +204,8 @@ object Actuator {
     case class OK[T](action: Action[T]) extends Command[T]
     case class KO[T](action: Action[T], reason: String) extends Command[T]
     case class Timeout[T]() extends Command[T]
+
+    /** Drops the pending actions for [[receiver]] in [[scenario]]. */
+    case class Cancel[T](receiver: String, scenario: String) extends Command[T]
   }
 }

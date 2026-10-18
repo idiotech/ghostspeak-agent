@@ -10,7 +10,7 @@ import org.apache.pekko.persistence.typed.scaladsl.{
   EventSourcedBehavior,
   RetentionCriteria
 }
-import tw.idv.idiotech.ghostspeak.agent.Actuator.Command.Perform
+import tw.idv.idiotech.ghostspeak.agent.Actuator.Command.{ Cancel, Perform }
 import tw.idv.idiotech.ghostspeak.agent.{
   Actuator,
   EventBase,
@@ -307,6 +307,8 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
             val redisKey = s"action-${message.scenarioId}-$user"
             logger.debug(s"deleting user from redis: $redisKey")
             redis.withClient(r => r.del(redisKey))
+            // delayed actions of the left run would otherwise reach the user's next run
+            actuator ! Cancel(user, message.scenarioId)
             Effect.persist(Event(List(Node.leave), message, Nil))
           case Right(EventPayload.PerformDirectly(action)) =>
             simplyPerform(action)
