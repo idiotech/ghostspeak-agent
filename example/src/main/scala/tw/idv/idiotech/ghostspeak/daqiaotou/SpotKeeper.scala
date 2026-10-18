@@ -1,6 +1,7 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
 import io.circe.Codec
+import tw.idv.idiotech.ghostspeak.agent.jsoncodec.FreshDefault
 import tw.idv.idiotech.ghostspeak.agent.jsoncodec.semiauto.deriveConfiguredCodec
 
 import org.apache.pekko.Done
@@ -11,7 +12,7 @@ import org.apache.pekko.persistence.typed.scaladsl.{ Effect, EventSourcedBehavio
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.syntax._
-import io.circe.{ Decoder, Encoder, Printer }
+import io.circe.{ Decoder, Encoder, Json, Printer }
 import tw.idv.idiotech.ghostspeak.agent.Actuator.Command.Perform
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Command
 import tw.idv.idiotech.ghostspeak.agent.SystemPayload.Join
@@ -235,7 +236,9 @@ object SpotKeeper {
   }
 
   object Spot {
-    implicit val codecForSpot: Codec.AsObject[Spot] = deriveConfiguredCodec[Spot]
+    // a Spot uploaded without an id gets a new one, as the constructor does
+    implicit val codecForSpot: Codec.AsObject[Spot] =
+      FreshDefault(deriveConfiguredCodec[Spot], "id")(Json.fromString(s"SPOT-${UUID.randomUUID()}"))
   }
 
   sealed trait SpotPayload

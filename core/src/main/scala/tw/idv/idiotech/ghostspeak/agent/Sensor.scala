@@ -1,6 +1,7 @@
 package tw.idv.idiotech.ghostspeak.agent
 
-import io.circe.Codec
+import io.circe.{ Codec, Json }
+import tw.idv.idiotech.ghostspeak.agent.jsoncodec.FreshDefault
 import tw.idv.idiotech.ghostspeak.agent.jsoncodec.semiauto.deriveConfiguredCodec
 
 import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors }
@@ -206,10 +207,17 @@ object Sensor {
         extends Event
 
     object Created {
-      implicit val codecForCreated: Codec.AsObject[Created] = deriveConfiguredCodec[Created]
+      private[Event] def newUniqueId: Json = Json.fromString(UUID.randomUUID().toString)
+
+      // a Created without a uniqueId (older events) gets a new one, as the constructor does
+      implicit val codecForCreated: Codec.AsObject[Created] =
+        FreshDefault(deriveConfiguredCodec[Created], "uniqueId")(newUniqueId)
     }
 
-    implicit val codecForEvent: Codec.AsObject[Event] = deriveConfiguredCodec[Event]
+    implicit val codecForEvent: Codec.AsObject[Event] =
+      FreshDefault(deriveConfiguredCodec[Event], "uniqueId", onlyForType = Some("CREATED"))(
+        Created.newUniqueId
+      )
   }
 
   case class Identifier(engine: String, scenarioId: String)

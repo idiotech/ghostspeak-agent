@@ -6,7 +6,7 @@ import com.typesafe.config.ConfigFactory
 import enumeratum.EnumEntry.UpperSnakecase
 import enumeratum.{ CirceEnum, Enum, EnumEntry }
 import io.circe.{ Decoder, Encoder, Json }
-import tw.idv.idiotech.ghostspeak.agent.jsoncodec.Configuration
+import tw.idv.idiotech.ghostspeak.agent.jsoncodec.{ Configuration, FreshDefault }
 import tw.idv.idiotech.ghostspeak.agent.jsoncodec.semiauto._
 import io.circe.config.syntax._
 
@@ -120,8 +120,11 @@ package object agent {
       }
     }
 
+    // Modal.time defaults to the time of decoding
     implicit val codecForSystemPayload: Codec.AsObject[SystemPayload] =
-      deriveConfiguredCodec[SystemPayload]
+      FreshDefault(deriveConfiguredCodec[SystemPayload], "time", onlyForType = Some("MODAL"))(
+        Json.fromLong(System.currentTimeMillis())
+      )
   }
 
   // Events for server to process
