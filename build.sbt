@@ -72,7 +72,7 @@ libraryDependencies in ThisBuild ++= Seq(
   "org.apache.logging.log4j" % "log4j-slf4j2-impl" % "2.23.1",
   "org.apache.logging.log4j" % "log4j-core" % "2.23.1",
   "org.apache.logging.log4j" % "log4j-api" % "2.23.1",
-  "org.scalatest" %% "scalatest" % "3.1.0" % Test
+  "org.scalatest" %% "scalatest" % "3.2.19" % Test
 ) ++ log
 
 
