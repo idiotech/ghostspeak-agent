@@ -96,6 +96,21 @@ class RedisStoreTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     store.hgetAll(key("missing")) mustBe empty
   }
 
+  it must "serve many concurrent operations" in {
+    // EventRoutes deletes every fetched action in parallel; the pool must not cap them at 8
+    requireRedis()
+    import scala.concurrent.{ Await, Future }
+    import scala.concurrent.duration._
+    implicit val ec: scala.concurrent.ExecutionContext =
+      scala.concurrent.ExecutionContext.fromExecutor(java.util.concurrent.Executors.newFixedThreadPool(50))
+    val k = key("concurrent")
+    val writes = Future.traverse((1 to 50).toList)(i => Future(store.hset(k, s"a$i", s"v$i")))
+    Await.result(writes, 10.seconds)
+    store.hgetAll(k).size mustBe 50
+    Await.result(Future.traverse((1 to 50).toList)(i => Future(store.hdel(k, s"a$i"))), 10.seconds)
+    store.hgetAll(k) mustBe empty
+  }
+
   it must "delete one field, then the whole key" in {
     requireRedis()
     val k = key("delete")

@@ -50,7 +50,7 @@ libraryDependencies in ThisBuild ++= Seq(
   "org.virtuslab.psh" %% "circe-pekko-serializer" % "0.8.0",
   "org.virtuslab.psh" %% "annotation" % "0.8.0",
   "org.apache.pekko" %% "pekko-connectors-google-fcm" % "1.0.2",
-  "net.debasishg" %% "redisclient" % "3.41",
+  "redis.clients" % "jedis" % "5.1.5",
 //  "com.twitter" %% "chill" % "0.10.0",
 //  "com.twitter" %% "chill-pekko" % "0.10.0",
 //  "io.altoo" %% "pekko-kryo-serialization" && "",
