@@ -196,15 +196,19 @@ object Actuator {
     }
 
     object Performance {
+
       implicit def codecForPerformance[T: Encoder: Decoder]: Codec.AsObject[Performance[T]] = {
-        implicit val actionCodec: Codec[Action[T]] = Codec.from(Action.decoder[T], Action.encoder[T])
+        implicit val actionCodec: Codec[Action[T]] =
+          Codec.from(Action.decoder[T], Action.encoder[T])
         deriveCodec[Performance[T]]
       }
     }
 
-    case class ActionDone[T](actions: Set[Performance[T]] = Set.empty[Performance[T]]) extends Event[T]
+    case class ActionDone[T](actions: Set[Performance[T]] = Set.empty[Performance[T]])
+        extends Event[T]
 
     object ActionDone {
+
       implicit def codecForActionDone[T: Encoder: Decoder]: Codec.AsObject[ActionDone[T]] =
         deriveCodec[ActionDone[T]]
     }
@@ -213,9 +217,11 @@ object Actuator {
       deriveConfiguredCodec[Event[T]]
   }
 
-  case class State[T](pendingActions: Set[Event.Performance[T]] = Set.empty[Event.Performance[T]]) extends EventBase
+  case class State[T](pendingActions: Set[Event.Performance[T]] = Set.empty[Event.Performance[T]])
+      extends EventBase
 
   object State {
+
     implicit def codecForState[T: Encoder: Decoder]: Codec.AsObject[State[T]] =
       deriveCodec[State[T]]
   }

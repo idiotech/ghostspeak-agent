@@ -236,6 +236,7 @@ object SpotKeeper {
   }
 
   object Spot {
+
     // a Spot uploaded without an id gets a new one, as the constructor does
     implicit val codecForSpot: Codec.AsObject[Spot] =
       FreshDefault(deriveConfiguredCodec[Spot], "id")(Json.fromString(s"SPOT-${UUID.randomUUID()}"))

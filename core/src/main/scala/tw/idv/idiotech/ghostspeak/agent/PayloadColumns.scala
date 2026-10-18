@@ -10,16 +10,16 @@ import scala.concurrent.duration._
 import scala.concurrent.Await
 import scala.util.control.NonFatal
 
-/** The MySQL schema that pekko-persistence-jdbc creates stores journal events and snapshots in
-  * BLOB columns, which hold at most 64 KB. A Created event carries a whole scenario template, and
-  * a snapshot of a sensor holds every scenario, so either can be bigger: in strict mode the insert
+/** The MySQL schema that pekko-persistence-jdbc creates stores journal events and snapshots in BLOB
+  * columns, which hold at most 64 KB. A Created event carries a whole scenario template, and a
+  * snapshot of a sensor holds every scenario, so either can be bigger: in strict mode the insert
   * fails, and otherwise MySQL truncates it into JSON that no longer decodes.
   *
-  * At startup the payload columns are checked. If one is still a BLOB, the server logs the SQL
-  * that widens it to LONGBLOB, and runs it only when ghostspeak.widen-payload-columns
-  * (WIDEN_PAYLOAD_COLUMNS=true) is set: the ALTER copies the whole table and locks it meanwhile,
-  * so it belongs in one deliberate deploy (or done by hand), not in every pod's startup. Nothing
-  * here stops the server from starting: a failed check or ALTER is logged.
+  * At startup the payload columns are checked. If one is still a BLOB, the server logs the SQL that
+  * widens it to LONGBLOB, and runs it only when ghostspeak.widen-payload-columns
+  * (WIDEN_PAYLOAD_COLUMNS=true) is set: the ALTER copies the whole table and locks it meanwhile, so
+  * it belongs in one deliberate deploy (or done by hand), not in every pod's startup. Nothing here
+  * stops the server from starting: a failed check or ALTER is logged.
   */
 object PayloadColumns extends LazyLogging {
 
@@ -79,7 +79,7 @@ object PayloadColumns extends LazyLogging {
             )
             dataType match {
               case Some(t) if t.equalsIgnoreCase("longblob") => ()
-              case Some(t) if widen =>
+              case Some(t) if widen                          =>
                 logger.warn(s"widening $c from $t to LONGBLOB: ${c.widenSql}")
                 // no timeout: the ALTER takes as long as copying the table does
                 Await.result(db.run(sqlu"#${c.widenSql}").map(_ => ()), Duration.Inf)

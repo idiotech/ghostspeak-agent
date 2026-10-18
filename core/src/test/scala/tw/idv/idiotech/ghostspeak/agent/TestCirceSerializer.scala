@@ -11,8 +11,8 @@ class TestCirceSerializer extends Serializer {
 
   override def toBinary(o: AnyRef): Array[Byte] = {
     val json = o match {
-      case e: Sensor.Event   => e.asJson
-      case e: Sensor.State   => e.asJson
+      case e: Sensor.Event      => e.asJson
+      case e: Sensor.State      => e.asJson
       case e: Actuator.Event[_] => e.asInstanceOf[Actuator.Event[String]].asJson
       case e: Actuator.State[_] => e.asInstanceOf[Actuator.State[String]].asJson
     }
@@ -25,7 +25,8 @@ class TestCirceSerializer extends Serializer {
     val result =
       if (classOf[Sensor.Event].isAssignableFrom(c)) decode[Sensor.Event](string)
       else if (classOf[Sensor.State].isAssignableFrom(c)) decode[Sensor.State](string)
-      else if (classOf[Actuator.Event[_]].isAssignableFrom(c)) decode[Actuator.Event[String]](string)
+      else if (classOf[Actuator.Event[_]].isAssignableFrom(c))
+        decode[Actuator.Event[String]](string)
       else decode[Actuator.State[String]](string)
     result.fold(throw _, identity)
   }

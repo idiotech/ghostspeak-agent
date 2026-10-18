@@ -19,7 +19,9 @@ class FreshDefaultsTest extends AnyFlatSpec with Matchers {
 
   "a Created event without a uniqueId" must "get a new uniqueId on every decode" in {
     val json = """{"scenario":{"id":"s","engine":"graphscript","template":"[]"},"type":"CREATED"}"""
-    val ids = (1 to 3).map(_ => decode[Sensor.Event](json).toOption.get.asInstanceOf[Sensor.Event.Created].uniqueId)
+    val ids = (1 to 3).map(_ =>
+      decode[Sensor.Event](json).toOption.get.asInstanceOf[Sensor.Event.Created].uniqueId
+    )
     ids.distinct.size mustBe 3
   }
 
@@ -30,10 +32,11 @@ class FreshDefaultsTest extends AnyFlatSpec with Matchers {
   }
 
   "a MODAL payload without a time" must "get the current time on every decode" in {
-    val json = """{"id":"m","receiver":"ghost","sender":"u","payload":{"modality":"DONE","type":"MODAL"},"scenarioId":"s"}"""
+    val json =
+      """{"id":"m","receiver":"ghost","sender":"u","payload":{"modality":"DONE","type":"MODAL"},"scenarioId":"s"}"""
     def time() = decode[Message](json).toOption.get.payload match {
       case Left(SystemPayload.Modal(_, t)) => t
-      case other                          => fail(s"not a modal: $other")
+      case other                           => fail(s"not a modal: $other")
     }
     val first = time()
     Thread.sleep(20)

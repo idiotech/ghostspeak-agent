@@ -247,6 +247,7 @@ object Sensor {
   }
 
   object State {
+
     // Snapshots store each scenario once, in `scenarios`, and each category as the list of its
     // scenario ids in order (newest first, as `add` builds it), rather than repeating every
     // Created (template included) once per category.

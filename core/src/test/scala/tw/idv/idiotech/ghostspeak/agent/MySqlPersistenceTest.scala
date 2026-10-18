@@ -200,7 +200,7 @@ class MySqlPersistenceTest extends AnyWordSpec with Matchers with BeforeAndAfter
           """)
         .withFallback(system.settings.config)
       PayloadColumns.columns(withSchema).map(_.qualifiedTable) shouldBe
-        List(s"`$database`.`event_journal`", s"`$database`.`snapshot`")
+      List(s"`$database`.`event_journal`", s"`$database`.`snapshot`")
       checkColumns(withSchema, widen = true)
       payloadTypes shouldBe (("longblob", "longblob"))
     }

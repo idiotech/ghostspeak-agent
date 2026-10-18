@@ -66,8 +66,10 @@ class PersistenceConfigTest extends AnyFlatSpec with Matchers {
     // not set on the store, so Pekko's plugin fallback (false) applies
     val config = loadWithReference()
     config.hasPath("jdbc-snapshot-store.snapshot-is-optional") mustBe false
-    config.getBoolean("pekko.persistence.snapshot-store-plugin-fallback.snapshot-is-optional") mustBe
-      false
+    config.getBoolean(
+      "pekko.persistence.snapshot-store-plugin-fallback.snapshot-is-optional"
+    ) mustBe
+    false
   }
 
   "the replay-on-error snapshot store" must "be the same store, skipping unreadable snapshots" in {
