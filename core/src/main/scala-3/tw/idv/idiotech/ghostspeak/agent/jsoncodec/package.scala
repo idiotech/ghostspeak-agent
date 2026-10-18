@@ -5,8 +5,8 @@ import io.circe.derivation.{ ConfiguredCodec, ConfiguredDecoder, ConfiguredEncod
 
 import scala.deriving.Mirror
 
-/** Configured circe derivation, Scala 3 side: circe's built-in io.circe.derivation. Same names
-  * as the Scala 2 side (src/main/scala-2), which uses circe-generic-extras.
+/** Configured circe derivation, Scala 3 side: circe's built-in io.circe.derivation. Same names as
+  * the Scala 2 side (src/main/scala-2), which uses circe-generic-extras.
   */
 type Configuration = io.circe.derivation.Configuration
 val Configuration: io.circe.derivation.Configuration.type = io.circe.derivation.Configuration

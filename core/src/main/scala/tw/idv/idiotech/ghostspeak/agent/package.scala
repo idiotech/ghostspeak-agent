@@ -199,7 +199,6 @@ package object agent {
     implicit val codecForAgentConf: Codec.AsObject[AgentConf] = deriveConfiguredCodec[AgentConf]
   }
 
-  lazy val agentConfig: AgentConf = {
+  lazy val agentConfig: AgentConf =
     ConfigFactory.load().as[AgentConf]("app").fold(throw _, identity)
-  }
 }

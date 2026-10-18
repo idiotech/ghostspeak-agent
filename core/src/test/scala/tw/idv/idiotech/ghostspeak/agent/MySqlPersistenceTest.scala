@@ -18,8 +18,8 @@ import scala.concurrent.duration._
 import scala.concurrent.{ Await, Future }
 
 /** Runs the real JDBC journal and snapshot store against MySQL. Opt-in: set
-  * GHOSTSPEAK_IT_MYSQL_HOST (and optionally _PORT, _USER, _PASSWORD); the test creates and
-  * drops its own database. Without it every test is canceled, not failed.
+  * GHOSTSPEAK_IT_MYSQL_HOST (and optionally _PORT, _USER, _PASSWORD); the test creates and drops
+  * its own database. Without it every test is canceled, not failed.
   */
 class MySqlPersistenceTest extends AnyWordSpec with Matchers with BeforeAndAfterAll {
 

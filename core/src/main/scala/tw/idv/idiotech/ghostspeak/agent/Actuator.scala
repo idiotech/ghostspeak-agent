@@ -107,7 +107,8 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
       case Timeout() =>
         val current = System.currentTimeMillis()
         logger.info(
-          s"total queue at $current: ${state.pendingActions.map(x => s"${x.action.id} ${x.startTime}")}"
+          s"total queue at $current: ${state.pendingActions
+              .map(x => s"${x.action.id} ${x.startTime}")}"
         )
         val toExecute = state.pendingActions.filter(_.startTime <= current)
         logger.info(s"ready to execute: ${toExecute.map(_.action.id)}")

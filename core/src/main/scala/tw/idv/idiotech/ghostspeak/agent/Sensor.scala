@@ -53,7 +53,7 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
           .fold[StatusReply[String]] {
             logger.info(
               s"no such scenario: ${message.scenarioId} $id in children ${ctx.children
-                .map(_.path)} at ${state.scenarios.map(p => p._1 + p._2.uniqueId)} for message $message"
+                  .map(_.path)} at ${state.scenarios.map(p => p._1 + p._2.uniqueId)} for message $message"
             )
             StatusReply.Error("no such scenario")
           } { actor =>

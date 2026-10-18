@@ -3,8 +3,8 @@ package tw.idv.idiotech.ghostspeak.agent.util
 import tw.idv.idiotech.ghostspeak.agent.{ Action, Message }
 
 /** Replaces the top-level fields of a Message or an Action whose value is exactly `original`
-  * (scripts use "?u" for the user ID). Only fields whose value is a String count; strings inside
-  * an Option, a payload, a session or a content are left alone.
+  * (scripts use "?u" for the user ID). Only fields whose value is a String count; strings inside an
+  * Option, a payload, a session or a content are left alone.
   */
 object substitute {
 

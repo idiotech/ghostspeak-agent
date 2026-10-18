@@ -6,16 +6,16 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
 import tw.idv.idiotech.ghostspeak.agent
 import tw.idv.idiotech.ghostspeak.agent.{
+  Action => BaseAction,
   Actuator,
   CategoryManager,
+  Message => BaseMessage,
   Metadata,
   Modality,
   Scenario,
   Sensor,
   Session,
-  SystemPayload,
-  Action => BaseAction,
-  Message => BaseMessage
+  SystemPayload
 }
 import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.{ ActTime, Comparison, Node, Precondition }
 import tw.idv.idiotech.ghostspeak.daqiaotou.SpotKeeper.{ Spot, SpotPayload }
@@ -87,7 +87,7 @@ class GoldenJsonTest extends AnyFlatSpec with Matchers {
     ),
     "popup-dismissal" -> Task.PopupDismissal(Set(Destination.Alert)),
     "incoming-call"   -> Task.IncomingCall("Juliet", IncomingCallType.Connecting, "p.png"),
-    "sound-static" -> Task.Sound(
+    "sound-static"    -> Task.Sound(
       "https://example.com/a.mp3",
       Volume.StaticVolume(Some(12), 5, 2, Some(mainVolume)),
       SoundType.Main
@@ -105,10 +105,10 @@ class GoldenJsonTest extends AnyFlatSpec with Matchers {
     "marker"         -> Task.Marker(location, "icon.png", "Balcony", Some("a-popup")),
     "marker-removal" -> Task.MarkerRemoval("a-marker"),
     "map-style"      -> Task.MapStyle(Some("https://example.com/style"), true),
-    "intro-image" -> Task
+    "intro-image"    -> Task
       .IntroImage(Some("bg.png"), Some("logo.png"), Some(1.5f), None, Some(20f), None),
-    "button-style" -> Task.ButtonStyle("#000000", "#ffffff"),
-    "popup-style"  -> Task.PopupStyle("#ff0000"),
+    "button-style"     -> Task.ButtonStyle("#000000", "#ffffff"),
+    "popup-style"      -> Task.PopupStyle("#ff0000"),
     "variable-updates" -> Task.VariableUpdates(
       List(
         VariableUpdate("score", Operation.+, 2),

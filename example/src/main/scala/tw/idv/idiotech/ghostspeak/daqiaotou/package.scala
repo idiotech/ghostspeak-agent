@@ -56,9 +56,8 @@ package object daqiaotou {
       deriveConfiguredCodec[DaqiaotouConf]
   }
 
-  lazy val config: DaqiaotouConf = {
+  lazy val config: DaqiaotouConf =
     ConfigFactory.load().as[DaqiaotouConf]("app").fold(throw _, identity)
-  }
 
   lazy val redis = new RedisStore(config.redis.host, config.redis.port)
 

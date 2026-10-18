@@ -227,7 +227,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
 
   def textMatches(reply: String, answer: String): Boolean =
     answer match {
-      case regexPattern(text) => text.r.matches(reply)
+      case regexPattern(text)    => text.r.matches(reply)
       case containsPattern(text) =>
         reply.filterNot(_.isWhitespace).contains(text.filterNot(_.isWhitespace))
       case text => text.filterNot(_.isWhitespace) == reply.filterNot(_.isWhitespace)
@@ -310,7 +310,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
                 )
                 action.content.task match {
                   case vu: VariableUpdates => vu.updates
-                  case _ =>
+                  case _                   =>
                     actuator ! Perform(action, startTime)
                     Nil
                 }
@@ -407,8 +407,8 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
         if (message.sender != "!you123")
           s"COMMAND: ${message.sender}, ${message.actionId.getOrElse("")}"
         else ""
-      case Command.Broadcast(message, replyTo)                                         => "braodcast"
-      case Command.Create(scenario, replyTo)                                           => "create"
+      case Command.Broadcast(message, replyTo) => "braodcast"
+      case Command.Create(scenario, replyTo)   => "create"
       case Command.Query(isPublic, isFeatured, category, scenarioId, passode, replyTo) => "query"
 //      case Command.Destroy(scenarioId, replyTo) => "destroy"
     }
