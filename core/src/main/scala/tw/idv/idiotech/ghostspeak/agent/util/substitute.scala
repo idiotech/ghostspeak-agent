@@ -10,7 +10,12 @@ object substitute {
 
   def apply[T](m: Message[T], original: String, updated: String): Message[T] = {
     def s(v: String) = if (v == original) updated else v
-    m.copy(id = s(m.id), receiver = s(m.receiver), sender = s(m.sender), scenarioId = s(m.scenarioId))
+    m.copy(
+      id = s(m.id),
+      receiver = s(m.receiver),
+      sender = s(m.sender),
+      scenarioId = s(m.scenarioId)
+    )
   }
 
   def apply[C](a: Action[C], original: String, updated: String): Action[C] = {

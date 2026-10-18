@@ -31,7 +31,7 @@ class SubstituteTest extends AnyFlatSpec with Matchers {
     val action = Action[String]("?u", "?u", "?u", "?u", Session("?u", Some("?u")), Some("?u"))
     // content is replaced too when it is itself a String (in production it is a Content)
     substitute(action, "?u", "amy") mustBe
-      Action[String]("amy", "amy", "amy", "amy", Session("?u", Some("?u")), Some("?u"))
+    Action[String]("amy", "amy", "amy", "amy", Session("?u", Some("?u")), Some("?u"))
   }
 
   it must "leave a non-String content alone" in {

@@ -102,7 +102,9 @@ class RedisStoreTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     import scala.concurrent.{ Await, Future }
     import scala.concurrent.duration._
     implicit val ec: scala.concurrent.ExecutionContext =
-      scala.concurrent.ExecutionContext.fromExecutor(java.util.concurrent.Executors.newFixedThreadPool(50))
+      scala.concurrent.ExecutionContext.fromExecutor(
+        java.util.concurrent.Executors.newFixedThreadPool(50)
+      )
     val k = key("concurrent")
     val writes = Future.traverse((1 to 50).toList)(i => Future(store.hset(k, s"a$i", s"v$i")))
     Await.result(writes, 10.seconds)
