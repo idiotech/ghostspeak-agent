@@ -1,0 +1,10 @@
+{
+  "id" : "m1",
+  "actionId" : null,
+  "receiver" : "ghost",
+  "sender" : "Romeo",
+  "payload" : {
+    "type" : "JOIN"
+  },
+  "scenarioId" : "scn-1"
+}

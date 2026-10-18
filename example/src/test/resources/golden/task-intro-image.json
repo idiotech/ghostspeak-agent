@@ -1,0 +1,9 @@
+{
+  "backgroundUrl" : "bg.png",
+  "logoUrl" : "logo.png",
+  "logoMarginTop" : 1.5,
+  "logoWidth" : null,
+  "logoHeight" : 20.0,
+  "mapLogoUrl" : null,
+  "type" : "INTRO_IMAGE"
+}

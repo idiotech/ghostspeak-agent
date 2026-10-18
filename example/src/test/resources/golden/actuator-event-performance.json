@@ -1,0 +1,40 @@
+{
+  "action" : {
+    "id" : "a1",
+    "receiver" : "Romeo",
+    "sender" : "Juliet",
+    "content" : {
+      "task" : {
+        "text" : "Do you love me?",
+        "choices" : [
+          "yes",
+          "no"
+        ],
+        "allowTextReply" : true,
+        "pictures" : [
+          "https://example.com/a.jpg"
+        ],
+        "destinations" : [
+          "APP",
+          "NOTIFICATION"
+        ],
+        "closeAlertAfterReply" : false,
+        "clearDialog" : true,
+        "type" : "POPUP"
+      },
+      "condition" : {
+        "type" : "ALWAYS"
+      },
+      "exclusiveWith" : [
+        "other"
+      ]
+    },
+    "session" : {
+      "scenario" : "romeo and juliet",
+      "chapter" : "chapter 1"
+    },
+    "description" : null
+  },
+  "startTime" : 1700000000000,
+  "type" : "PERFORMANCE"
+}

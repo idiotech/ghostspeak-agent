@@ -1,0 +1,10 @@
+{
+  "location" : {
+    "lat" : 24.1,
+    "lon" : 120.6
+  },
+  "icon" : "icon.png",
+  "title" : "Balcony",
+  "onClickActionId" : "a-popup",
+  "type" : "MARKER"
+}

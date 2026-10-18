@@ -1,0 +1,33 @@
+{
+  "scenarios" : {
+    "scn-1" : {
+      "scenario" : {
+        "id" : "scn-1",
+        "engine" : "graphscript",
+        "template" : "[]",
+        "name" : "rj",
+        "displayName" : "R&J",
+        "public" : true,
+        "owner" : "o",
+        "ordinal" : 7,
+        "metadata" : {
+          "name" : "rj",
+          "displayName" : "Romeo and Juliet",
+          "description" : "a tragedy",
+          "featured" : true,
+          "public" : true,
+          "passcode" : "1234",
+          "owner" : "owner@example.com",
+          "ordinal" : 42,
+          "categories" : [
+            "drama",
+            "classic"
+          ],
+          "details" : "details",
+          "image" : "cover.png"
+        }
+      },
+      "uniqueId" : "uid-1"
+    }
+  }
+}

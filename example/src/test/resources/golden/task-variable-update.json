@@ -1,0 +1,6 @@
+{
+  "name" : "score",
+  "operation" : "+",
+  "value" : 1,
+  "type" : "VARIABLE_UPDATE"
+}
