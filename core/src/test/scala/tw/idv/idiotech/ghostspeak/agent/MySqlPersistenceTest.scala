@@ -61,7 +61,7 @@ class MySqlPersistenceTest extends AnyWordSpec with Matchers with BeforeAndAfter
 
   private def config: Config = {
     val (host, port, user, password) = env.get
-    ConfigFactory
+    val config = ConfigFactory
       .parseString(s"""
         MYSQL_HOST = "$host"
         MYSQL_PORT = "$port"
@@ -77,6 +77,7 @@ class MySqlPersistenceTest extends AnyWordSpec with Matchers with BeforeAndAfter
       .withFallback(ConfigFactory.parseResources("application.conf"))
       .withFallback(ConfigFactory.defaultReference())
       .resolve()
+    PersistenceSettings.withRecoveryLimit(config) // as the server does
   }
 
   private var testKit: ActorTestKit = _

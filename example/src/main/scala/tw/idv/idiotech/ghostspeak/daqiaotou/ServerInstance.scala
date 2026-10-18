@@ -1,7 +1,7 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
 import org.apache.pekko.actor.typed.ActorSystem
-import tw.idv.idiotech.ghostspeak.agent.{ Actuator, Sensor, Server }
+import tw.idv.idiotech.ghostspeak.agent.{ Actuator, PersistenceSettings, Sensor, Server }
 import tw.idv.idiotech.ghostspeak.daqiaotou.SpotKeeper.SpotPayload
 
 object ServerInstance extends App {
@@ -17,7 +17,8 @@ object ServerInstance extends App {
         "0.0.0.0",
         8080
       ),
-      "BuildJobsServer"
+      "BuildJobsServer",
+      PersistenceSettings.load()
     )
 
   val spotKeeperSensor = new Sensor[SpotPayload]
@@ -32,7 +33,8 @@ object ServerInstance extends App {
         "0.0.0.0",
         8081
       ),
-      "BuildJobsServer"
+      "BuildJobsServer",
+      PersistenceSettings.load()
     )
 
   if (config.engine == "graphscript") {

@@ -23,6 +23,15 @@ class PersistenceConfigTest extends AnyFlatSpec with Matchers {
       .withFallback(ConfigFactory.defaultReference())
       .resolve(ConfigResolveOptions.noSystem())
 
+  def recoveryLimit(config: Config): Int =
+    PersistenceSettings
+      .withRecoveryLimit(config.withFallback(ConfigFactory.defaultReference()))
+      .getInt("pekko.persistence.max-concurrent-recoveries")
+
+  "max-concurrent-recoveries" must "be at least 1, even with a pool of one connection" in {
+    recoveryLimit(load("MYSQL_POOL_SIZE" -> "1")) mustBe 1
+  }
+
   "the persistence plugins" must "all use the one shared database" in {
     val config = load()
     for (plugin <- Seq("jdbc-journal", "jdbc-snapshot-store", "jdbc-read-journal")) {
@@ -33,23 +42,23 @@ class PersistenceConfigTest extends AnyFlatSpec with Matchers {
     "slick.jdbc.MySQLProfile$"
   }
 
-  "the shared pool" must "default to 20 connections, with recoveries capped to match" in {
+  "the shared pool" must "default to 20 connections, with recoveries capped at half of it" in {
     val config = load()
     config.getInt("pekko-persistence-jdbc.shared-databases.slick.db.numThreads") mustBe 20
     config.getInt("pekko-persistence-jdbc.shared-databases.slick.db.maxConnections") mustBe 20
-    config.getInt("pekko.persistence.max-concurrent-recoveries") mustBe 20
+    recoveryLimit(config) mustBe 10
   }
 
   it must "follow MYSQL_POOL_SIZE" in {
     val config = load("MYSQL_POOL_SIZE" -> "8")
     config.getInt("pekko-persistence-jdbc.shared-databases.slick.db.numThreads") mustBe 8
     config.getInt("pekko-persistence-jdbc.shared-databases.slick.db.maxConnections") mustBe 8
-    config.getInt("pekko.persistence.max-concurrent-recoveries") mustBe 8
+    recoveryLimit(config) mustBe 4
   }
 
   "max-concurrent-recoveries" must "follow MAX_CONCURRENT_RECOVERIES" in {
     val config = load("MYSQL_POOL_SIZE" -> "30", "MAX_CONCURRENT_RECOVERIES" -> "10")
-    config.getInt("pekko.persistence.max-concurrent-recoveries") mustBe 10
+    recoveryLimit(config) mustBe 10
     config.getInt("pekko-persistence-jdbc.shared-databases.slick.db.maxConnections") mustBe 30
   }
 
