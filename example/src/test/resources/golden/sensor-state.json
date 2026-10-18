@@ -29,5 +29,13 @@
       },
       "uniqueId" : "uid-1"
     }
+  },
+  "categories" : {
+    "drama" : [
+      "scn-1"
+    ],
+    "classic" : [
+      "scn-1"
+    ]
   }
 }

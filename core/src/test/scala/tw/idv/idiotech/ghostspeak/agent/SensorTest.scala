@@ -130,11 +130,34 @@ class SensorTest
       state.scenariosByCategory.view.mapValues(_.toSet).toMap
     }
 
+    "keep each category's order, as replaying the journal builds it" in {
+      // newest first; re-adding a scenario moves it to the front
+      val ids = (1 to 40).map(i => s"s$i")
+      val state = ids.foldLeft(Sensor.State())((s, id) => s.add(categorised(id, "cat")))
+        .add(categorised("s7", "cat"))
+      val restored = decode[Sensor.State](state.asJson.noSpaces).toOption.get
+      restored.scenariosByCategory("cat").map(_.scenario.id) shouldBe
+        state.scenariosByCategory("cat").map(_.scenario.id)
+      restored shouldBe state
+    }
+
+    "decode a snapshot that has no category lists (written before they were stored)" in {
+      val state = Sensor.State().add(categorised("s1", "a", "b")).add(categorised("s2", "a"))
+      val legacy = state.asJson.hcursor.downField("categories").delete.top.get
+      val restored = legacy.as[Sensor.State].toOption.get
+      restored.scenarios shouldBe state.scenarios
+      restored.scenariosByCategory.view.mapValues(_.toSet).toMap shouldBe
+        state.scenariosByCategory.view.mapValues(_.toSet).toMap
+    }
+
     "store each scenario once, not again per category" in {
       val state = Sensor.State().add(categorised("s1", "a", "b", "c"))
       val json = state.asJson
-      json.hcursor.keys.get.toList shouldBe List("scenarios")
-      "\"s1\"".r.findAllMatchIn(json.noSpaces).size shouldBe 2 // map key + scenario.id
+      json.hcursor.keys.get.toList shouldBe List("scenarios", "categories")
+      json.hcursor.downField("categories").focus.get shouldBe
+        io.circe.parser.parse("""{"a":["s1"],"b":["s1"],"c":["s1"]}""").toOption.get
+      // the scenario itself appears once: map key + scenario.id (+ one id per category)
+      "\"s1\"".r.findAllMatchIn(json.noSpaces).size shouldBe 5
     }
   }
 }

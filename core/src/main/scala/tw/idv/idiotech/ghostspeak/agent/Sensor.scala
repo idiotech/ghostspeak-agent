@@ -247,14 +247,30 @@ object Sensor {
   }
 
   object State {
-    // Snapshots store only `scenarios`: `scenariosByCategory` repeats every Created (template
-    // included) once per category, so it is rebuilt on load instead of being written out.
-    implicit val encoder: Encoder[State] = Encoder.forProduct1("scenarios")(_.scenarios)
+    // Snapshots store each scenario once, in `scenarios`, and each category as the list of its
+    // scenario ids in order (newest first, as `add` builds it), rather than repeating every
+    // Created (template included) once per category.
+    implicit val encoder: Encoder[State] = Encoder.forProduct2("scenarios", "categories") { s =>
+      (s.scenarios, s.scenariosByCategory.view.mapValues(_.map(_.scenario.id)).toMap)
+    }
 
-    implicit val decoder: Decoder[State] =
-      Decoder.forProduct1("scenarios")((scenarios: Map[String, Created]) =>
-        scenarios.values.foldLeft(State())(_ add _)
+    implicit val decoder: Decoder[State] = Decoder.instance { c =>
+      for {
+        scenarios  <- c.get[Map[String, Created]]("scenarios")
+        categories <- c.get[Option[Map[String, List[String]]]]("categories")
+      } yield State(
+        scenarios,
+        categories match {
+          case Some(ids) => ids.view.mapValues(_.flatMap(scenarios.get)).toMap
+          // snapshots written before the category lists were stored: rebuild them; the order
+          // within a category is then the map's, not the original insertion order
+          case None =>
+            scenarios.values.toList
+              .flatMap(c => c.scenario.metadata.categories.distinct.map(_ -> c))
+              .groupMap(_._1)(_._2)
+        }
       )
+    }
   }
 
   // Root sensors hold one Created per scenario, so their journals stay short.
