@@ -25,9 +25,8 @@ import io.circe.syntax._
 import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.{ Comparison, Node, Precondition }
 import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
-import io.circe.{ Codec, Decoder, Encoder }
-import io.circe.generic.extras.{ Configuration, ConfiguredJsonCodec }
-import io.circe.generic.extras.semiauto.deriveConfiguredCodec
+import io.circe.{ Decoder, Encoder }
+import io.circe.generic.extras.ConfiguredJsonCodec
 import tw.idv.idiotech.ghostspeak.daqiaotou.Task.VariableUpdates
 
 import java.util.UUID
@@ -65,18 +64,18 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
   @ConfiguredJsonCodec
   case class Trigger(message: Message, nodes: List[Node])
 
+  // variables and strings are required, with no defaults, on purpose. Snapshots written before
+  // they were stored lack both fields, so they fail to decode instead of silently coming back
+  // empty. With jdbc-snapshot-store.snapshot-is-optional = true, Pekko then skips such a
+  // snapshot and rebuilds the state by replaying the user's whole journal (events are never
+  // deleted), which restores the real variables and strings.
+  @ConfiguredJsonCodec
   case class StateStorage(
     triggers: List[Trigger],
     exclusions: Map[ActionId, List[NodeId]],
-    variables: Map[String, Int] = Map.empty,
-    strings: Map[String, String] = Map.empty
+    variables: Map[String, Int],
+    strings: Map[String, String]
   )
-
-  object StateStorage {
-    // withDefaults so snapshots written before variables/strings were stored still decode
-    private implicit val configuration: Configuration = Configuration.default.withDefaults
-    implicit val codec: Codec[StateStorage] = deriveConfiguredCodec[StateStorage]
-  }
 
   case class State(
     triggers: Map[Message, List[Node]],
@@ -430,7 +429,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
             case Right(_) => false
           }
         }
-        .withRetention(RetentionCriteria.snapshotEvery(50, 2))
+        .withRetention(RetentionCriteria.snapshotEvery(100, 2))
     }
 
   def createUserScenario(
@@ -477,7 +476,12 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
               val scn = created.scenario
               implicit val script: Map[String, Node] = createScript(scn)
               val actor: Behavior[Sensor.Command[EventPayload]] =
-                sensor.apply(scn.id, createUserScenario(actuatorRef), sensor.onCommandPerUser)
+                sensor.apply(
+                  scn.id,
+                  createUserScenario(actuatorRef),
+                  sensor.onCommandPerUser,
+                  Sensor.PerUserSnapshotEvery
+                )
               ctx.spawn(
                 actor,
                 if (created.uniqueId.nonEmpty) created.uniqueId else UUID.randomUUID().toString

@@ -115,6 +115,22 @@ class ActuatorTest
     }
   }
 
+  "earliestPending" should {
+    "return the earliest future start time, whatever the Set's iteration order" in {
+      val now = 1000000L
+      // more than 4 elements, so pendingActions is a HashSet with no particular order
+      val startTimes = Seq(now + 600, now + 300, now + 900, now + 100, now + 700, now + 500)
+      val pending = startTimes.zipWithIndex.map { case (t, i) => Performance(action(s"a$i"), t) }
+      val state = actuator.State((pending :+ Performance(action("past"), now - 50)).toSet)
+      actuator.earliestPending(state, now) shouldBe now + 100
+    }
+
+    "be Long.MaxValue when nothing is pending in the future" in {
+      val state = actuator.State(Set(Performance(action("past"), 10L)))
+      actuator.earliestPending(state, 1000L) shouldBe Long.MaxValue
+    }
+  }
+
   "Actuator state" should {
     "survive a JSON round-trip, as used for snapshots" in {
       val state = actuator.State(

@@ -82,11 +82,7 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
           Effect.none
         } else {
           logger.info(s"delaying execution: ${action.id}")
-          val earliest =
-            state.pendingActions
-              .map(_.startTime)
-              .find(_ > System.currentTimeMillis())
-              .getOrElse(Long.MaxValue)
+          val earliest = earliestPending(state, System.currentTimeMillis())
           if (startTime <= earliest) {
             logger.info(s"set timer for ${action.id} after ${remainingTime.millis}")
             timer.startSingleTimer(TimerKey, Timeout(), remainingTime.millis)
@@ -122,6 +118,15 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
         Effect.none
     }
   }
+
+  // Start time of the next pending action that is still in the future: the one the timer is
+  // currently set for. pendingActions is an unordered Set, so this must be the minimum.
+  private[agent] def earliestPending(state: State, now: Long): Long =
+    state.pendingActions.iterator
+      .map(_.startTime)
+      .filter(_ > now)
+      .minOption
+      .getOrElse(Long.MaxValue)
 
   def eventHandler(state: State, event: Event): State = event match {
     case p: Performance =>

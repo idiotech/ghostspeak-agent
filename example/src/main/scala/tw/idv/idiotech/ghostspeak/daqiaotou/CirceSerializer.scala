@@ -4,7 +4,7 @@ import org.apache.pekko.serialization.Serializer
 import io.circe.Json
 import io.circe.syntax._
 import io.circe.parser.decode
-import tw.idv.idiotech.ghostspeak.agent.{ CategoryManager, EventBase }
+import tw.idv.idiotech.ghostspeak.agent.{ Actuator, CategoryManager, EventBase }
 import tw.idv.idiotech.ghostspeak.{ agent, daqiaotou }
 
 class CirceSerializer extends Serializer {
@@ -12,32 +12,44 @@ class CirceSerializer extends Serializer {
 
   override def includeManifest: Boolean = true
 
-  import daqiaotou.ServerInstance.scenarioCreator
-  import daqiaotou.ServerInstance.actuator
-  import daqiaotou.ServerInstance.spotKeeperActuator
+  // Only one engine runs per server, and only its actuator persists anything. The graphscript
+  // and spotkeeper actuators are instances of the same Actuator class, so their Event and State
+  // classes are the same at runtime and the manifest cannot tell them apart: decode with the
+  // actuator of the engine that is running, so restored Performances belong to that actuator.
+  private lazy val codec = new CirceCodec(
+    ServerInstance.scenarioCreator,
+    if (config.engine == "spotkeeper") ServerInstance.spotKeeperActuator
+    else ServerInstance.actuator
+  )
 
-  override def toBinary(o: AnyRef): Array[Byte] = {
+  override def toBinary(o: AnyRef): Array[Byte] = codec.toBinary(o)
+
+  override def fromBinary(bytes: Array[Byte], manifest: Option[Class[_]]): AnyRef =
+    codec.fromBinary(bytes, manifest)
+}
+
+class CirceCodec(val scenarioCreator: ScenarioCreator, val actuator: Actuator[Content, _]) {
+
+  def toBinary(o: AnyRef): Array[Byte] = {
     val json: Json = o match {
       case eb: EventBase =>
         eb match {
-          case e: scenarioCreator.Event    => e.asJson
-          case e: scenarioCreator.State    => e.asJson
-          case e: actuator.Event           => e.asJson
-          case e: actuator.State           => e.asJson
-          case e: agent.Sensor.Event       => e.asJson
-          case e: agent.Sensor.State       => e.asJson
-          case e: SpotKeeper.Event         => e.asJson
-          case e: SpotKeeper.State         => e.asJson
-          case e: spotKeeperActuator.Event => e.asJson
-          case e: spotKeeperActuator.State => e.asJson
-          case e: CategoryManager.Event    => e.asJson
-          case e: CategoryManager.State    => e.asJson
+          case e: scenarioCreator.Event => e.asJson
+          case e: scenarioCreator.State => e.asJson
+          case e: actuator.Event        => e.asJson
+          case e: actuator.State        => e.asJson
+          case e: agent.Sensor.Event    => e.asJson
+          case e: agent.Sensor.State    => e.asJson
+          case e: SpotKeeper.Event      => e.asJson
+          case e: SpotKeeper.State      => e.asJson
+          case e: CategoryManager.Event => e.asJson
+          case e: CategoryManager.State => e.asJson
         }
     }
     json.toString.getBytes("UTF-8")
   }
 
-  override def fromBinary(bytes: Array[Byte], manifest: Option[Class[_]]): AnyRef = {
+  def fromBinary(bytes: Array[Byte], manifest: Option[Class[_]]): AnyRef = {
     val sce = classOf[scenarioCreator.Event]
     val scs = classOf[scenarioCreator.State]
     val ae = classOf[actuator.Event]
@@ -46,8 +58,6 @@ class CirceSerializer extends Serializer {
     val ss = classOf[agent.Sensor.State]
     val spe = classOf[daqiaotou.SpotKeeper.Event]
     val sps = classOf[daqiaotou.SpotKeeper.State]
-    val spae = classOf[spotKeeperActuator.Event]
-    val spas = classOf[spotKeeperActuator.State]
     val ce = classOf[CategoryManager.Event]
     val cs = classOf[CategoryManager.State]
     val string = new String(bytes, "UTF-8")
@@ -60,8 +70,6 @@ class CirceSerializer extends Serializer {
       else if (ss.isAssignableFrom(c)) decode[agent.Sensor.State](string)
       else if (spe.isAssignableFrom(c)) decode[daqiaotou.SpotKeeper.Event](string)
       else if (sps.isAssignableFrom(c)) decode[daqiaotou.SpotKeeper.State](string)
-      else if (spae.isAssignableFrom(c)) decode[spotKeeperActuator.Event](string)
-      else if (spas.isAssignableFrom(c)) decode[spotKeeperActuator.State](string)
       else if (ce.isAssignableFrom(c)) decode[CategoryManager.Event](string)
       else if (cs.isAssignableFrom(c)) decode[CategoryManager.State](string)
       else decode[agent.Sensor.State](string)

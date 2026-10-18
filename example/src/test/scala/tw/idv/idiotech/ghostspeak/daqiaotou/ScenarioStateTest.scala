@@ -41,10 +41,10 @@ class ScenarioStateTest extends AnyFlatSpec with Matchers {
     decode[creator.State](state.asJson.noSpaces) mustBe Right(state)
   }
 
-  it must "decode snapshots written without variables and strings" in {
+  it must "refuse snapshots written without variables and strings" in {
+    // Such a snapshot lost the user's variables and strings. Failing to decode it makes Pekko
+    // (snapshot-is-optional = true) replay the whole journal instead of restoring empty maps.
     val legacy = """{"triggers":[],"exclusions":{"action-1":["node-1"]}}"""
-    decode[creator.State](legacy) mustBe Right(
-      creator.State(Map.empty, Map("action-1" -> List("node-1")))
-    )
+    decode[creator.State](legacy).isLeft mustBe true
   }
 }

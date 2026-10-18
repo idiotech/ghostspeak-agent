@@ -32,6 +32,7 @@ object Server {
     Behaviors.setup { ctx =>
       implicit val system = ctx.system
       Await.result(SchemaUtils.createIfNotExists(), Duration.Inf)
+      Await.result(SnapshotSchemaMigration(), Duration.Inf)
       val dummySensor: ActorRef[Sensor.Command[P]] = ctx.spawn(behavior, "RootSensor")
       val categoryManager: ActorRef[CategoryManager.Command] =
         ctx.spawn(CategoryManager(), "CategoryManager")

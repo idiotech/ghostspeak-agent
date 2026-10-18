@@ -92,12 +92,49 @@ class SensorTest
     }
   }
 
+  "Sensor" should {
+    "snapshot at the interval it is given" in {
+      val perUser = EventSourcedBehaviorTestKit[Sensor.Command[String], Sensor.Event, Sensor.State](
+        system,
+        sensor(
+          "per-user",
+          (ctx, _) =>
+            Right(ctx.spawn(Behaviors.ignore[Sensor.Command[String]], UUID.randomUUID().toString)),
+          snapshotEvery = 10
+        ),
+        SerializationSettings.disabled
+      )
+      (1 to 25).foreach(i =>
+        perUser.runCommand[StatusReply[String]](r => Create[String](scenario(s"u$i"), r))
+      )
+      perUser.snapshotTestKit.get
+        .persistedInStorage("sensor-per-user")
+        .map(_._1.sequenceNr) shouldBe
+      Seq(10L, 20L)
+    }
+  }
+
   "Sensor state" should {
+    def categorised(id: String, categories: String*) =
+      Created(scenario(id).copy(metadata = Metadata(categories = categories.toList)))
+
     "survive a JSON round-trip, as used for snapshots" in {
-      val c1 = Created(scenario("s1").copy(metadata = Metadata(categories = List("cat"))))
-      val c2 = Created(scenario("s2"))
-      val state = Sensor.State().add(c1).add(c2)
-      decode[Sensor.State](state.asJson.noSpaces) shouldBe Right(state)
+      val state = Sensor
+        .State()
+        .add(categorised("s1", "cat", "other"))
+        .add(categorised("s2", "cat"))
+        .add(categorised("s3"))
+      val restored = decode[Sensor.State](state.asJson.noSpaces).toOption.get
+      restored.scenarios shouldBe state.scenarios
+      restored.scenariosByCategory.view.mapValues(_.toSet).toMap shouldBe
+      state.scenariosByCategory.view.mapValues(_.toSet).toMap
+    }
+
+    "store each scenario once, not again per category" in {
+      val state = Sensor.State().add(categorised("s1", "a", "b", "c"))
+      val json = state.asJson
+      json.hcursor.keys.get.toList shouldBe List("scenarios")
+      "\"s1\"".r.findAllMatchIn(json.noSpaces).size shouldBe 2 // map key + scenario.id
     }
   }
 }

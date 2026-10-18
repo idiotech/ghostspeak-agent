@@ -139,7 +139,8 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
   def apply(
     name: String,
     createScenario: CreatorScenarioActor,
-    handle: OnCommand = onCommand _
+    handle: OnCommand = onCommand _,
+    snapshotEvery: Int = Sensor.SnapshotEvery
   ): Behavior[Command[P]] =
     Behaviors.setup { context: ActorContext[Command[P]] =>
       EventSourcedBehavior
@@ -149,7 +150,7 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
           commandHandler = handle(context, createScenario),
           eventHandler = onEvent
         )
-        .withRetention(RetentionCriteria.snapshotEvery(100, 2))
+        .withRetention(RetentionCriteria.snapshotEvery(snapshotEvery, 2))
         .receiveSignal { case (state, RecoveryCompleted) =>
           val scns = state.scenarios.values.map(s => createScenario(context, s))
           logger.info(s"====== recovery complete for $name")
@@ -208,7 +209,6 @@ object Sensor {
   @ConfiguredJsonCodec
   case class Identifier(engine: String, scenarioId: String)
 
-  @ConfiguredJsonCodec
   case class State(
     scenarios: Map[String, Created] = Map.empty,
     scenariosByCategory: Map[String, List[Created]] = Map.empty
@@ -228,6 +228,25 @@ object Sensor {
         scenariosByCategory.view.mapValues(_.filterNot(_.scenario.id == d.scenarioId)).toMap
       )
   }
+
+  object State {
+    // Snapshots store only `scenarios`: `scenariosByCategory` repeats every Created (template
+    // included) once per category, so it is rebuilt on load instead of being written out.
+    implicit val encoder: Encoder[State] = Encoder.forProduct1("scenarios")(_.scenarios)
+
+    implicit val decoder: Decoder[State] =
+      Decoder.forProduct1("scenarios")((scenarios: Map[String, Created]) =>
+        scenarios.values.foldLeft(State())(_ add _)
+      )
+  }
+
+  // Root sensors hold one Created per scenario, so their journals stay short.
+  val SnapshotEvery = 100
+
+  // Per-user sensors (onCommandPerUser) hold one Created per user, and every snapshot rewrites
+  // all of them, so snapshotting every 100 users would make total snapshot bytes grow with the
+  // square of the user count. Replaying up to 1000 small Created events is cheap.
+  val PerUserSnapshotEvery = 1000
 
   sealed trait Command[P] extends CommandBase
 
