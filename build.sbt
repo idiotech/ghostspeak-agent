@@ -58,7 +58,6 @@ libraryDependencies in ThisBuild ++= Seq(
   "com.beachape" %% "enumeratum-circe" % enumeratumVersion,
   "com.github.pjfanning" %% "pekko-http-circe" % "2.4.0",
   "com.github.andyglow" %% "scala-jsonschema-circe-json" % "0.7.11",
-  "com.chuusai" %% "shapeless" % "2.3.9",
   "com.softwaremill.retry" %% "retry" % "0.3.6",
   "io.circe"        %% "circe-generic"       % circeVersion,
   "io.circe"        %% "circe-generic-extras"       % "0.14.3",
