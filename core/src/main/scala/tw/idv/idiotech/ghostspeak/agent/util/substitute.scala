@@ -8,8 +8,11 @@ import tw.idv.idiotech.ghostspeak.agent.{ Action, Message }
   */
 object substitute {
 
+  private def replace(original: String, updated: String)(v: String): String =
+    if (v == original) updated else v
+
   def apply[T](m: Message[T], original: String, updated: String): Message[T] = {
-    def s(v: String) = if (v == original) updated else v
+    val s = replace(original, updated) _
     m.copy(
       id = s(m.id),
       receiver = s(m.receiver),
@@ -19,7 +22,7 @@ object substitute {
   }
 
   def apply[C](a: Action[C], original: String, updated: String): Action[C] = {
-    def s(v: String) = if (v == original) updated else v
+    val s = replace(original, updated) _
     val content = a.content match {
       case str: String => s(str).asInstanceOf[C]
       case other       => other

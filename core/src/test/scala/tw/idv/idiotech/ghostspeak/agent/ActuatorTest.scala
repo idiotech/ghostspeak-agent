@@ -115,6 +115,20 @@ class ActuatorTest
     }
   }
 
+  "Actuator" should {
+    "snapshot at the interval it is given" in {
+      val every10 = EventSourcedBehaviorTestKit[Actuator.Command[String], actuator.Event, actuator.State](
+        system,
+        actuator.behaviorFromFuture("every-10", sensor.ref, _ => Future.successful(Done), snapshotEvery = 10),
+        SerializationSettings.disabled
+      )
+      (1 to 25).foreach(i => every10.runCommand(Perform(action(s"a$i"), inOneHour(i.toLong))))
+      every10.snapshotTestKit.get.persistedInStorage("actuator-every-10").map(_._1.sequenceNr) shouldBe
+        Seq(10L, 20L)
+      every10.restart().state.pendingActions.size shouldBe 25
+    }
+  }
+
   "earliestPending" should {
     "return the earliest future start time, whatever the Set's iteration order" in {
       val now = 1000000L

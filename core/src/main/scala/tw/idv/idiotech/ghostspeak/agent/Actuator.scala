@@ -131,7 +131,7 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
       ret
   }
 
-  private def behavior(name: String, sensor: ActorRef[Sensor.Command[P]])(
+  private def behavior(name: String, sensor: ActorRef[Sensor.Command[P]], snapshotEvery: Int)(
     commandHandlerFrom: GenCommandHandler[T, P]
   ): Behavior[Command[T]] = Behaviors.withTimers { timer =>
     Behaviors.setup { ctx =>
@@ -141,16 +141,17 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
         emptyState = State[T](),
         commandHandler = commandHandler,
         eventHandler = eventHandler
-      ).withRetention(RetentionCriteria.snapshotEvery(100, 2))
+      ).withRetention(RetentionCriteria.snapshotEvery(snapshotEvery, 2))
     }
   }
 
   def behaviorFromChild(
     name: String,
     sensor: ActorRef[Sensor.Command[P]],
-    discover: Discover
+    discover: Discover,
+    snapshotEvery: Int = Actuator.SnapshotEvery
   ): Behavior[Command[T]] =
-    behavior(name, sensor) { (ctx, sensor, timer) =>
+    behavior(name, sensor, snapshotEvery) { (ctx, sensor, timer) =>
       commandHandler(sensor, timer) { action =>
         discover(ctx, action, ctx.self).foreach { a =>
           a ! Perform(action, System.currentTimeMillis())
@@ -161,9 +162,10 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
   def behaviorFromFuture(
     name: String,
     sensor: ActorRef[Sensor.Command[P]],
-    performFuture: Action[T] => Future[_]
+    performFuture: Action[T] => Future[_],
+    snapshotEvery: Int = Actuator.SnapshotEvery
   ): Behavior[Command[T]] =
-    behavior(name, sensor) { (ctx, sensor, timer) =>
+    behavior(name, sensor, snapshotEvery) { (ctx, sensor, timer) =>
       commandHandler(sensor, timer) { action =>
         ctx.pipeToSelf(performFuture(action)) {
           case Success(_) =>
@@ -178,6 +180,10 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
 }
 
 object Actuator {
+
+  // the journal holds a Performance per delayed action and an ActionDone per batch performed,
+  // while the state is only the actions still pending
+  val SnapshotEvery = 100
 
   sealed trait Event[T] extends EventBase
 
