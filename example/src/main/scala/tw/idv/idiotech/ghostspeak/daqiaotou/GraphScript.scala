@@ -5,7 +5,6 @@ import io.circe.generic.extras.semiauto.deriveConfiguredCodec
 
 import enumeratum.{ CirceEnum, Enum, EnumEntry }
 import enumeratum.EnumEntry.UpperSnakecase
-import json.schema.typeHint
 import tw.idv.idiotech.ghostspeak.agent.util.substitute
 import tw.idv.idiotech.ghostspeak.daqiaotou.BeaconType.findValues
 
@@ -68,7 +67,6 @@ object GraphScript {
       deriveConfiguredCodec[Performance]
   }
 
-  @typeHint[String]
   sealed trait Comparison extends EnumEntry
 
   object Comparison extends Enum[Comparison] with CirceEnum[Comparison] {

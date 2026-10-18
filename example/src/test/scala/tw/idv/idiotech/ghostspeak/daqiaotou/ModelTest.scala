@@ -1,7 +1,6 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
 import com.typesafe.scalalogging.LazyLogging
-import json._
 import io.circe.syntax._
 import io.circe.parser.decode
 import org.scalatest.flatspec.AnyFlatSpec
@@ -12,9 +11,6 @@ import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.{ defaultZone, ActTime, 
 import java.time.temporal.ChronoUnit
 import java.time.{ Clock, Instant, LocalDateTime, LocalTime, ZonedDateTime }
 import scala.concurrent.duration._
-//import json.schema._
-import com.github.andyglow.jsonschema.AsCirce._
-import json.schema.Version._
 
 class ModelTest extends AnyFlatSpec with Matchers with LazyLogging {
 

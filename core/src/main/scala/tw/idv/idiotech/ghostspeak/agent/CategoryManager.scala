@@ -11,13 +11,11 @@ import org.apache.pekko.actor.typed.scaladsl.ActorContext
 import org.apache.pekko.persistence.typed.PersistenceId
 import enumeratum.EnumEntry.UpperSnakecase
 import enumeratum._
-import json.schema.typeHint
 
 import scala.collection.immutable
 
 object CategoryManager {
 
-  @typeHint[String]
   sealed trait DisplayType extends EnumEntry
 
   object DisplayType extends Enum[DisplayType] with CirceEnum[DisplayType] {

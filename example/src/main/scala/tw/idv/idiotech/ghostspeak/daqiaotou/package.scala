@@ -6,7 +6,6 @@ import io.circe.generic.extras.semiauto.deriveConfiguredCodec
 import enumeratum.EnumEntry.UpperSnakecase
 import enumeratum.{ CirceEnum, Enum, EnumEntry }
 import io.circe.generic.extras.Configuration
-import json.schema.{ description, title, typeHint }
 import com.typesafe.config.ConfigFactory
 import tw.idv.idiotech.ghostspeak.agent.{ Action, Message }
 import io.circe.config.syntax._
@@ -63,7 +62,6 @@ package object daqiaotou {
 
   lazy val redis = new RedisStore(config.redis.host, config.redis.port)
 
-  @typeHint[String]
   sealed trait Destination extends EnumEntry
 
   object Destination extends Enum[Destination] with CirceEnum[Destination] {
@@ -82,7 +80,6 @@ package object daqiaotou {
     case object Dialer extends Destination with UpperSnakecase
   }
 
-  @typeHint[String]
   sealed trait SoundType extends EnumEntry
 
   object SoundType extends Enum[SoundType] with CirceEnum[SoundType] {
@@ -96,7 +93,6 @@ package object daqiaotou {
 
   }
 
-  @typeHint[String]
   sealed trait BeaconType extends EnumEntry
 
   object BeaconType extends Enum[BeaconType] with CirceEnum[BeaconType] {
@@ -108,7 +104,6 @@ package object daqiaotou {
 
   }
 
-  @typeHint[String]
   sealed trait IncomingCallType extends EnumEntry
 
   object IncomingCallType extends Enum[IncomingCallType] with CirceEnum[IncomingCallType] {
@@ -167,7 +162,6 @@ package object daqiaotou {
     implicit val codecForVolume: Codec.AsObject[Volume] = deriveConfiguredCodec[Volume]
   }
 
-  @typeHint[String]
   sealed trait Operation extends EnumEntry
 
   object Operation extends Enum[Operation] with CirceEnum[Operation] {
@@ -189,83 +183,81 @@ package object daqiaotou {
 
   object Task {
 
-    @title("Popup message")
-    @description("Client should show it as a notification or a popup window in the app.")
+    // Popup message
+    // Client should show it as a notification or a popup window in the app.
     case class Popup(
-      @description("This is the message to be shown. Can be null.")
+      // This is the message to be shown. Can be null.
       text: Option[String] = None,
-      @description(
-        "They are acceptable choices from the user. They can be shown as buttons or drop-down menu depending on client design."
-      )
+      // They are acceptable choices from the user. They can be shown as buttons or drop-down menu depending on client design.
       choices: List[String] = Nil,
-      @description("If true, user is allowed to enter a text reply")
+      // If true, user is allowed to enter a text reply
       allowTextReply: Boolean = false,
-      @title("Picture URL to be shown")
+      // Picture URL to be shown
       pictures: List[String] = Nil,
-      @title("Destinations to be shown")
+      // Destinations to be shown
       destinations: Set[Destination] = Set.empty,
-      @title("Close alert popup after reply")
+      // Close alert popup after reply
       closeAlertAfterReply: Boolean = true,
-      @title("Clear dialog")
+      // Clear dialog
       clearDialog: Boolean = false
     ) extends Task
 
-    @title("Close popup message")
-    @description("Client should close popup message")
+    // Close popup message
+    // Client should close popup message
     case class PopupDismissal(
-      @description("Destinations to be dismissed")
+      // Destinations to be dismissed
       destinations: Set[Destination] = Set.empty
     ) extends Task
 
-    @title("Incoming call")
-    @description("Client should show an incoming call message.")
+    // Incoming call
+    // Client should show an incoming call message.
     case class IncomingCall(
-      @description("The marker to delete; should be the action id that adds the marker.")
+      // The marker to delete; should be the action id that adds the marker.
       caller: String,
       status: IncomingCallType,
       portrait: String
     ) extends Task
 
-    @title("Sound message")
-    @description("Client should play the sound.")
+    // Sound message
+    // Client should play the sound.
     case class Sound(
-      @description("URL of the sound file")
+      // URL of the sound file
       url: String,
-      @description("The length of the part of the sound file that contains speech")
+      // The length of the part of the sound file that contains speech
       volumeSetting: Volume,
-      @description("Controls whether the sound should be queued or looped")
+      // Controls whether the sound should be queued or looped
       mode: SoundType
     ) extends Task
 
-    @title("Marker message")
-    @description("Client should display the marker on map.")
+    // Marker message
+    // Client should display the marker on map.
     case class Marker(
-      @description("The marker should be shown at this location.")
+      // The marker should be shown at this location.
       location: Location,
-      @description("The icon image URL for the marker.")
+      // The icon image URL for the marker.
       icon: String,
-      @description("The marker title.")
+      // The marker title.
       title: String,
-      @description("The action to call on click")
+      // The action to call on click
       onClickActionId: Option[String] = None
     ) extends Task
 
-    @title("Marker removal")
-    @description("Client should remove the marker from map.")
+    // Marker removal
+    // Client should remove the marker from map.
     case class MarkerRemoval(
-      @description("The marker to delete; should be the action id that adds the marker.")
+      // The marker to delete; should be the action id that adds the marker.
       id: String
     ) extends Task
 
-    @title("Map style")
-    @description("Client should change the style of the map")
+    // Map style
+    // Client should change the style of the map
     case class MapStyle(
       url: Option[String],
       satellite: Boolean = false
     ) extends Task
 
-    @title("Intro image")
-    @description("The background image to show ")
+    // Intro image
+    // The background image to show
     case class IntroImage(
       backgroundUrl: Option[String],
       logoUrl: Option[String],
@@ -275,36 +267,36 @@ package object daqiaotou {
       mapLogoUrl: Option[String]
     ) extends Task
 
-    @title("Button style")
-    @description("The colors of a button")
+    // Button style
+    // The colors of a button
     case class ButtonStyle(backgroundColor: String, textColor: String) extends Task
 
-    @title("Popup style")
-    @description("The colors of a popup window")
+    // Popup style
+    // The colors of a popup window
     case class PopupStyle(alertTextColor: String) extends Task
 
-    @title("Variable update")
-    @description("The operation to update the value of a variable")
+    // Variable update
+    // The operation to update the value of a variable
     case class VariableUpdates(updates: List[VariableUpdate]) extends Task
 
-    @title("Finish the scenario")
-    @description("Client should return to homepage")
+    // Finish the scenario
+    // Client should return to homepage
     case object EndGame extends Task
 
-    @title("A image on the bottom of the map to guide user to go somewhere")
-    @description("Add the guide image")
+    // A image on the bottom of the map to guide user to go somewhere
+    // Add the guide image
     case class GuideImage(image: String) extends Task
 
-    @title("guide image removal")
-    @description("Remove the guide image")
+    // guide image removal
+    // Remove the guide image
     case object GuideImageRemoval extends Task
 
-    @title("Silence a sound")
-    @description("Make a sound by the ID stop")
+    // Silence a sound
+    // Make a sound by the ID stop
     case class Silence(id: String, fadeOutSeconds: Int) extends Task
 
-    @title("Add a friend")
-    @description("Add a person with name and icon")
+    // Add a friend
+    // Add a person with name and icon
     case class Friend(id: String, name: String, icon: Option[String]) extends Task
 
     implicit val codecForTask: Codec.AsObject[Task] = deriveConfiguredCodec[Task]
@@ -314,26 +306,25 @@ package object daqiaotou {
 
   object Condition {
 
-    @typeHint[String]
     case object Always extends Condition
 
-    @title("Geofence")
-    @description("Location condition for action.")
+    // Geofence
+    // Location condition for action.
     case class Geofence(
-      @description("Geographic coordinates")
+      // Geographic coordinates
       location: Location,
-      @description("The radius of the geofence in meters.")
+      // The radius of the geofence in meters.
       radius: Int
     ) extends Condition
 
-    @title("Beacon")
-    @description("Beacon condition for action")
+    // Beacon
+    // Beacon condition for action
     case class Beacon(
-      @description("Beacon ID")
+      // Beacon ID
       beaconId: String,
-      @description("Threshold value for triggering")
+      // Threshold value for triggering
       threshold: Int,
-      @description("Whether to activate on enter or on exit")
+      // Whether to activate on enter or on exit
       mode: BeaconType
     ) extends Condition
 

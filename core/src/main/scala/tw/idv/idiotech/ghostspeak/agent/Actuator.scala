@@ -14,7 +14,6 @@ import org.apache.pekko.persistence.typed.scaladsl.{
 import org.apache.pekko.persistence.typed.PersistenceId
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.{ Decoder, Encoder }
-import org.virtuslab.psh.annotation.SerializabilityTrait
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Command.Sense
 
 import scala.concurrent.Future
@@ -58,7 +57,7 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
     implicit val codecForState: Codec.AsObject[State] = deriveCodec[State]
   }
 
-  case object TimerKey extends SerializabilityTrait
+  case object TimerKey
   import Command._
   import Event._
 

@@ -11,7 +11,6 @@ import io.circe.generic.extras.semiauto._
 import io.circe.config.syntax._
 
 import scala.collection.immutable
-import json.schema._
 import org.apache.pekko.http.scaladsl.model.headers.HttpOrigin
 package object agent {
 
@@ -28,7 +27,6 @@ package object agent {
     implicit val codecForSession: Codec.AsObject[Session] = deriveConfiguredCodec[Session]
   }
 
-  @typeHint[String]
   sealed trait Modality extends EnumEntry
 
   object Modality extends Enum[Modality] with CirceEnum[Modality] {
@@ -39,22 +37,20 @@ package object agent {
     case object Intended extends Modality with UpperSnakecase
   }
 
-  @title("Action for clients to execute")
-  @description(
-    "An action represents something to execute on the devices. It is sent from the server to the client."
-  )
+  // Action for clients to execute
+  // An action represents something to execute on the devices. It is sent from the server to the client.
   case class Action[Content](
-    @description("Unique ID for an action instance")
+    // Unique ID for an action instance
     id: String,
-    @description("Unique ID of the receiver; usually the user ID.")
+    // Unique ID of the receiver; usually the user ID.
     receiver: String,
-    @description("Unique ID of the sender; usually a constant string or the name of an NPC.")
+    // Unique ID of the sender; usually a constant string or the name of an NPC.
     sender: String,
-    @description("Content to be shown or played. Can be text/image popup, sound or marker.")
+    // Content to be shown or played. Can be text/image popup, sound or marker.
     content: Content,
-    @description("The session ID indicates a chapter, episode, etc.")
+    // The session ID indicates a chapter, episode, etc.
     session: Session,
-    @description("Human-readable info for the action")
+    // Human-readable info for the action
     description: Option[String] = None
   ) {
 
@@ -100,19 +96,14 @@ package object agent {
 
   object SystemPayload {
 
-    @typeHint[String]
     case object Ack extends SystemPayload
 
-    @typeHint[String]
     case object Start extends SystemPayload
 
-    @typeHint[String]
     case object End extends SystemPayload
 
-    @typeHint[String]
     case object Join extends SystemPayload
 
-    @typeHint[String]
     case object Leave extends SystemPayload
 
     case class Modal(modality: Modality, time: Long = System.currentTimeMillis())
@@ -129,22 +120,20 @@ package object agent {
       deriveConfiguredCodec[SystemPayload]
   }
 
-  @title("Events for server to process")
-  @description(
-    "An event represents something to process on the server. It is sent from the client to the server."
-  )
+  // Events for server to process
+  // An event represents something to process on the server. It is sent from the client to the server.
   case class Message[T](
-    @description("Unique ID for an event instance")
+    // Unique ID for an event instance
     id: String,
-    @description("Action ID for which the event is in reply to")
+    // Action ID for which the event is in reply to
     actionId: Option[String],
-    @description("Unique ID of the receiver; usually a constant string or the name of an NPC.")
+    // Unique ID of the receiver; usually a constant string or the name of an NPC.
     receiver: String,
-    @description("Unique ID of the sender; usually the user ID.")
+    // Unique ID of the sender; usually the user ID.
     sender: String,
-    @description("what the client wants to tell the server")
+    // what the client wants to tell the server
     payload: Payload[T],
-    @description("The scenario this event belongs to")
+    // The scenario this event belongs to
     scenarioId: String
   ) {
     def forComparison = copy(id = "", scenarioId = "")

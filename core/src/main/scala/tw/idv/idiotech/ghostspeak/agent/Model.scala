@@ -1,9 +1,6 @@
 package tw.idv.idiotech.ghostspeak.agent
 
-import org.virtuslab.psh.annotation.SerializabilityTrait
-
-@SerializabilityTrait
+// Marker for everything persisted (events, snapshots); serialized with circe.
 trait EventBase
 
-@SerializabilityTrait
 trait CommandBase
