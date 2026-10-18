@@ -1,7 +1,7 @@
 package tw.idv.idiotech.ghostspeak.agent
 
 import io.circe.Codec
-import io.circe.generic.extras.semiauto.deriveConfiguredCodec
+import tw.idv.idiotech.ghostspeak.agent.jsoncodec.semiauto.deriveConfiguredCodec
 
 import org.apache.pekko.Done
 import org.apache.pekko.actor.typed.ActorSystem
@@ -15,7 +15,7 @@ import org.apache.pekko.stream.RestartSettings
 import org.apache.pekko.stream.connectors.google.firebase.fcm.FcmNotificationModels.Token
 import org.apache.pekko.stream.scaladsl.{ RestartFlow, Sink, Source }
 import io.circe.Encoder
-import io.circe.generic.extras.Configuration
+import tw.idv.idiotech.ghostspeak.agent.jsoncodec.Configuration
 import io.circe.syntax._
 import io.circe.parser.decode
 

@@ -1,7 +1,7 @@
 package tw.idv.idiotech.ghostspeak.agent
 
 import io.circe.Codec
-import io.circe.generic.extras.semiauto.deriveConfiguredCodec
+import tw.idv.idiotech.ghostspeak.agent.jsoncodec.semiauto.deriveConfiguredCodec
 import io.circe.generic.semiauto.deriveCodec
 
 import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors, TimerScheduler }

@@ -36,6 +36,9 @@ class MySqlPersistenceTest extends AnyWordSpec with Matchers with BeforeAndAfter
 
   private def serverConnection(): Connection = {
     val (host, port, user, password) = env.get
+    // DriverManager discovers drivers once per JVM; register ours in case another classloader
+    // (an earlier cross-version test run in the same sbt) got there first
+    Class.forName("com.mysql.cj.jdbc.Driver")
     DriverManager.getConnection(s"jdbc:mysql://$host:$port/?useSSL=false", user, password)
   }
 

@@ -1,7 +1,7 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
 import io.circe.Codec
-import io.circe.generic.extras.semiauto.deriveConfiguredCodec
+import tw.idv.idiotech.ghostspeak.agent.jsoncodec.semiauto.deriveConfiguredCodec
 
 import com.softwaremill.quicklens._
 import org.apache.pekko.Done

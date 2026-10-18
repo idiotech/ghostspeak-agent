@@ -6,8 +6,8 @@ import com.typesafe.config.ConfigFactory
 import enumeratum.EnumEntry.UpperSnakecase
 import enumeratum.{ CirceEnum, Enum, EnumEntry }
 import io.circe.{ Decoder, Encoder, Json }
-import io.circe.generic.extras.Configuration
-import io.circe.generic.extras.semiauto._
+import tw.idv.idiotech.ghostspeak.agent.jsoncodec.Configuration
+import tw.idv.idiotech.ghostspeak.agent.jsoncodec.semiauto._
 import io.circe.config.syntax._
 
 import scala.collection.immutable
@@ -66,8 +66,12 @@ package object agent {
   }
 
   object Action {
-    def decoder[T](implicit decoder: Decoder[T]) = deriveConfiguredDecoder[Action[T]]
-    def encoder[T](implicit encoder: Encoder[T]) = deriveConfiguredEncoder[Action[T]]
+
+    def decoder[T](implicit decoder: Decoder[T]): Decoder[Action[T]] =
+      deriveConfiguredDecoder[Action[T]]
+
+    def encoder[T](implicit encoder: Encoder[T]): Encoder.AsObject[Action[T]] =
+      deriveConfiguredEncoder[Action[T]]
 
     def apply[C](id: String, message: Message[_], content: C): Action[C] =
       Action[C](id, message.sender, message.receiver, content, Session(message.scenarioId, None))
@@ -141,13 +145,13 @@ package object agent {
 
   object Message {
 
-    def decoder[T](implicit decoder: Decoder[T]) = {
-      implicit val payloadDec = Payload.h[T]
+    def decoder[T](implicit decoder: Decoder[T]): Decoder[Message[T]] = {
+      implicit val payloadDec: Decoder[Payload[T]] = Payload.h[T]
       deriveConfiguredDecoder[Message[T]]
     }
 
-    def encoder[T](implicit encoder: Encoder[T]) = {
-      implicit val payloadEnc = Payload.e[T]
+    def encoder[T](implicit encoder: Encoder[T]): Encoder.AsObject[Message[T]] = {
+      implicit val payloadEnc: Encoder[Payload[T]] = Payload.e[T]
       deriveConfiguredEncoder[Message[T]]
     }
   }

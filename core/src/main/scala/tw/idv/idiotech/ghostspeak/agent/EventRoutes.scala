@@ -1,7 +1,7 @@
 package tw.idv.idiotech.ghostspeak.agent
 
 import io.circe.Codec
-import io.circe.generic.extras.semiauto.deriveConfiguredCodec
+import tw.idv.idiotech.ghostspeak.agent.jsoncodec.semiauto.deriveConfiguredCodec
 
 import com.github.pjfanning.pekkohttpcirce.FailFastCirceSupport
 import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem }

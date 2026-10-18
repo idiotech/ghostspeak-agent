@@ -1,11 +1,11 @@
 package tw.idv.idiotech.ghostspeak
 
 import io.circe.{ Codec, Decoder, Encoder }
-import io.circe.generic.extras.semiauto.deriveConfiguredCodec
+import tw.idv.idiotech.ghostspeak.agent.jsoncodec.semiauto.deriveConfiguredCodec
 
 import enumeratum.EnumEntry.UpperSnakecase
 import enumeratum.{ CirceEnum, Enum, EnumEntry }
-import io.circe.generic.extras.Configuration
+import tw.idv.idiotech.ghostspeak.agent.jsoncodec.Configuration
 import com.typesafe.config.ConfigFactory
 import tw.idv.idiotech.ghostspeak.agent.{ Action, Message }
 import io.circe.config.syntax._
