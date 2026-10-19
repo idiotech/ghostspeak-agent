@@ -64,8 +64,18 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
   @ConfiguredJsonCodec
   case class Trigger(message: Message, nodes: List[Node])
 
+  // variables and strings are required, with no defaults, on purpose. Snapshots written before
+  // they were stored lack both fields, so they fail to decode instead of silently coming back
+  // empty. With jdbc-snapshot-store.snapshot-is-optional = true, Pekko then skips such a
+  // snapshot and rebuilds the state by replaying the user's whole journal (events are never
+  // deleted), which restores the real variables and strings.
   @ConfiguredJsonCodec
-  case class StateStorage(triggers: List[Trigger], exclusions: Map[ActionId, List[NodeId]])
+  case class StateStorage(
+    triggers: List[Trigger],
+    exclusions: Map[ActionId, List[NodeId]],
+    variables: Map[String, Int],
+    strings: Map[String, String]
+  )
 
   case class State(
     triggers: Map[Message, List[Node]],
@@ -104,12 +114,18 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
       State(
         ss.triggers.map(t => t.message -> t.nodes).toMap,
         ss.exclusions,
-        Map.empty
+        ss.variables,
+        ss.strings
       )
     )
 
     implicit val encoder = implicitly[Encoder[StateStorage]].contramap[State](s =>
-      StateStorage(s.triggers.toList.map(t => Trigger(t._1, t._2)), s.exclusions)
+      StateStorage(
+        s.triggers.toList.map(t => Trigger(t._1, t._2)),
+        s.exclusions,
+        s.variables,
+        s.strings
+      )
     )
   }
 
@@ -460,7 +476,12 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
               val scn = created.scenario
               implicit val script: Map[String, Node] = createScript(scn)
               val actor: Behavior[Sensor.Command[EventPayload]] =
-                sensor.apply(scn.id, createUserScenario(actuatorRef), sensor.onCommandPerUser)
+                sensor.apply(
+                  scn.id,
+                  createUserScenario(actuatorRef),
+                  sensor.onCommandPerUser,
+                  Sensor.PerUserSnapshotEvery
+                )
               ctx.spawn(
                 actor,
                 if (created.uniqueId.nonEmpty) created.uniqueId else UUID.randomUUID().toString

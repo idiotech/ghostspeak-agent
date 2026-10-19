@@ -2,7 +2,11 @@ package tw.idv.idiotech.ghostspeak.agent
 
 import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors, TimerScheduler }
 import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem, Behavior }
-import org.apache.pekko.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
+import org.apache.pekko.persistence.typed.scaladsl.{
+  Effect,
+  EventSourcedBehavior,
+  RetentionCriteria
+}
 import org.apache.pekko.persistence.typed.PersistenceId
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.generic.JsonCodec
@@ -78,11 +82,7 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
           Effect.none
         } else {
           logger.info(s"delaying execution: ${action.id}")
-          val earliest =
-            state.pendingActions
-              .map(_.startTime)
-              .find(_ > System.currentTimeMillis())
-              .getOrElse(Long.MaxValue)
+          val earliest = earliestPending(state, System.currentTimeMillis())
           if (startTime <= earliest) {
             logger.info(s"set timer for ${action.id} after ${remainingTime.millis}")
             timer.startSingleTimer(TimerKey, Timeout(), remainingTime.millis)
@@ -109,7 +109,7 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
             )
             timer.startSingleTimer(TimerKey, Timeout(), (p.startTime - current).millis)
           }
-        Effect.persist(ActionDone(toExecute))
+        if (toExecute.isEmpty) Effect.none else Effect.persist(ActionDone(toExecute))
       case OK(action) =>
         sensor ! Sense(action.toMessage(Modality.Done))
         Effect.none
@@ -118,6 +118,15 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
         Effect.none
     }
   }
+
+  // Start time of the next pending action that is still in the future: the one the timer is
+  // currently set for. pendingActions is an unordered Set, so this must be the minimum.
+  private[agent] def earliestPending(state: State, now: Long): Long =
+    state.pendingActions.iterator
+      .map(_.startTime)
+      .filter(_ > now)
+      .minOption
+      .getOrElse(Long.MaxValue)
 
   def eventHandler(state: State, event: Event): State = event match {
     case p: Performance =>
@@ -145,7 +154,7 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
         emptyState = State(),
         commandHandler = commandHandler,
         eventHandler = eventHandler
-      )
+      ).withRetention(RetentionCriteria.snapshotEvery(100, 2))
     }
   }
 

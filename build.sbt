@@ -91,5 +91,8 @@ def project(projectName: String) = Project(projectName, new File(projectName)).s
 )
 //  .enablePlugins(PekkoSerializationHelperPlugin)
 
-val core = project("core")
+val core = project("core").settings(
+  // for MySqlPersistenceTest; the example module ships the driver at runtime
+  libraryDependencies += "com.mysql" % "mysql-connector-j" % "8.0.32" % Test
+)
 val example = project("example").dependsOn(core)
