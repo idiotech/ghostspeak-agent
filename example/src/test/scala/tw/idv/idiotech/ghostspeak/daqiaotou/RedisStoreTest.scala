@@ -124,39 +124,48 @@ class RedisStoreTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     store.del(k)
   }
 
+  /** A server that accepts connections and never replies, for `test(port)`. */
+  private def withSilentServer(test: Int => Unit): Unit = {
+    val server = new java.net.ServerSocket(0)
+    // keep the accepted sockets referenced: a collected socket is closed, which resets the
+    // client's connection
+    val accepted = new java.util.concurrent.ConcurrentLinkedQueue[Socket]()
+    val acceptor = new Thread(() =>
+      while (!server.isClosed) scala.util.Try(server.accept()).foreach(accepted.add)
+    )
+    acceptor.setDaemon(true)
+    acceptor.start()
+    try test(server.getLocalPort)
+    finally {
+      server.close()
+      accepted.forEach(_.close())
+    }
+  }
+
   it must "time out a call when a timeout is set and Redis does not answer" in {
     requireRedis()
-    // a server that accepts the connection but never replies
-    val silent = new java.net.ServerSocket(0)
-    val accepted = new Thread(() => { scala.util.Try(silent.accept()); () })
-    accepted.setDaemon(true)
-    accepted.start()
-    val timed = new RedisStore("127.0.0.1", silent.getLocalPort, timeoutMs = 300)
-    try {
-      val start = System.nanoTime()
-      an[Exception] must be thrownBy timed.hgetAll("anything")
-      (System.nanoTime() - start) / 1000000 must be < 5000L
-    } finally {
-      timed.close()
-      silent.close()
+    withSilentServer { port =>
+      val timed = new RedisStore("127.0.0.1", port, timeoutMs = 300)
+      try {
+        val start = System.nanoTime()
+        an[Exception] must be thrownBy timed.hgetAll("anything")
+        (System.nanoTime() - start) / 1000000 must be < 5000L
+      } finally timed.close()
     }
   }
 
   it must "by default keep waiting past Jedis's own 2 s timeout, as redisclient did" in {
     requireRedis()
-    val silent = new java.net.ServerSocket(0)
-    val accepted = new Thread(() => { scala.util.Try(silent.accept()); () })
-    accepted.setDaemon(true)
-    accepted.start()
-    val untimed = new RedisStore("127.0.0.1", silent.getLocalPort)
-    val call = new Thread(() => { scala.util.Try(untimed.hgetAll("anything")); () })
-    call.setDaemon(true)
-    call.start()
-    call.join(3000)
-    try call.isAlive mustBe true // still waiting after 3 s
-    finally {
-      silent.close() // ends the call
-      untimed.close()
+    withSilentServer { port =>
+      val untimed = new RedisStore("127.0.0.1", port)
+      @volatile var outcome: Option[scala.util.Try[Map[String, String]]] = None
+      val call = new Thread(() => outcome = Some(scala.util.Try(untimed.hgetAll("anything"))))
+      call.setDaemon(true)
+      call.start()
+      call.join(3000)
+      // still waiting after 3 s; closing the server afterwards ends the call
+      try withClue(s"the call ended with $outcome: ")(call.isAlive mustBe true)
+      finally untimed.close()
     }
   }
 
