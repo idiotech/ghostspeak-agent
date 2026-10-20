@@ -70,6 +70,14 @@ class GoldenJsonTest extends AnyFlatSpec with Matchers {
       parse(json).flatMap(_.as[A]).isLeft mustBe true
     }
 
+  // the operator-named enumeration values
+  val OperationPlus = Operation.+
+  val OperationMinus = Operation.-
+  val OperationSet = Operation.`=`
+  val AtLeast = Comparison.>=
+  val AtMost = Comparison.<=
+  val EqualTo = Comparison.==
+
   // ---- shared sample values
 
   val session = Session("romeo and juliet", Some("chapter 1"))
@@ -256,6 +264,44 @@ class GoldenJsonTest extends AnyFlatSpec with Matchers {
     CategoryManager.Event.Uploaded(CategoryManager.State(List(category)))
   )
   golden[CategoryManager.State]("category-state", CategoryManager.State(List(category)))
+
+  // ---- every enumeration value
+
+  golden[List[Modality]](
+    "enum-modality",
+    List(Modality.Doing, Modality.Done, Modality.Failed, Modality.Intended)
+  )
+  golden[List[Destination]](
+    "enum-destination",
+    List(
+      Destination.App,
+      Destination.Alert,
+      Destination.Intro,
+      Destination.Welcome,
+      Destination.Notification,
+      Destination.Dialer
+    )
+  )
+  golden[List[SoundType]](
+    "enum-sound-type",
+    List(SoundType.Main, SoundType.Background, SoundType.Loop)
+  )
+  golden[List[BeaconType]]("enum-beacon-type", List(BeaconType.Enter, BeaconType.Exit))
+  golden[List[IncomingCallType]](
+    "enum-incoming-call-type",
+    List(IncomingCallType.Connecting, IncomingCallType.Connected, IncomingCallType.Disconnected)
+  )
+  golden[List[Operation]]("enum-operation", List(OperationPlus, OperationMinus, OperationSet))
+  golden[List[Comparison]]("enum-comparison", List(AtLeast, AtMost, EqualTo))
+  golden[List[CategoryManager.DisplayType]](
+    "enum-display-type",
+    List(
+      CategoryManager.DisplayType.Carousel,
+      CategoryManager.DisplayType.TwoInARow,
+      CategoryManager.DisplayType.OneInARow,
+      CategoryManager.DisplayType.LIST
+    )
+  )
 
   // ---- legacy inputs: optional fields left out
 
