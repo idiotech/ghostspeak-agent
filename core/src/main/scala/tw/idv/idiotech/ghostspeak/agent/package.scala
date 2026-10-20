@@ -1,14 +1,10 @@
 package tw.idv.idiotech.ghostspeak.agent
 
 import com.typesafe.config.ConfigFactory
-import enumeratum.{ CirceEnum, Enum, EnumEntry }
-import enumeratum.EnumEntry.UpperSnakecase
 import io.circe.{ Codec, Decoder, Encoder, Json }
 import io.circe.config.syntax.*
 import io.circe.derivation.{ Configuration, ConfiguredCodec, ConfiguredDecoder, ConfiguredEncoder }
 import org.apache.pekko.http.scaladsl.model.headers.HttpOrigin
-
-import scala.collection.immutable
 
 given configuration: Configuration = Configuration.default
   .withDiscriminator("type")
@@ -20,15 +16,11 @@ trait CirceSerializable
 case class Session(scenario: String, chapter: Option[String]) extends CirceSerializable
     derives ConfiguredCodec
 
-sealed trait Modality extends EnumEntry
-
-object Modality extends Enum[Modality] with CirceEnum[Modality] {
-  val values: immutable.IndexedSeq[Modality] = findValues
-  case object Doing extends Modality with UpperSnakecase
-  case object Done extends Modality with UpperSnakecase
-  case object Failed extends Modality with UpperSnakecase
-  case object Intended extends Modality with UpperSnakecase
+enum Modality {
+  case Doing, Done, Failed, Intended
 }
+
+object Modality extends JsonEnum[Modality]
 
 // Action for clients to execute
 // An action represents something to execute on the devices. It is sent from the server to the client.

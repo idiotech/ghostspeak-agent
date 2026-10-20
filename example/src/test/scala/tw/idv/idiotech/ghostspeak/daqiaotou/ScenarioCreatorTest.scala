@@ -104,7 +104,7 @@ class ScenarioCreatorTest
               "v",
               "?u",
               "ghost",
-              Content(VariableUpdate("score", Operation.+, 1), Condition.Always),
+              Content(VariableUpdate("score", Operation.Plus, 1), Condition.Always),
               Session("scn", None)
             )
           )

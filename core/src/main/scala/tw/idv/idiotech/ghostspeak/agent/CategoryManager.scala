@@ -1,7 +1,5 @@
 package tw.idv.idiotech.ghostspeak.agent
 
-import enumeratum.*
-import enumeratum.EnumEntry.UpperSnakecase
 import io.circe.derivation.ConfiguredCodec
 import org.apache.pekko.actor.typed.{ ActorRef, Behavior }
 import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors }
@@ -9,23 +7,13 @@ import org.apache.pekko.pattern.StatusReply
 import org.apache.pekko.persistence.typed.PersistenceId
 import org.apache.pekko.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior, ReplyEffect }
 
-import scala.collection.immutable
-
 object CategoryManager {
 
-  sealed trait DisplayType extends EnumEntry
-
-  object DisplayType extends Enum[DisplayType] with CirceEnum[DisplayType] {
-    val values: immutable.IndexedSeq[DisplayType] = findValues
-
-    case object Carousel extends DisplayType with UpperSnakecase
-
-    case object TwoInARow extends DisplayType with UpperSnakecase
-
-    case object OneInARow extends DisplayType with UpperSnakecase
-
-    case object LIST extends DisplayType with UpperSnakecase
+  enum DisplayType {
+    case Carousel, TwoInARow, OneInARow, LIST
   }
+
+  object DisplayType extends JsonEnum[DisplayType]
 
   sealed trait Event extends EventBase derives ConfiguredCodec
 

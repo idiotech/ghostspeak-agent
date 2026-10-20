@@ -81,9 +81,9 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
     def apply(update: VariableUpdate): State = {
       val prevValue = variables.getOrElse(update.name, 0)
       val newValue: Int = update.operation match {
-        case Operation.+   => prevValue + update.value
-        case Operation.-   => prevValue - update.value
-        case Operation.`=` => update.value
+        case Operation.Plus  => prevValue + update.value
+        case Operation.Minus => prevValue - update.value
+        case Operation.Set   => update.value
       }
       copy(variables = variables + (update.name -> newValue))
     }
@@ -94,9 +94,9 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
         .get(precondition.name)
         .fold(false)(v =>
           precondition.comparison match {
-            case Comparison.>= => v >= precondition.value
-            case Comparison.<= => v <= precondition.value
-            case Comparison.== => v == precondition.value
+            case Comparison.AtLeast => v >= precondition.value
+            case Comparison.AtMost  => v <= precondition.value
+            case Comparison.EqualTo => v == precondition.value
           }
         )
     def check(preconds: List[Precondition]): Boolean = preconds.forall(check)

@@ -1,15 +1,11 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
 import com.typesafe.config.ConfigFactory
-import enumeratum.{ CirceEnum, Enum, EnumEntry }
-import enumeratum.EnumEntry.UpperSnakecase
 import io.circe.{ Decoder, Encoder }
 import io.circe.config.syntax.*
 import io.circe.derivation.{ Configuration, ConfiguredCodec }
 
-import tw.idv.idiotech.ghostspeak.agent.{ Action, Message }
-
-import scala.collection.immutable
+import tw.idv.idiotech.ghostspeak.agent.{ Action, JsonEnum, Message }
 
 given configuration: Configuration = Configuration.default
   .withDiscriminator("type")
@@ -41,55 +37,29 @@ lazy val config: DaqiaotouConf =
 
 lazy val redis = new RedisStore(config.redis.host, config.redis.port, config.redis.timeoutMs)
 
-sealed trait Destination extends EnumEntry
-
-object Destination extends Enum[Destination] with CirceEnum[Destination] {
-  val values: immutable.IndexedSeq[Destination] = findValues
-
-  case object App extends Destination with UpperSnakecase
-
-  case object Alert extends Destination with UpperSnakecase
-
-  case object Intro extends Destination with UpperSnakecase
-
-  case object Welcome extends Destination with UpperSnakecase
-
-  case object Notification extends Destination with UpperSnakecase
-
-  case object Dialer extends Destination with UpperSnakecase
+enum Destination {
+  case App, Alert, Intro, Welcome, Notification, Dialer
 }
 
-sealed trait SoundType extends EnumEntry
+object Destination extends JsonEnum[Destination]
 
-object SoundType extends Enum[SoundType] with CirceEnum[SoundType] {
-  val values: immutable.IndexedSeq[SoundType] = findValues
-
-  case object Main extends SoundType with UpperSnakecase
-
-  case object Background extends SoundType with UpperSnakecase
-
-  case object Loop extends SoundType with UpperSnakecase
+enum SoundType {
+  case Main, Background, Loop
 }
 
-sealed trait BeaconType extends EnumEntry
+object SoundType extends JsonEnum[SoundType]
 
-object BeaconType extends Enum[BeaconType] with CirceEnum[BeaconType] {
-  val values: immutable.IndexedSeq[BeaconType] = findValues
-
-  case object Enter extends BeaconType with UpperSnakecase
-
-  case object Exit extends BeaconType with UpperSnakecase
+enum BeaconType {
+  case Enter, Exit
 }
 
-sealed trait IncomingCallType extends EnumEntry
+object BeaconType extends JsonEnum[BeaconType]
 
-object IncomingCallType extends Enum[IncomingCallType] with CirceEnum[IncomingCallType] {
-  val values: immutable.IndexedSeq[IncomingCallType] = findValues
-
-  case object Connecting extends IncomingCallType with UpperSnakecase
-  case object Connected extends IncomingCallType with UpperSnakecase
-  case object Disconnected extends IncomingCallType with UpperSnakecase
+enum IncomingCallType {
+  case Connecting, Connected, Disconnected
 }
+
+object IncomingCallType extends JsonEnum[IncomingCallType]
 
 case class Location(lat: Double, lon: Double) extends EventPayload derives ConfiguredCodec
 
@@ -128,13 +98,15 @@ object Volume {
   ) extends Volume
 }
 
-sealed trait Operation extends EnumEntry
+// how a VariableUpdate changes its variable; written as the operator in JSON
+enum Operation(val symbol: String) {
+  case Plus extends Operation("+")
+  case Minus extends Operation("-")
+  case Set extends Operation("=")
+}
 
-object Operation extends Enum[Operation] with CirceEnum[Operation] {
-  val values: immutable.IndexedSeq[Operation] = findValues
-  case object + extends Operation with UpperSnakecase
-  case object - extends Operation with UpperSnakecase
-  case object `=` extends Operation with UpperSnakecase
+object Operation extends JsonEnum[Operation] {
+  override def jsonName(o: Operation): String = o.symbol
 }
 
 case class VariableUpdate(name: String, operation: Operation, value: Int) extends Task

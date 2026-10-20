@@ -14,7 +14,6 @@ ThisBuild / scalacOptions ++= Seq(
 
 val pekkoVersion = "1.1.0-M1"
 val pekkoHttpVersion = "1.0.1"
-val enumeratumVersion = "1.7.2"
 val circeVersion = "0.14.6"
 val log4jVersion = "2.23.1"
 
@@ -32,8 +31,7 @@ ThisBuild / libraryDependencies ++= Seq(
   "com.typesafe" %% "ssl-config-core" % "0.6.1",
   "io.circe" %% "circe-core" % circeVersion,
   "io.circe" %% "circe-parser" % circeVersion,
-  "com.beachape" %% "enumeratum" % enumeratumVersion,
-  "com.beachape" %% "enumeratum-circe" % enumeratumVersion,
+
   "com.typesafe" % "config" % "1.4.2",
   "com.hunorkovacs" %% "circe-config" % "0.10.0",
   "org.typelevel" %% "cats-core" % "2.8.0",

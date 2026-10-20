@@ -70,14 +70,6 @@ class GoldenJsonTest extends AnyFlatSpec with Matchers {
       parse(json).flatMap(_.as[A]).isLeft mustBe true
     }
 
-  // the operator-named enumeration values
-  val OperationPlus = Operation.+
-  val OperationMinus = Operation.-
-  val OperationSet = Operation.`=`
-  val AtLeast = Comparison.>=
-  val AtMost = Comparison.<=
-  val EqualTo = Comparison.==
-
   // ---- shared sample values
 
   val session = Session("romeo and juliet", Some("chapter 1"))
@@ -120,12 +112,12 @@ class GoldenJsonTest extends AnyFlatSpec with Matchers {
     "popup-style"      -> Task.PopupStyle("#ff0000"),
     "variable-updates" -> Task.VariableUpdates(
       List(
-        VariableUpdate("score", Operation.+, 2),
-        VariableUpdate("lives", Operation.-, 1),
-        VariableUpdate("level", Operation.`=`, 3)
+        VariableUpdate("score", Operation.Plus, 2),
+        VariableUpdate("lives", Operation.Minus, 1),
+        VariableUpdate("level", Operation.Set, 3)
       )
     ),
-    "variable-update"     -> VariableUpdate("score", Operation.+, 1),
+    "variable-update"     -> VariableUpdate("score", Operation.Plus, 1),
     "end-game"            -> Task.EndGame,
     "guide-image"         -> Task.GuideImage("guide.png"),
     "guide-image-removal" -> Task.GuideImageRemoval,
@@ -185,7 +177,10 @@ class GoldenJsonTest extends AnyFlatSpec with Matchers {
         .Performance(action("p1"), Some(ActTime(Some(LocalTime.of(21, 10, 5)), 1000L, 60000L)), 0L),
       GraphScript.Performance(action("p2", tasks(3)._2, conditions(1)._2), None, 5000L)
     ),
-    List(Precondition("score", Comparison.>=, 3), Precondition("lives", Comparison.==, 1)),
+    List(
+      Precondition("score", Comparison.AtLeast, 3),
+      Precondition("lives", Comparison.EqualTo, 1)
+    ),
     Set("n2"),
     List("n2", "n3")
   )
@@ -229,7 +224,7 @@ class GoldenJsonTest extends AnyFlatSpec with Matchers {
     scenarioCreator.Event(
       List(node),
       message(Right(EventPayload.Text("yes"))),
-      List(VariableUpdate("score", Operation.+, 1)),
+      List(VariableUpdate("score", Operation.Plus, 1)),
       List(scenarioCreator.StringVariable("answer", "yes"))
     )
   )
@@ -291,8 +286,11 @@ class GoldenJsonTest extends AnyFlatSpec with Matchers {
     "enum-incoming-call-type",
     List(IncomingCallType.Connecting, IncomingCallType.Connected, IncomingCallType.Disconnected)
   )
-  golden[List[Operation]]("enum-operation", List(OperationPlus, OperationMinus, OperationSet))
-  golden[List[Comparison]]("enum-comparison", List(AtLeast, AtMost, EqualTo))
+  golden[List[Operation]]("enum-operation", List(Operation.Plus, Operation.Minus, Operation.Set))
+  golden[List[Comparison]](
+    "enum-comparison",
+    List(Comparison.AtLeast, Comparison.AtMost, Comparison.EqualTo)
+  )
   golden[List[CategoryManager.DisplayType]](
     "enum-display-type",
     List(

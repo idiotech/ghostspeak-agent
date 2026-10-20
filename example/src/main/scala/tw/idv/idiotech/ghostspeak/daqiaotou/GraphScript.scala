@@ -1,14 +1,11 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
-import enumeratum.{ CirceEnum, Enum, EnumEntry }
-import enumeratum.EnumEntry.UpperSnakecase
 import io.circe.derivation.ConfiguredCodec
 
+import tw.idv.idiotech.ghostspeak.agent.JsonEnum
 import tw.idv.idiotech.ghostspeak.agent.util.substitute
-import tw.idv.idiotech.ghostspeak.daqiaotou.BeaconType.findValues
 
 import java.time.{ Clock, Instant, LocalDateTime, LocalTime, ZonedDateTime, ZoneId }
-import scala.collection.immutable
 import scala.util.Random
 
 object GraphScript {
@@ -48,16 +45,15 @@ object GraphScript {
   case class Performance(action: Action, time: Option[ActTime] = None, delay: Long = 0)
       derives ConfiguredCodec
 
-  sealed trait Comparison extends EnumEntry
+// how a Precondition compares its variable; written as the operator in JSON
+  enum Comparison(val symbol: String) {
+    case AtLeast extends Comparison(">=")
+    case AtMost extends Comparison("<=")
+    case EqualTo extends Comparison("==")
+  }
 
-  object Comparison extends Enum[Comparison] with CirceEnum[Comparison] {
-    val values: immutable.IndexedSeq[Comparison] = findValues
-
-    case object >= extends Comparison with UpperSnakecase
-
-    case object <= extends Comparison with UpperSnakecase
-
-    case object == extends Comparison with UpperSnakecase
+  object Comparison extends JsonEnum[Comparison] {
+    override def jsonName(c: Comparison): String = c.symbol
   }
 
   case class Precondition(name: String, comparison: Comparison, value: Int) derives ConfiguredCodec
