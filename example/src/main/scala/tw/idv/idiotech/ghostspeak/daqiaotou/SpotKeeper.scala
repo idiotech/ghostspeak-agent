@@ -1,21 +1,16 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
+import SpotKeeper.*
+import com.typesafe.scalalogging.LazyLogging
+import io.circe.{ Codec, Decoder, Encoder, Json, Printer }
 import io.circe.derivation.ConfiguredCodec
-
-import io.circe.Codec
-import tw.idv.idiotech.ghostspeak.agent.FreshDefault
-
+import io.circe.syntax.*
 import org.apache.pekko.Done
-import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors }
 import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem, Behavior }
+import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors }
 import org.apache.pekko.persistence.typed.PersistenceId
 import org.apache.pekko.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
-import com.typesafe.scalalogging.LazyLogging
-import io.circe.syntax._
-import io.circe.{ Decoder, Encoder, Json, Printer }
-import tw.idv.idiotech.ghostspeak.agent.Actuator.Command.Perform
-import tw.idv.idiotech.ghostspeak.agent.Sensor.Command
-import tw.idv.idiotech.ghostspeak.agent.SystemPayload.Join
+
 import tw.idv.idiotech.ghostspeak.agent.{
   Action,
   Actuator,
@@ -27,11 +22,14 @@ import tw.idv.idiotech.ghostspeak.agent.{
   Session,
   SystemPayload
 }
+import tw.idv.idiotech.ghostspeak.agent.Actuator.Command.Perform
+import tw.idv.idiotech.ghostspeak.agent.FreshDefault
+import tw.idv.idiotech.ghostspeak.agent.Sensor.Command
+import tw.idv.idiotech.ghostspeak.agent.SystemPayload.Join
 
 import java.util.UUID
 import scala.concurrent.Future
 import scala.util.Try
-import SpotKeeper._
 
 class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPayload])
     extends LazyLogging {
@@ -113,7 +111,7 @@ class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPa
     sensorRef: ActorRef[Command],
     actuatorRef: ActorRef[Actuator.Command[Content]]
   )(
-    actorContext: ActorContext[_],
+    actorContext: ActorContext[?],
     created: Sensor.Event.Created
   ): Either[String, ActorRef[Command]] =
     Right(
@@ -125,7 +123,7 @@ class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPa
 
   def sendMessage(
     action: Action[Content]
-  )(using actorSystem: ActorSystem[_], encoder: Encoder[Action[Content]]): Future[Done] = {
+  )(using actorSystem: ActorSystem[?], encoder: Encoder[Action[Content]]): Future[Done] = {
     val actionJson = action.asJson.printWith(Printer.spaces2)
     val redisKey = s"action-${action.session.scenario}-${action.receiver}"
     val hashKey = action.id

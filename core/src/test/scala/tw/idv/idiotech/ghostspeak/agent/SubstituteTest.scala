@@ -2,6 +2,7 @@ package tw.idv.idiotech.ghostspeak.agent
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
+
 import tw.idv.idiotech.ghostspeak.agent.util.substitute
 
 // Node.replace uses substitute to put the user ID into a script's "?u" placeholders.

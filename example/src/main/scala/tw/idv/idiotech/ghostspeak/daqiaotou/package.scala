@@ -1,15 +1,13 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
-import io.circe.derivation.ConfiguredCodec
-
-import io.circe.{ Decoder, Encoder }
-
-import enumeratum.EnumEntry.UpperSnakecase
-import enumeratum.{ CirceEnum, Enum, EnumEntry }
-import io.circe.derivation.Configuration
 import com.typesafe.config.ConfigFactory
+import enumeratum.{ CirceEnum, Enum, EnumEntry }
+import enumeratum.EnumEntry.UpperSnakecase
+import io.circe.{ Decoder, Encoder }
+import io.circe.config.syntax.*
+import io.circe.derivation.{ Configuration, ConfiguredCodec }
+
 import tw.idv.idiotech.ghostspeak.agent.{ Action, Message }
-import io.circe.config.syntax._
 
 import scala.collection.immutable
 

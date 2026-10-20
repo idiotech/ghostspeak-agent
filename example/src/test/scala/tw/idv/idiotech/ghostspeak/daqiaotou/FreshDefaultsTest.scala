@@ -3,6 +3,7 @@ package tw.idv.idiotech.ghostspeak.daqiaotou
 import io.circe.parser.decode
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
+
 import tw.idv.idiotech.ghostspeak.agent.{ Sensor, SystemPayload }
 import tw.idv.idiotech.ghostspeak.daqiaotou.SpotKeeper.Spot
 

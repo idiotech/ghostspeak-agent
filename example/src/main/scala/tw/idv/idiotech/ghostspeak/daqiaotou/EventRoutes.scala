@@ -1,21 +1,18 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
-import io.circe.Codec
-
-import cats.implicits._
+import cats.implicits.*
+import io.circe.{ Codec, Decoder, Json, ParsingFailure }
+import io.circe.parser.{ decode, parse }
+import io.circe.syntax.*
 import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem }
+import org.apache.pekko.actor.typed.scaladsl.AskPattern.{ schedulerFromActorSystem, Askable }
+import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.apache.pekko.http.scaladsl.server.Route
-import io.circe.{ Decoder, Json, ParsingFailure }
+import org.apache.pekko.pattern.StatusReply
+
 import tw.idv.idiotech.ghostspeak.agent
 import tw.idv.idiotech.ghostspeak.agent.{ CategoryManager, Scenario, Sensor }
-import org.apache.pekko.http.scaladsl.server.Directives._
-import org.apache.pekko.http.scaladsl.model.StatusCodes
-import org.apache.pekko.http.scaladsl.model.ContentTypes._
-import org.apache.pekko.pattern.StatusReply
-import io.circe.parser.{ decode, parse }
-import io.circe.syntax._
-import org.apache.pekko.actor.typed.scaladsl.AskPattern.schedulerFromActorSystem
-import org.apache.pekko.actor.typed.scaladsl.AskPattern.Askable
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Identifier
 
 import scala.concurrent.Future
@@ -24,10 +21,10 @@ import scala.util.{ Failure, Success }
 class EventRoutes[T: Decoder](
   sensor: ActorRef[Sensor.Command[T]],
   cm: ActorRef[CategoryManager.Command],
-  system: ActorSystem[_]
+  system: ActorSystem[?]
 ) extends agent.EventRoutes[T](sensor, cm, system) {
 
-  import EventRoutes._
+  import EventRoutes.*
 
   override lazy val routes: List[Route] = List(
     pathPrefix("v1" / "scenario" / Segment / Segment / "user" / Segment / "actions") {
@@ -52,7 +49,7 @@ class EventRoutes[T: Decoder](
                   Future.successful(res)
                 }
                 // one HDEL for all the fetched actions
-                _ <- Future(redis.hdel(key, all.keys.toSeq: _*))
+                _ <- Future(redis.hdel(key, all.keys.toSeq*))
               } yield all
             onComplete(fetch) {
               case Success(all) =>

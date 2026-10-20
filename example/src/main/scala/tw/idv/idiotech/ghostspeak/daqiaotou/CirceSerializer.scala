@@ -1,11 +1,12 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
-import org.apache.pekko.serialization.Serializer
 import io.circe.Json
-import io.circe.syntax._
 import io.circe.parser.decode
-import tw.idv.idiotech.ghostspeak.agent.{ Actuator, CategoryManager, EventBase }
+import io.circe.syntax.*
+import org.apache.pekko.serialization.Serializer
+
 import tw.idv.idiotech.ghostspeak.{ agent, daqiaotou }
+import tw.idv.idiotech.ghostspeak.agent.{ Actuator, CategoryManager, EventBase }
 
 class CirceSerializer extends Serializer {
   override def identifier: Int = 5566
@@ -16,7 +17,7 @@ class CirceSerializer extends Serializer {
 
   override def toBinary(o: AnyRef): Array[Byte] = codec.toBinary(o)
 
-  override def fromBinary(bytes: Array[Byte], manifest: Option[Class[_]]): AnyRef =
+  override def fromBinary(bytes: Array[Byte], manifest: Option[Class[?]]): AnyRef =
     codec.fromBinary(bytes, manifest)
 }
 
@@ -30,8 +31,8 @@ class CirceCodec(val scenarioCreator: ScenarioCreator) {
         eb match {
           case e: scenarioCreator.Event => e.asJson
           case e: scenarioCreator.State => e.asJson
-          case e: Actuator.Event[_]     => e.asInstanceOf[Actuator.Event[Content]].asJson
-          case e: Actuator.State[_]     => e.asInstanceOf[Actuator.State[Content]].asJson
+          case e: Actuator.Event[?]     => e.asInstanceOf[Actuator.Event[Content]].asJson
+          case e: Actuator.State[?]     => e.asInstanceOf[Actuator.State[Content]].asJson
           case e: agent.Sensor.Event    => e.asJson
           case e: agent.Sensor.State    => e.asJson
           case e: SpotKeeper.Event      => e.asJson
@@ -43,11 +44,11 @@ class CirceCodec(val scenarioCreator: ScenarioCreator) {
     json.toString.getBytes("UTF-8")
   }
 
-  def fromBinary(bytes: Array[Byte], manifest: Option[Class[_]]): AnyRef = {
+  def fromBinary(bytes: Array[Byte], manifest: Option[Class[?]]): AnyRef = {
     val sce = classOf[scenarioCreator.Event]
     val scs = classOf[scenarioCreator.State]
-    val ae = classOf[Actuator.Event[_]]
-    val as = classOf[Actuator.State[_]]
+    val ae = classOf[Actuator.Event[?]]
+    val as = classOf[Actuator.State[?]]
     val se = classOf[agent.Sensor.Event]
     val ss = classOf[agent.Sensor.State]
     val spe = classOf[daqiaotou.SpotKeeper.Event]

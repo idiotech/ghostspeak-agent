@@ -3,7 +3,7 @@ package tw.idv.idiotech.ghostspeak.daqiaotou
 // _root_: the package object has a `redis` value that would shadow the redis package
 import _root_.redis.clients.jedis.{ Jedis, JedisPool, JedisPoolConfig }
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 import scala.util.Using
 
 /** The Redis operations the server uses: one hash per user and scenario
@@ -33,7 +33,7 @@ class RedisStore(host: String, port: Int, timeoutMs: Int = 0) {
 
   /** Deletes the given fields of the hash, in one command. */
   def hdel(key: String, fields: String*): Unit =
-    if (fields.nonEmpty) withClient(_.hdel(key, fields: _*))
+    if (fields.nonEmpty) withClient(_.hdel(key, fields*))
 
   def del(key: String): Unit =
     withClient(_.del(key))

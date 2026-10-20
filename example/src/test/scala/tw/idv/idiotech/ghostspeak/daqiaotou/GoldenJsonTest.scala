@@ -1,15 +1,16 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
-import io.circe.parser.parse
 import io.circe.{ Decoder, Encoder, Json, Printer }
+import io.circe.parser.parse
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
+
 import tw.idv.idiotech.ghostspeak.agent
 import tw.idv.idiotech.ghostspeak.agent.{
-  Action => BaseAction,
+  Action as BaseAction,
   Actuator,
   CategoryManager,
-  Message => BaseMessage,
+  Message as BaseMessage,
   Metadata,
   Modality,
   Scenario,

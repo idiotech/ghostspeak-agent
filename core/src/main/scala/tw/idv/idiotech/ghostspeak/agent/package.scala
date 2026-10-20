@@ -1,18 +1,14 @@
 package tw.idv.idiotech.ghostspeak.agent
 
-import io.circe.derivation.{ ConfiguredCodec, ConfiguredDecoder, ConfiguredEncoder }
-
-import io.circe.Codec
-
 import com.typesafe.config.ConfigFactory
-import enumeratum.EnumEntry.UpperSnakecase
 import enumeratum.{ CirceEnum, Enum, EnumEntry }
-import io.circe.{ Decoder, Encoder, Json }
-import io.circe.derivation.Configuration
-import io.circe.config.syntax._
+import enumeratum.EnumEntry.UpperSnakecase
+import io.circe.{ Codec, Decoder, Encoder, Json }
+import io.circe.config.syntax.*
+import io.circe.derivation.{ Configuration, ConfiguredCodec, ConfiguredDecoder, ConfiguredEncoder }
+import org.apache.pekko.http.scaladsl.model.headers.HttpOrigin
 
 import scala.collection.immutable
-import org.apache.pekko.http.scaladsl.model.headers.HttpOrigin
 
 given configuration: Configuration = Configuration.default
   .withDiscriminator("type")
@@ -70,7 +66,7 @@ object Action {
   def encoder[T](using encoder: Encoder[T]): Encoder.AsObject[Action[T]] =
     ConfiguredEncoder.derived[Action[T]]
 
-  def apply[C](id: String, message: Message[_], content: C): Action[C] =
+  def apply[C](id: String, message: Message[?], content: C): Action[C] =
     Action[C](id, message.sender, message.receiver, content, Session(message.scenarioId, None))
 }
 

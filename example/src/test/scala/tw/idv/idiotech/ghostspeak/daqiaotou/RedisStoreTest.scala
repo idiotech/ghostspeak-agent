@@ -100,7 +100,7 @@ class RedisStoreTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     // many clients fetching their actions at once; the pool must not cap them at 8
     requireRedis()
     import scala.concurrent.{ Await, Future }
-    import scala.concurrent.duration._
+    import scala.concurrent.duration.*
     given ec: scala.concurrent.ExecutionContext =
       scala.concurrent.ExecutionContext.fromExecutor(
         java.util.concurrent.Executors.newFixedThreadPool(50)

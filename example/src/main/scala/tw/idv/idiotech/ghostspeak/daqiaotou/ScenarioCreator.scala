@@ -1,8 +1,12 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
+import cats.implicits.*
+import com.softwaremill.quicklens.*
+import com.typesafe.scalalogging.LazyLogging
+import io.circe.{ Decoder, Encoder }
 import io.circe.derivation.ConfiguredCodec
-
-import com.softwaremill.quicklens._
+import io.circe.parser.decode
+import io.circe.syntax.*
 import org.apache.pekko.Done
 import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem, Behavior }
 import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors }
@@ -12,7 +16,8 @@ import org.apache.pekko.persistence.typed.scaladsl.{
   EventSourcedBehavior,
   RetentionCriteria
 }
-import tw.idv.idiotech.ghostspeak.agent.Actuator.Command.Perform
+
+import tw.idv.idiotech.ghostspeak.agent
 import tw.idv.idiotech.ghostspeak.agent.{
   Actuator,
   EventBase,
@@ -22,25 +27,19 @@ import tw.idv.idiotech.ghostspeak.agent.{
   Session,
   SystemPayload
 }
-import io.circe.parser.decode
-import io.circe.syntax._
-import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.{ Comparison, Node, Precondition }
-import cats.implicits._
-import com.typesafe.scalalogging.LazyLogging
-import io.circe.{ Decoder, Encoder }
-import tw.idv.idiotech.ghostspeak.daqiaotou.Task.VariableUpdates
-
-import java.util.UUID
-import scala.concurrent.Future
-import tw.idv.idiotech.ghostspeak.agent
+import tw.idv.idiotech.ghostspeak.agent.Actuator.Command.Perform
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Command
+import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.{ Comparison, Node, Precondition }
 import tw.idv.idiotech.ghostspeak.daqiaotou.ScenarioCreator.{
   commandTime,
   eventTime,
   getEffectTime,
   performTime
 }
+import tw.idv.idiotech.ghostspeak.daqiaotou.Task.VariableUpdates
 
+import java.util.UUID
+import scala.concurrent.Future
 import scala.util.Try
 
 object ScenarioCreator {
@@ -429,7 +428,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
 
   def createUserScenario(
     actuatorRef: ActorRef[Actuator.Command[Content]]
-  )(actorContext: ActorContext[_], created: Sensor.Event.Created)(using
+  )(actorContext: ActorContext[?], created: Sensor.Event.Created)(using
     script: Map[String, Node]
   ): Either[String, ActorRef[Command]] =
     if (created.scenario.id.isBlank) Left("empty user ID not allowed")
@@ -440,7 +439,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
 
   def sendMessage(
     action: Action
-  )(using actorSystem: ActorSystem[_]): Future[Done] = {
+  )(using actorSystem: ActorSystem[?]): Future[Done] = {
     val actionJson = action.asJson.toString()
     val redisKey = s"action-${action.session.scenario}-${action.receiver}"
     val hashKey = action.id

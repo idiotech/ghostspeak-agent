@@ -1,24 +1,21 @@
 package tw.idv.idiotech.ghostspeak.agent
 
-import io.circe.derivation.ConfiguredCodec
-
-import org.apache.pekko.Done
-import org.apache.pekko.actor.typed.ActorSystem
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.LazyLogging
-
-import scala.concurrent.duration._
-import org.apache.pekko.stream.connectors.google.firebase.fcm.scaladsl.GoogleFcm
-import org.apache.pekko.stream.connectors.google.firebase.fcm._
-import org.apache.pekko.stream.RestartSettings
-import org.apache.pekko.stream.connectors.google.firebase.fcm.FcmNotificationModels.Token
-import org.apache.pekko.stream.scaladsl.{ RestartFlow, Sink, Source }
 import io.circe.Encoder
-import io.circe.derivation.Configuration
-import io.circe.syntax._
+import io.circe.derivation.{ Configuration, ConfiguredCodec }
 import io.circe.parser.decode
+import io.circe.syntax.*
+import org.apache.pekko.Done
+import org.apache.pekko.actor.typed.ActorSystem
+import org.apache.pekko.stream.RestartSettings
+import org.apache.pekko.stream.connectors.google.firebase.fcm.*
+import org.apache.pekko.stream.connectors.google.firebase.fcm.FcmNotificationModels.Token
+import org.apache.pekko.stream.connectors.google.firebase.fcm.scaladsl.GoogleFcm
+import org.apache.pekko.stream.scaladsl.{ RestartFlow, Sink, Source }
 
 import scala.concurrent.Future
+import scala.concurrent.duration.*
 
 object FcmSender extends LazyLogging {
   private given configuration: Configuration = Configuration.default.withSnakeCaseMemberNames
@@ -41,7 +38,7 @@ object FcmSender extends LazyLogging {
   def send[T](
     action: Action[T],
     logPerf: (Action[T], String) => Unit = (_: Action[T], _: String) => ()
-  )(using actorSystem: ActorSystem[_], encoder: Encoder[Action[T]]): Future[Done] =
+  )(using actorSystem: ActorSystem[?], encoder: Encoder[Action[T]]): Future[Done] =
     Source
       .single {
         logger.info(s"sending action: ${action.asJson.toString()} to receiver: ${action.receiver}")

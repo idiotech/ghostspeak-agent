@@ -2,22 +2,23 @@ package tw.idv.idiotech.ghostspeak.agent
 
 import com.typesafe.config.{ Config, ConfigFactory }
 import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
-import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem }
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.pattern.StatusReply
-import org.apache.pekko.persistence.typed.{ PersistenceId, RecoveryCompleted, RecoveryFailed }
-import org.apache.pekko.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
 import org.apache.pekko.persistence.jdbc.db.SlickExtension
 import org.apache.pekko.persistence.jdbc.testkit.scaladsl.SchemaUtils
+import org.apache.pekko.persistence.typed.{ PersistenceId, RecoveryCompleted, RecoveryFailed }
+import org.apache.pekko.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
+
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Command.{ Create, Query }
 
 import java.sql.{ Connection, DriverManager }
 import java.util.UUID
-import scala.concurrent.duration._
 import scala.concurrent.Await
+import scala.concurrent.duration.*
 
 /** Runs the real JDBC journal and snapshot store against MySQL. Opt-in: set
   * GHOSTSPEAK_IT_MYSQL_HOST (and optionally _PORT, _USER, _PASSWORD); the test creates and drops
@@ -81,7 +82,7 @@ class MySqlPersistenceTest extends AnyWordSpec with Matchers with BeforeAndAfter
   }
 
   private var testKit: ActorTestKit = _
-  private given system: ActorSystem[_] = testKit.system
+  private given system: ActorSystem[?] = testKit.system
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -133,7 +134,7 @@ class MySqlPersistenceTest extends AnyWordSpec with Matchers with BeforeAndAfter
     io.circe.parser.decode[List[Scenario]](json).toOption.get.map(_.id).toSet
   }
 
-  private def stop(ref: ActorRef[_]): Unit =
+  private def stop(ref: ActorRef[?]): Unit =
     testKit.stop(ref, 10.seconds)
 
   "the persistence plugins" should {

@@ -6,8 +6,8 @@ import org.apache.pekko.actor.typed.ActorSystem
 import org.apache.pekko.persistence.jdbc.db.SlickExtension
 import slick.jdbc.MySQLProfile
 
-import scala.concurrent.duration._
 import scala.concurrent.Await
+import scala.concurrent.duration.*
 import scala.util.control.NonFatal
 
 /** The MySQL schema that pekko-persistence-jdbc creates stores journal events and snapshots in BLOB
@@ -48,7 +48,7 @@ object PayloadColumns extends LazyLogging {
   }
 
   /** At startup: check, and widen if ghostspeak.widen-payload-columns is set. */
-  def check()(using system: ActorSystem[_]): Unit = {
+  def check()(using system: ActorSystem[?]): Unit = {
     val config = system.settings.config
     val widen = config.hasPath("ghostspeak.widen-payload-columns") &&
       config.getBoolean("ghostspeak.widen-payload-columns")
@@ -56,13 +56,13 @@ object PayloadColumns extends LazyLogging {
   }
 
   def check(config: Config, widen: Boolean, checkTimeout: FiniteDuration)(using
-    system: ActorSystem[_]
+    system: ActorSystem[?]
   ): Unit = {
     val slickDb =
       SlickExtension(system).database(system.settings.config.getConfig("jdbc-snapshot-store"))
     slickDb.profile match {
       case _: MySQLProfile =>
-        import MySQLProfile.api._
+        import MySQLProfile.api.*
         import system.executionContext
         val db = slickDb.database
         columns(config).foreach { c =>

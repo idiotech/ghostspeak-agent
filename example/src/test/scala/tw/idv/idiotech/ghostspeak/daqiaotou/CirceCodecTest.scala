@@ -2,8 +2,9 @@ package tw.idv.idiotech.ghostspeak.daqiaotou
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
+
 import tw.idv.idiotech.ghostspeak.agent.{ Actuator, Metadata, Scenario, Sensor, Session }
-import tw.idv.idiotech.ghostspeak.agent.{ Action => BaseAction }
+import tw.idv.idiotech.ghostspeak.agent.Action as BaseAction
 import tw.idv.idiotech.ghostspeak.daqiaotou.SpotKeeper.SpotPayload
 
 // CirceSerializer delegates to CirceCodec, so these round-trips go through the same

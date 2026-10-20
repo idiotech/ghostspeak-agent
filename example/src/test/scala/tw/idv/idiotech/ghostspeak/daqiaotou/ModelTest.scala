@@ -1,16 +1,17 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
 import com.typesafe.scalalogging.LazyLogging
-import io.circe.syntax._
 import io.circe.parser.decode
+import io.circe.syntax.*
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
-import tw.idv.idiotech.ghostspeak.agent.{ Action => BaseAction, _ }
+
+import tw.idv.idiotech.ghostspeak.agent.{ Action as BaseAction, * }
 import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.{ defaultZone, ActTime }
 
-import java.time.temporal.ChronoUnit
 import java.time.{ Clock, Instant, LocalTime, ZonedDateTime }
-import scala.concurrent.duration._
+import java.time.temporal.ChronoUnit
+import scala.concurrent.duration.*
 
 class ModelTest extends AnyFlatSpec with Matchers with LazyLogging {
 

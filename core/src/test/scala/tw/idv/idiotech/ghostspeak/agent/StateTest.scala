@@ -2,8 +2,8 @@ package tw.idv.idiotech.ghostspeak.agent
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
-import tw.idv.idiotech.ghostspeak.agent.Sensor.Event.Created
-import tw.idv.idiotech.ghostspeak.agent.Sensor.Event.Destroyed
+
+import tw.idv.idiotech.ghostspeak.agent.Sensor.Event.{ Created, Destroyed }
 
 class StateTest extends AnyFlatSpec with Matchers {
 

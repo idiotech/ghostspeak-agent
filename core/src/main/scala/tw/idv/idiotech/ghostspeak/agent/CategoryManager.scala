@@ -1,15 +1,13 @@
 package tw.idv.idiotech.ghostspeak.agent
 
-import io.circe.derivation.ConfiguredCodec
-
-import org.apache.pekko.actor.typed.{ ActorRef, Behavior }
-import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import org.apache.pekko.pattern.StatusReply
-import org.apache.pekko.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior, ReplyEffect }
-import org.apache.pekko.actor.typed.scaladsl.ActorContext
-import org.apache.pekko.persistence.typed.PersistenceId
+import enumeratum.*
 import enumeratum.EnumEntry.UpperSnakecase
-import enumeratum._
+import io.circe.derivation.ConfiguredCodec
+import org.apache.pekko.actor.typed.{ ActorRef, Behavior }
+import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors }
+import org.apache.pekko.pattern.StatusReply
+import org.apache.pekko.persistence.typed.PersistenceId
+import org.apache.pekko.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior, ReplyEffect }
 
 import scala.collection.immutable
 

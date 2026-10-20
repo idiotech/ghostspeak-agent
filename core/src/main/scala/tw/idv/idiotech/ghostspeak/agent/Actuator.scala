@@ -1,28 +1,26 @@
 package tw.idv.idiotech.ghostspeak.agent
 
+import com.typesafe.scalalogging.LazyLogging
+import io.circe.{ Codec, Decoder, Encoder }
 import io.circe.derivation.ConfiguredCodec
-
-import io.circe.Codec
-
-import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors, TimerScheduler }
 import org.apache.pekko.actor.typed.{ ActorRef, Behavior }
+import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors, TimerScheduler }
+import org.apache.pekko.persistence.typed.PersistenceId
 import org.apache.pekko.persistence.typed.scaladsl.{
   Effect,
   EventSourcedBehavior,
   RetentionCriteria
 }
-import org.apache.pekko.persistence.typed.PersistenceId
-import com.typesafe.scalalogging.LazyLogging
-import io.circe.{ Decoder, Encoder }
+
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Command.Sense
 
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.{ Failure, Success }
 
 class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
 
-  import Actuator._
+  import Actuator.*
 
   // Events and state are the same types for every actuator (see the companion), so any
   // actuator, whatever its engine, can decode what another one persisted.
@@ -36,11 +34,11 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
   given stateCodec: Codec.AsObject[State] = Actuator.State.codecForState[T]
 
   case object TimerKey
-  import Command._
-  import Actuator.Event._
+  import Actuator.Event.*
+  import Command.*
 
   type Discover = (
-    ActorContext[_],
+    ActorContext[?],
     Action[T],
     ActorRef[Command[T]]
   ) => Option[ActorRef[Command[T]]]
@@ -162,7 +160,7 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
   def behaviorFromFuture(
     name: String,
     sensor: ActorRef[Sensor.Command[P]],
-    performFuture: Action[T] => Future[_],
+    performFuture: Action[T] => Future[?],
     snapshotEvery: Int = Actuator.SnapshotEvery
   ): Behavior[Command[T]] =
     behavior(name, sensor, snapshotEvery) { (ctx, sensor, timer) =>

@@ -1,6 +1,6 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
-import scalikejdbc._
+import scalikejdbc.*
 
 object PerformanceLogger {
   Class.forName("com.mysql.jdbc.Driver")

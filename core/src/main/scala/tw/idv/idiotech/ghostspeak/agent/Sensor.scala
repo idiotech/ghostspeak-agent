@@ -1,11 +1,11 @@
 package tw.idv.idiotech.ghostspeak.agent
 
+import com.typesafe.scalalogging.LazyLogging
+import io.circe.{ Codec, Decoder, Encoder, Json }
 import io.circe.derivation.ConfiguredCodec
-
-import io.circe.{ Codec, Json }
-
-import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors }
+import io.circe.syntax.*
 import org.apache.pekko.actor.typed.{ ActorRef, Behavior }
+import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors }
 import org.apache.pekko.pattern.StatusReply
 import org.apache.pekko.persistence.typed.{ PersistenceId, RecoveryCompleted }
 import org.apache.pekko.persistence.typed.scaladsl.{
@@ -14,9 +14,7 @@ import org.apache.pekko.persistence.typed.scaladsl.{
   ReplyEffect,
   RetentionCriteria
 }
-import com.typesafe.scalalogging.LazyLogging
-import io.circe.{ Decoder, Encoder }
-import io.circe.syntax._
+
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Event.{ Created, Destroyed }
 
 import java.util.UUID
@@ -24,23 +22,22 @@ import java.util.UUID
 class Sensor[P: Encoder: Decoder] extends LazyLogging {
 
   import Sensor.Command
-  import Sensor.Command._
-
+  import Sensor.Command.*
   import Sensor.Event
-  import Sensor.Event._
+  import Sensor.Event.*
   import Sensor.State
 
   type CreatorScenarioActor = (
-    ActorContext[_],
+    ActorContext[?],
     Created
   ) => Either[String, ActorRef[Command[P]]]
 
   type Reff = ReplyEffect[Event, State]
 
-  def getChild(ctx: ActorContext[_], name: String) =
+  def getChild(ctx: ActorContext[?], name: String) =
     ctx.child(name).map(_.asInstanceOf[ActorRef[Command[P]]])
 
-  def getChildren(ctx: ActorContext[_]): Iterable[ActorRef[Command[P]]] =
+  def getChildren(ctx: ActorContext[?]): Iterable[ActorRef[Command[P]]] =
     ctx.children.map(_.asInstanceOf[ActorRef[Command[P]]])
 
   def onCommand(

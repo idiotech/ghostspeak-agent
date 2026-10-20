@@ -1,18 +1,19 @@
 package tw.idv.idiotech.ghostspeak.agent
 
 import io.circe.parser.decode
-import io.circe.syntax._
+import io.circe.syntax.*
 import org.apache.pekko.Done
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.persistence.testkit.scaladsl.EventSourcedBehaviorTestKit
 import org.apache.pekko.persistence.testkit.scaladsl.EventSourcedBehaviorTestKit.SerializationSettings
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.wordspec.AnyWordSpecLike
+
 import tw.idv.idiotech.ghostspeak.agent.Actuator.Command.{ Perform, Timeout }
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Command.Sense
 
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class ActuatorTest
     extends ScalaTestWithActorTestKit(PersistenceTestConfig.config)

@@ -1,7 +1,7 @@
 package tw.idv.idiotech.ghostspeak.agent
 
 import io.circe.parser.decode
-import io.circe.syntax._
+import io.circe.syntax.*
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.pattern.StatusReply
@@ -9,12 +9,13 @@ import org.apache.pekko.persistence.testkit.scaladsl.EventSourcedBehaviorTestKit
 import org.apache.pekko.persistence.testkit.scaladsl.EventSourcedBehaviorTestKit.SerializationSettings
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.wordspec.AnyWordSpecLike
+
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Command.{ Create, Destroy }
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Event.{ Created, Destroyed }
 
 import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedQueue
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 class SensorTest
     extends ScalaTestWithActorTestKit(PersistenceTestConfig.config)

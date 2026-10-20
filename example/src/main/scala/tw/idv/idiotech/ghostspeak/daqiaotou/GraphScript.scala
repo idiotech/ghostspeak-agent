@@ -1,13 +1,13 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
-import io.circe.derivation.ConfiguredCodec
-
 import enumeratum.{ CirceEnum, Enum, EnumEntry }
 import enumeratum.EnumEntry.UpperSnakecase
+import io.circe.derivation.ConfiguredCodec
+
 import tw.idv.idiotech.ghostspeak.agent.util.substitute
 import tw.idv.idiotech.ghostspeak.daqiaotou.BeaconType.findValues
 
-import java.time.{ Clock, Instant, LocalDateTime, LocalTime, ZoneId, ZonedDateTime }
+import java.time.{ Clock, Instant, LocalDateTime, LocalTime, ZonedDateTime, ZoneId }
 import scala.collection.immutable
 import scala.util.Random
 
