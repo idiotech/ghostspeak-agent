@@ -1,11 +1,12 @@
 package tw.idv.idiotech.ghostspeak
 
-import io.circe.{ Codec, Decoder, Encoder }
-import tw.idv.idiotech.ghostspeak.agent.jsoncodec.semiauto.deriveConfiguredCodec
+import io.circe.derivation.ConfiguredCodec
+
+import io.circe.{ Decoder, Encoder }
 
 import enumeratum.EnumEntry.UpperSnakecase
 import enumeratum.{ CirceEnum, Enum, EnumEntry }
-import tw.idv.idiotech.ghostspeak.agent.jsoncodec.Configuration
+import io.circe.derivation.Configuration
 import com.typesafe.config.ConfigFactory
 import tw.idv.idiotech.ghostspeak.agent.{ Action, Message }
 import io.circe.config.syntax._
@@ -20,17 +21,9 @@ package object daqiaotou {
     .withDefaults
 
   // timeoutMs: connect and read timeout; 0 waits indefinitely, like the redisclient it replaced
-  case class RedisConf(host: String, port: Int, timeoutMs: Int = 0)
+  case class RedisConf(host: String, port: Int, timeoutMs: Int = 0) derives ConfiguredCodec
 
-  object RedisConf {
-    implicit val codecForRedisConf: Codec.AsObject[RedisConf] = deriveConfiguredCodec[RedisConf]
-  }
-
-  case class IconConf(pending: String, arrived: String)
-
-  object IconConf {
-    implicit val codecForIconConf: Codec.AsObject[IconConf] = deriveConfiguredCodec[IconConf]
-  }
+  case class IconConf(pending: String, arrived: String) derives ConfiguredCodec
 
   case class MysqlConf(
     host: String,
@@ -38,24 +31,14 @@ package object daqiaotou {
     username: String,
     password: String,
     database: String
-  )
-
-  object MysqlConf {
-    implicit val codecForMysqlConf: Codec.AsObject[MysqlConf] = deriveConfiguredCodec[MysqlConf]
-  }
+  ) derives ConfiguredCodec
 
   case class DaqiaotouConf(
     engine: String = "graphscript",
     redis: RedisConf,
     icon: IconConf,
     mysql: MysqlConf
-  )
-
-  object DaqiaotouConf {
-
-    implicit val codecForDaqiaotouConf: Codec.AsObject[DaqiaotouConf] =
-      deriveConfiguredCodec[DaqiaotouConf]
-  }
+  ) derives ConfiguredCodec
 
   lazy val config: DaqiaotouConf =
     ConfigFactory.load().as[DaqiaotouConf]("app").fold(throw _, identity)
@@ -90,7 +73,6 @@ package object daqiaotou {
     case object Background extends SoundType with UpperSnakecase
 
     case object Loop extends SoundType with UpperSnakecase
-
   }
 
   sealed trait BeaconType extends EnumEntry
@@ -101,7 +83,6 @@ package object daqiaotou {
     case object Enter extends BeaconType with UpperSnakecase
 
     case object Exit extends BeaconType with UpperSnakecase
-
   }
 
   sealed trait IncomingCallType extends EnumEntry
@@ -112,26 +93,17 @@ package object daqiaotou {
     case object Connecting extends IncomingCallType with UpperSnakecase
     case object Connected extends IncomingCallType with UpperSnakecase
     case object Disconnected extends IncomingCallType with UpperSnakecase
-
   }
 
-  case class Location(lat: Double, lon: Double) extends EventPayload
-
-  object Location {
-    implicit val codecForLocation: Codec.AsObject[Location] = deriveConfiguredCodec[Location]
-  }
+  case class Location(lat: Double, lon: Double) extends EventPayload derives ConfiguredCodec
 
   case class MainVolume(
     speechLength: Int,
     fadeOutSeconds: Int,
     fadeInSeconds: Int = 0
-  )
+  ) derives ConfiguredCodec
 
-  object MainVolume {
-    implicit val codecForMainVolume: Codec.AsObject[MainVolume] = deriveConfiguredCodec[MainVolume]
-  }
-
-  sealed trait Volume {
+  sealed trait Volume derives ConfiguredCodec {
     val mainVolume: Option[MainVolume]
   }
 
@@ -158,8 +130,6 @@ package object daqiaotou {
       maxValue: Int,
       mainVolume: Option[MainVolume]
     ) extends Volume
-
-    implicit val codecForVolume: Codec.AsObject[Volume] = deriveConfiguredCodec[Volume]
   }
 
   sealed trait Operation extends EnumEntry
@@ -172,14 +142,9 @@ package object daqiaotou {
   }
 
   case class VariableUpdate(name: String, operation: Operation, value: Int) extends Task
+      derives ConfiguredCodec
 
-  object VariableUpdate {
-
-    implicit val codecForVariableUpdate: Codec.AsObject[VariableUpdate] =
-      deriveConfiguredCodec[VariableUpdate]
-  }
-
-  sealed trait Task
+  sealed trait Task derives ConfiguredCodec
 
   object Task {
 
@@ -298,11 +263,9 @@ package object daqiaotou {
     // Add a friend
     // Add a person with name and icon
     case class Friend(id: String, name: String, icon: Option[String]) extends Task
-
-    implicit val codecForTask: Codec.AsObject[Task] = deriveConfiguredCodec[Task]
   }
 
-  sealed trait Condition
+  sealed trait Condition derives ConfiguredCodec
 
   object Condition {
 
@@ -327,28 +290,20 @@ package object daqiaotou {
       // Whether to activate on enter or on exit
       mode: BeaconType
     ) extends Condition
-
-    implicit val codecForCondition: Codec.AsObject[Condition] = deriveConfiguredCodec[Condition]
   }
 
   case class Content(task: Task, condition: Condition, exclusiveWith: List[String] = Nil)
-
-  object Content {
-    implicit val codecForContent: Codec.AsObject[Content] = deriveConfiguredCodec[Content]
-  }
+      derives ConfiguredCodec
 
   type Action = tw.idv.idiotech.ghostspeak.agent.Action[Content]
   type Message = tw.idv.idiotech.ghostspeak.agent.Message[EventPayload]
 
-  sealed trait EventPayload
+  sealed trait EventPayload derives ConfiguredCodec
 
   object EventPayload {
     case class Text(text: String, asVariable: Option[String] = None) extends EventPayload
     case object GoldenFinger extends EventPayload
     case class PerformDirectly(action: Action) extends EventPayload
-
-    implicit val codecForEventPayload: Codec.AsObject[EventPayload] =
-      deriveConfiguredCodec[EventPayload]
   }
 
   implicit lazy val contentEncoder: Encoder.AsObject[Action] = Action.encoder[Content]
@@ -356,9 +311,5 @@ package object daqiaotou {
   implicit lazy val messageEncoder: Encoder.AsObject[Message] = Message.encoder[EventPayload]
   implicit lazy val messageDecoder: Decoder[Message] = Message.decoder[EventPayload]
 
-  case class PerfLog(user: String, action: String, stage: String)
-
-  object PerfLog {
-    implicit val codecForPerfLog: Codec.AsObject[PerfLog] = deriveConfiguredCodec[PerfLog]
-  }
+  case class PerfLog(user: String, action: String, stage: String) derives ConfiguredCodec
 }

@@ -1,32 +1,22 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
-import io.circe.Codec
-import tw.idv.idiotech.ghostspeak.agent.jsoncodec.semiauto.deriveConfiguredCodec
+import io.circe.derivation.ConfiguredCodec
 
 import enumeratum.{ CirceEnum, Enum, EnumEntry }
 import enumeratum.EnumEntry.UpperSnakecase
 import tw.idv.idiotech.ghostspeak.agent.util.substitute
 import tw.idv.idiotech.ghostspeak.daqiaotou.BeaconType.findValues
 
-import java.time.{
-  Clock,
-  Instant,
-  LocalDate,
-  LocalDateTime,
-  LocalTime,
-  ZoneId,
-  ZoneOffset,
-  ZonedDateTime
-}
+import java.time.{ Clock, Instant, LocalDateTime, LocalTime, ZoneId, ZonedDateTime }
 import scala.collection.immutable
-import scala.concurrent.duration.Duration
 import scala.util.Random
 
 object GraphScript {
 
   val defaultZone = ZoneId.of("Asia/Taipei")
 
-  case class ActTime(target: Option[LocalTime], minAfter: Long, range: Long) {
+  case class ActTime(target: Option[LocalTime], minAfter: Long, range: Long)
+      derives ConfiguredCodec {
 
     def time(clock: Clock = Clock.system(defaultZone)): Long = {
       println(s"calculating time for $this")
@@ -55,17 +45,8 @@ object GraphScript {
     }
   }
 
-  object ActTime {
-    implicit val codecForActTime: Codec.AsObject[ActTime] = deriveConfiguredCodec[ActTime]
-  }
-
   case class Performance(action: Action, time: Option[ActTime] = None, delay: Long = 0)
-
-  object Performance {
-
-    implicit val codecForPerformance: Codec.AsObject[Performance] =
-      deriveConfiguredCodec[Performance]
-  }
+      derives ConfiguredCodec
 
   sealed trait Comparison extends EnumEntry
 
@@ -77,16 +58,9 @@ object GraphScript {
     case object <= extends Comparison with UpperSnakecase
 
     case object == extends Comparison with UpperSnakecase
-
   }
 
-  case class Precondition(name: String, comparison: Comparison, value: Int)
-
-  object Precondition {
-
-    implicit val codecForPrecondition: Codec.AsObject[Precondition] =
-      deriveConfiguredCodec[Precondition]
-  }
+  case class Precondition(name: String, comparison: Comparison, value: Int) derives ConfiguredCodec
 
   // state
   // 1. 劇本： node map HashMap<Id, Node>
@@ -100,7 +74,7 @@ object GraphScript {
     preconditions: List[Precondition] = Nil,
     exclusiveWith: Set[String],
     children: List[String]
-  ) {
+  ) derives ConfiguredCodec {
 
     def replace(user: String): Node =
       Node(
@@ -123,8 +97,6 @@ object GraphScript {
   }
 
   object Node {
-    implicit val codecForNode: Codec.AsObject[Node] = deriveConfiguredCodec[Node]
-
     val leave = Node("leave", Nil, Nil, Nil, Set.empty, Nil)
   }
 }

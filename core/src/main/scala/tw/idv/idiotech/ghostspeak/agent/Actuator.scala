@@ -1,8 +1,8 @@
 package tw.idv.idiotech.ghostspeak.agent
 
+import io.circe.derivation.ConfiguredCodec
+
 import io.circe.Codec
-import tw.idv.idiotech.ghostspeak.agent.jsoncodec.semiauto.deriveConfiguredCodec
-import io.circe.generic.semiauto.deriveCodec
 
 import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors, TimerScheduler }
 import org.apache.pekko.actor.typed.{ ActorRef, Behavior }
@@ -200,7 +200,7 @@ object Actuator {
       implicit def codecForPerformance[T: Encoder: Decoder]: Codec.AsObject[Performance[T]] = {
         implicit val actionCodec: Codec[Action[T]] =
           Codec.from(Action.decoder[T], Action.encoder[T])
-        deriveCodec[Performance[T]]
+        Codec.AsObject.derived[Performance[T]]
       }
     }
 
@@ -210,11 +210,11 @@ object Actuator {
     object ActionDone {
 
       implicit def codecForActionDone[T: Encoder: Decoder]: Codec.AsObject[ActionDone[T]] =
-        deriveCodec[ActionDone[T]]
+        Codec.AsObject.derived[ActionDone[T]]
     }
 
     implicit def codecForEvent[T: Encoder: Decoder]: Codec.AsObject[Event[T]] =
-      deriveConfiguredCodec[Event[T]]
+      ConfiguredCodec.derived[Event[T]]
   }
 
   case class State[T](pendingActions: Set[Event.Performance[T]] = Set.empty[Event.Performance[T]])
@@ -223,7 +223,7 @@ object Actuator {
   object State {
 
     implicit def codecForState[T: Encoder: Decoder]: Codec.AsObject[State[T]] =
-      deriveCodec[State[T]]
+      Codec.AsObject.derived[State[T]]
   }
 
   sealed trait Command[T] extends CommandBase

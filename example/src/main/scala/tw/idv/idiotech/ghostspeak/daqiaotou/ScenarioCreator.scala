@@ -1,7 +1,6 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
-import io.circe.Codec
-import tw.idv.idiotech.ghostspeak.agent.jsoncodec.semiauto.deriveConfiguredCodec
+import io.circe.derivation.ConfiguredCodec
 
 import com.softwaremill.quicklens._
 import org.apache.pekko.Done
@@ -33,19 +32,15 @@ import tw.idv.idiotech.ghostspeak.daqiaotou.Task.VariableUpdates
 
 import java.util.UUID
 import scala.concurrent.Future
-import scala.concurrent.ExecutionContext.Implicits.global
-import org.apache.pekko.persistence.Persistence
 import tw.idv.idiotech.ghostspeak.agent
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Command
 import tw.idv.idiotech.ghostspeak.daqiaotou.ScenarioCreator.{
   commandTime,
   eventTime,
   getEffectTime,
-  logTime,
   performTime
 }
 
-import scala.annotation.unused
 import scala.util.Try
 
 object ScenarioCreator {
@@ -63,11 +58,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
   type NodeId = String
   type ActionId = String
 
-  case class Trigger(message: Message, nodes: List[Node])
-
-  object Trigger {
-    implicit val codecForTrigger: Codec.AsObject[Trigger] = deriveConfiguredCodec[Trigger]
-  }
+  case class Trigger(message: Message, nodes: List[Node]) derives ConfiguredCodec
 
   // variables and strings are required, with no defaults, on purpose. Snapshots written before
   // they were stored lack both fields, so they fail to decode instead of silently coming back
@@ -79,13 +70,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
     exclusions: Map[ActionId, List[NodeId]],
     variables: Map[String, Int],
     strings: Map[String, String]
-  )
-
-  object StateStorage {
-
-    implicit val codecForStateStorage: Codec.AsObject[StateStorage] =
-      deriveConfiguredCodec[StateStorage]
-  }
+  ) derives ConfiguredCodec
 
   case class State(
     triggers: Map[Message, List[Node]],
@@ -144,11 +129,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
     message: Message,
     variableUpdates: List[VariableUpdate],
     strings: List[StringVariable] = Nil
-  ) extends EventBase
-
-  object Event {
-    implicit val codecForEvent: Codec.AsObject[Event] = deriveConfiguredCodec[Event]
-  }
+  ) extends EventBase derives ConfiguredCodec
 
   def onEvent(
     user: String
@@ -233,13 +214,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
       case text => text.filterNot(_.isWhitespace) == reply.filterNot(_.isWhitespace)
     }
 
-  case class StringVariable(name: String, value: String)
-
-  object StringVariable {
-
-    implicit val codecForStringVariable: Codec.AsObject[StringVariable] =
-      deriveConfiguredCodec[StringVariable]
-  }
+  case class StringVariable(name: String, value: String) derives ConfiguredCodec
   private case class NodesAndVariables(nodes: List[Node], variable: Option[StringVariable])
 
   private def replaceString(text: String, strings: Map[String, String]): String =
@@ -517,5 +492,4 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
           else Left("not a graphscript scenario")
       )
     }
-
 }

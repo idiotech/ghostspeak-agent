@@ -1,15 +1,15 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
+import io.circe.derivation.ConfiguredCodec
+
 import io.circe.Codec
-import tw.idv.idiotech.ghostspeak.agent.jsoncodec.FreshDefault
-import tw.idv.idiotech.ghostspeak.agent.jsoncodec.semiauto.deriveConfiguredCodec
+import tw.idv.idiotech.ghostspeak.agent.FreshDefault
 
 import org.apache.pekko.Done
 import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors }
 import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem, Behavior }
 import org.apache.pekko.persistence.typed.PersistenceId
 import org.apache.pekko.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
-import cats.implicits._
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.syntax._
 import io.circe.{ Decoder, Encoder, Json, Printer }
@@ -172,7 +172,6 @@ class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPa
           else Left("not a graphscript scenario")
       )
     }
-
 }
 
 object SpotKeeper {
@@ -239,10 +238,12 @@ object SpotKeeper {
 
     // a Spot uploaded without an id gets a new one, as the constructor does
     implicit val codecForSpot: Codec.AsObject[Spot] =
-      FreshDefault(deriveConfiguredCodec[Spot], "id")(Json.fromString(s"SPOT-${UUID.randomUUID()}"))
+      FreshDefault(ConfiguredCodec.derived[Spot], "id")(
+        Json.fromString(s"SPOT-${UUID.randomUUID()}")
+      )
   }
 
-  sealed trait SpotPayload
+  sealed trait SpotPayload derives ConfiguredCodec
 
   // need to maintain an outer instance
   object SpotPayload {
@@ -250,23 +251,13 @@ object SpotKeeper {
     case class Upload(spot: Spot) extends SpotPayload
     case class Show(spot: Spot) extends SpotPayload
     case class Dump(user: String) extends SpotPayload
-
-    implicit val codecForSpotPayload: Codec.AsObject[SpotPayload] =
-      deriveConfiguredCodec[SpotPayload]
   }
 
-  case class State(spots: List[Spot]) extends EventBase
+  case class State(spots: List[Spot]) extends EventBase derives ConfiguredCodec
 
-  object State {
-    implicit val codecForState: Codec.AsObject[State] = deriveConfiguredCodec[State]
-  }
-
-  sealed trait Event extends EventBase
+  sealed trait Event extends EventBase derives ConfiguredCodec
 
   object Event {
     case class Uploaded(spot: Spot) extends Event
-
-    implicit val codecForEvent: Codec.AsObject[Event] = deriveConfiguredCodec[Event]
   }
-
 }

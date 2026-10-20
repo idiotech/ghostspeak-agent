@@ -2,8 +2,6 @@
 import com.typesafe.sbt.packager.docker.DockerVersion
 libraryDependencies ++= Seq(
   "com.softwaremill.quicklens" %% "quicklens" % "1.9.9",
-  "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8",
-  "com.google.cloud" % "google-cloud-texttospeech" % "2.0.3",
   "org.scalikejdbc" %% "scalikejdbc"       % "4.0.0",
   "com.mysql" % "mysql-connector-j" % "8.0.32"
 )

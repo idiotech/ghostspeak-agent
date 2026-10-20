@@ -1,8 +1,8 @@
 package tw.idv.idiotech.ghostspeak.agent
 
+import io.circe.derivation.ConfiguredCodec
+
 import io.circe.{ Codec, Json }
-import tw.idv.idiotech.ghostspeak.agent.jsoncodec.FreshDefault
-import tw.idv.idiotech.ghostspeak.agent.jsoncodec.semiauto.deriveConfiguredCodec
 
 import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors }
 import org.apache.pekko.actor.typed.{ ActorRef, Behavior }
@@ -158,7 +158,6 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
           val scns = state.scenarios.values.map(s => createScenario(context, s))
           logger.info(s"====== recovery complete for $name")
           scns.foreach(println)
-
         }
     }
 
@@ -211,20 +210,16 @@ object Sensor {
 
       // a Created without a uniqueId (older events) gets a new one, as the constructor does
       implicit val codecForCreated: Codec.AsObject[Created] =
-        FreshDefault(deriveConfiguredCodec[Created], "uniqueId")(newUniqueId)
+        FreshDefault(ConfiguredCodec.derived[Created], "uniqueId")(newUniqueId)
     }
 
     implicit val codecForEvent: Codec.AsObject[Event] =
-      FreshDefault(deriveConfiguredCodec[Event], "uniqueId", onlyForType = Some("CREATED"))(
+      FreshDefault(ConfiguredCodec.derived[Event], "uniqueId", onlyForType = Some("CREATED"))(
         Created.newUniqueId
       )
   }
 
-  case class Identifier(engine: String, scenarioId: String)
-
-  object Identifier {
-    implicit val codecForIdentifier: Codec.AsObject[Identifier] = deriveConfiguredCodec[Identifier]
-  }
+  case class Identifier(engine: String, scenarioId: String) derives ConfiguredCodec
 
   case class State(
     scenarios: Map[String, Created] = Map.empty,

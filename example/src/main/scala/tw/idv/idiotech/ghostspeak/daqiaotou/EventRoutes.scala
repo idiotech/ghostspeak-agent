@@ -1,7 +1,6 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
 import io.circe.Codec
-import io.circe.generic.semiauto.deriveCodec
 
 import cats.implicits._
 import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem }
@@ -12,7 +11,6 @@ import tw.idv.idiotech.ghostspeak.agent.{ CategoryManager, Scenario, Sensor }
 import org.apache.pekko.http.scaladsl.server.Directives._
 import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.apache.pekko.http.scaladsl.model.ContentTypes._
-import org.apache.pekko.http.scaladsl.model.headers.`Content-Type`
 import org.apache.pekko.pattern.StatusReply
 import io.circe.parser.{ decode, parse }
 import io.circe.syntax._
@@ -79,7 +77,6 @@ class EventRoutes[T: Decoder](
             }
           }
         ret
-
     },
     pathPrefix("v1" / "scenario" / Segment / Segment / "resources") { (engine, scenarioId) =>
       get {
@@ -151,10 +148,9 @@ class EventRoutes[T: Decoder](
 
 object EventRoutes {
 
-  case class Resources(images: List[String], sounds: List[String])
+  case class Resources(images: List[String], sounds: List[String]) derives Codec.AsObject
 
   object Resources {
-    implicit val codecForResources: Codec.AsObject[Resources] = deriveCodec[Resources]
 
     def apply(nodes: List[GraphScript.Node]): Resources = {
       val tasks: List[Task] = nodes.flatMap(_.performances.map(_.action.content.task))

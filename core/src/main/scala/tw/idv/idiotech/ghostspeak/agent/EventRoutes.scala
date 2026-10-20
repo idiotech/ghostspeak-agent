@@ -1,7 +1,6 @@
 package tw.idv.idiotech.ghostspeak.agent
 
-import io.circe.Codec
-import tw.idv.idiotech.ghostspeak.agent.jsoncodec.semiauto.deriveConfiguredCodec
+import io.circe.derivation.ConfiguredCodec
 
 import com.github.pjfanning.pekkohttpcirce.FailFastCirceSupport
 import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem }
@@ -11,7 +10,6 @@ import org.apache.pekko.http.scaladsl.server.Directives._
 import org.apache.pekko.http.scaladsl.model.{ HttpMethods, StatusCodes }
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.http.scaladsl.model.ContentTypes._
-import org.apache.pekko.http.scaladsl.model.headers.`Content-Type`
 import org.apache.pekko.pattern.StatusReply
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.Decoder
@@ -279,11 +277,5 @@ class EventRoutes[T: Decoder](
 
 object EventRoutes {
 
-  case class ScenarioPayload(template: Json, metadata: Metadata)
-
-  object ScenarioPayload {
-
-    implicit val codecForScenarioPayload: Codec.AsObject[ScenarioPayload] =
-      deriveConfiguredCodec[ScenarioPayload]
-  }
+  case class ScenarioPayload(template: Json, metadata: Metadata) derives ConfiguredCodec
 }

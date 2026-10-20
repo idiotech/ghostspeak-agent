@@ -6,10 +6,10 @@ import io.circe.parser.decode
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
 import tw.idv.idiotech.ghostspeak.agent.{ Action => BaseAction, _ }
-import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.{ defaultZone, ActTime, Performance }
+import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.{ defaultZone, ActTime }
 
 import java.time.temporal.ChronoUnit
-import java.time.{ Clock, Instant, LocalDateTime, LocalTime, ZonedDateTime }
+import java.time.{ Clock, Instant, LocalTime, ZonedDateTime }
 import scala.concurrent.duration._
 
 class ModelTest extends AnyFlatSpec with Matchers with LazyLogging {

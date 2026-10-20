@@ -1,13 +1,14 @@
 package tw.idv.idiotech.ghostspeak
 
+import io.circe.derivation.{ ConfiguredCodec, ConfiguredDecoder, ConfiguredEncoder }
+
 import io.circe.Codec
 
 import com.typesafe.config.ConfigFactory
 import enumeratum.EnumEntry.UpperSnakecase
 import enumeratum.{ CirceEnum, Enum, EnumEntry }
 import io.circe.{ Decoder, Encoder, Json }
-import tw.idv.idiotech.ghostspeak.agent.jsoncodec.{ Configuration, FreshDefault }
-import tw.idv.idiotech.ghostspeak.agent.jsoncodec.semiauto._
+import io.circe.derivation.Configuration
 import io.circe.config.syntax._
 
 import scala.collection.immutable
@@ -22,10 +23,7 @@ package object agent {
   trait CirceSerializable
 
   case class Session(scenario: String, chapter: Option[String]) extends CirceSerializable
-
-  object Session {
-    implicit val codecForSession: Codec.AsObject[Session] = deriveConfiguredCodec[Session]
-  }
+      derives ConfiguredCodec
 
   sealed trait Modality extends EnumEntry
 
@@ -68,10 +66,10 @@ package object agent {
   object Action {
 
     def decoder[T](implicit decoder: Decoder[T]): Decoder[Action[T]] =
-      deriveConfiguredDecoder[Action[T]]
+      ConfiguredDecoder.derived[Action[T]]
 
     def encoder[T](implicit encoder: Encoder[T]): Encoder.AsObject[Action[T]] =
-      deriveConfiguredEncoder[Action[T]]
+      ConfiguredEncoder.derived[Action[T]]
 
     def apply[C](id: String, message: Message[_], content: C): Action[C] =
       Action[C](id, message.sender, message.receiver, content, Session(message.scenarioId, None))
@@ -122,7 +120,7 @@ package object agent {
 
     // Modal.time defaults to the time of decoding
     implicit val codecForSystemPayload: Codec.AsObject[SystemPayload] =
-      FreshDefault(deriveConfiguredCodec[SystemPayload], "time", onlyForType = Some("MODAL"))(
+      FreshDefault(ConfiguredCodec.derived[SystemPayload], "time", onlyForType = Some("MODAL"))(
         Json.fromLong(System.currentTimeMillis())
       )
   }
@@ -150,12 +148,12 @@ package object agent {
 
     def decoder[T](implicit decoder: Decoder[T]): Decoder[Message[T]] = {
       implicit val payloadDec: Decoder[Payload[T]] = Payload.h[T]
-      deriveConfiguredDecoder[Message[T]]
+      ConfiguredDecoder.derived[Message[T]]
     }
 
     def encoder[T](implicit encoder: Encoder[T]): Encoder.AsObject[Message[T]] = {
       implicit val payloadEnc: Encoder[Payload[T]] = Payload.e[T]
-      deriveConfiguredEncoder[Message[T]]
+      ConfiguredEncoder.derived[Message[T]]
     }
   }
 
@@ -171,11 +169,7 @@ package object agent {
     categories: List[String] = Nil,
     details: Option[String] = None,
     image: Option[String] = None
-  )
-
-  object Metadata {
-    implicit val codecForMetadata: Codec.AsObject[Metadata] = deriveConfiguredCodec[Metadata]
-  }
+  ) derives ConfiguredCodec
 
   case class Scenario(
     id: String,
@@ -187,19 +181,11 @@ package object agent {
     owner: Option[String] = None,
     ordinal: Long = 9999999999999L,
     metadata: Metadata = Metadata()
-  )
+  ) derives ConfiguredCodec
 
-  object Scenario {
-    implicit val codecForScenario: Codec.AsObject[Scenario] = deriveConfiguredCodec[Scenario]
-  }
-
-  case class AgentConf(corsDomains: String) {
+  case class AgentConf(corsDomains: String) derives ConfiguredCodec {
     println(s"++++++++ ${corsDomains.split(",").toList}")
     val corsDomainList: Array[HttpOrigin] = corsDomains.split(",").map(HttpOrigin.apply)
-  }
-
-  object AgentConf {
-    implicit val codecForAgentConf: Codec.AsObject[AgentConf] = deriveConfiguredCodec[AgentConf]
   }
 
   lazy val agentConfig: AgentConf =

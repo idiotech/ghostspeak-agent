@@ -1,7 +1,6 @@
 package tw.idv.idiotech.ghostspeak.agent
 
-import io.circe.Codec
-import tw.idv.idiotech.ghostspeak.agent.jsoncodec.semiauto.deriveConfiguredCodec
+import io.circe.derivation.ConfiguredCodec
 
 import org.apache.pekko.actor.typed.{ ActorRef, Behavior }
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
@@ -30,16 +29,10 @@ object CategoryManager {
     case object LIST extends DisplayType with UpperSnakecase
   }
 
-  sealed trait Event extends EventBase
+  sealed trait Event extends EventBase derives ConfiguredCodec
 
   object Event {
-    case class Uploaded(state: State) extends Event
-
-    object Uploaded {
-      implicit val codecForUploaded: Codec.AsObject[Uploaded] = deriveConfiguredCodec[Uploaded]
-    }
-
-    implicit val codecForEvent: Codec.AsObject[Event] = deriveConfiguredCodec[Event]
+    case class Uploaded(state: State) extends Event derives ConfiguredCodec
   }
 
   sealed trait Command extends CommandBase
@@ -56,17 +49,9 @@ object CategoryManager {
     hidden: Boolean,
     displayType: DisplayType = DisplayType.OneInARow,
     displayCount: Int = 3
-  )
+  ) derives ConfiguredCodec
 
-  object Category {
-    implicit val codecForCategory: Codec.AsObject[Category] = deriveConfiguredCodec[Category]
-  }
-
-  case class State(categories: List[Category]) extends EventBase
-
-  object State {
-    implicit val codecForState: Codec.AsObject[State] = deriveConfiguredCodec[State]
-  }
+  case class State(categories: List[Category]) extends EventBase derives ConfiguredCodec
 
   private def onCommand(state: State, command: Command): ReplyEffect[Event, State] = command match {
     case Command.Upload(state, replyTo) =>
@@ -89,5 +74,4 @@ object CategoryManager {
       eventHandler = onEvent
     )
   }
-
 }

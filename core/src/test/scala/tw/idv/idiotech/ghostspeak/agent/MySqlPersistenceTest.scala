@@ -17,7 +17,7 @@ import tw.idv.idiotech.ghostspeak.agent.Sensor.Command.{ Create, Query }
 import java.sql.{ Connection, DriverManager }
 import java.util.UUID
 import scala.concurrent.duration._
-import scala.concurrent.{ Await, Future }
+import scala.concurrent.Await
 
 /** Runs the real JDBC journal and snapshot store against MySQL. Opt-in: set
   * GHOSTSPEAK_IT_MYSQL_HOST (and optionally _PORT, _USER, _PASSWORD); the test creates and drops

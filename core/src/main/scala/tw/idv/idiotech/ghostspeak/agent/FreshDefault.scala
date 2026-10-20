@@ -1,4 +1,4 @@
-package tw.idv.idiotech.ghostspeak.agent.jsoncodec
+package tw.idv.idiotech.ghostspeak.agent
 
 import io.circe.{ Codec, Decoder, Json }
 
