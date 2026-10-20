@@ -323,21 +323,19 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
             val forComparison = message.forComparison.copy(payload = fakeTextPayload)
             def findMatch(matcher: (String, String) => Boolean): Option[List[NodesAndVariables]] =
               Option(
-                state.triggers.flatMap {
-                  case (k, v) =>
-                    k.payload match {
-                      case Right(EventPayload.Text(answer, asVariable)) =>
-                        if (
-                          k.copy(payload = fakeTextPayload) == forComparison && matcher(
-                            reply,
-                            answer
-                          )
-                        ) {
-                          Some(NodesAndVariables(v, asVariable.map(n => StringVariable(n, reply))))
-                        } else None
-                      case Left(_) => None
-                    }
-                  case _ => None
+                state.triggers.flatMap { case (k, v) =>
+                  k.payload match {
+                    case Right(EventPayload.Text(answer, asVariable)) =>
+                      if (
+                        k.copy(payload = fakeTextPayload) == forComparison && matcher(
+                          reply,
+                          answer
+                        )
+                      ) {
+                        Some(NodesAndVariables(v, asVariable.map(n => StringVariable(n, reply))))
+                      } else None
+                    case _ => None // triggers for other payloads
+                  }
                 }.toList
               ).filter(_.nonEmpty)
 
@@ -384,7 +382,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
       case Command.Broadcast(message, replyTo) => "braodcast"
       case Command.Create(scenario, replyTo)   => "create"
       case Command.Query(isPublic, isFeatured, category, scenarioId, passode, replyTo) => "query"
-//      case Command.Destroy(scenarioId, replyTo) => "destroy"
+      case Command.Destroy(scenarioId, replyTo)                                        => "destroy"
     }
 
   def createScript(scenario: Scenario) = {
