@@ -23,6 +23,9 @@ ThisBuild / libraryDependencies ++= Seq(
   "org.apache.pekko" %% "pekko-stream-typed" % pekkoVersion,
   "org.apache.pekko" %% "pekko-http" % pekkoHttpVersion,
   "org.apache.pekko" %% "pekko-http-cors" % pekkoHttpVersion,
+  // not used directly: pins the version pulled in by pekko-connectors-google-fcm, since Pekko
+  // HTTP refuses to start with mixed module versions (HttpStartupTest)
+  "org.apache.pekko" %% "pekko-http-spray-json" % pekkoHttpVersion,
   "org.apache.pekko" %% "pekko-persistence-typed" % pekkoVersion,
   "org.apache.pekko" %% "pekko-persistence-query" % pekkoVersion,
   "org.apache.pekko" %% "pekko-persistence-jdbc" % "1.1.0-M1",
@@ -35,6 +38,8 @@ ThisBuild / libraryDependencies ++= Seq(
   "com.typesafe" % "config" % "1.4.2",
   "com.hunorkovacs" %% "circe-config" % "0.10.0",
   "org.typelevel" %% "cats-core" % "2.8.0",
+  // kept at the version the removed google-cloud-texttospeech dependency used to pull in
+  "org.scala-lang.modules" %% "scala-collection-compat" % "2.6.0",
   "redis.clients" % "jedis" % "5.1.5",
   "com.typesafe.scala-logging" %% "scala-logging" % "3.9.4",
   "org.apache.logging.log4j" % "log4j-slf4j2-impl" % log4jVersion,
