@@ -30,7 +30,7 @@ object Server {
     port: Int
   ): Behavior[Msg] =
     Behaviors.setup { ctx =>
-      implicit val system = ctx.system
+      given system: ActorSystem[?] = ctx.system
       Await.result(SchemaUtils.createIfNotExists(), Duration.Inf)
       PayloadColumns.check()
       val dummySensor: ActorRef[Sensor.Command[P]] = ctx.spawn(behavior, "RootSensor")

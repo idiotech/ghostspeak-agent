@@ -15,7 +15,7 @@ import scala.collection.immutable
 import org.apache.pekko.http.scaladsl.model.headers.HttpOrigin
 package object agent {
 
-  implicit val configuration: Configuration = Configuration.default
+  given configuration: Configuration = Configuration.default
     .withDiscriminator("type")
     .withScreamingSnakeCaseConstructorNames
     .withDefaults
@@ -65,10 +65,10 @@ package object agent {
 
   object Action {
 
-    def decoder[T](implicit decoder: Decoder[T]): Decoder[Action[T]] =
+    def decoder[T](using decoder: Decoder[T]): Decoder[Action[T]] =
       ConfiguredDecoder.derived[Action[T]]
 
-    def encoder[T](implicit encoder: Encoder[T]): Encoder.AsObject[Action[T]] =
+    def encoder[T](using encoder: Encoder[T]): Encoder.AsObject[Action[T]] =
       ConfiguredEncoder.derived[Action[T]]
 
     def apply[C](id: String, message: Message[_], content: C): Action[C] =
@@ -79,16 +79,16 @@ package object agent {
 
   object Payload {
 
-    def h[T](implicit b: Decoder[T]): Decoder[Either[SystemPayload, T]] = {
-      val l: Decoder[Either[SystemPayload, T]] = implicitly[Decoder[SystemPayload]].map(Left.apply)
+    def h[T](using b: Decoder[T]): Decoder[Either[SystemPayload, T]] = {
+      val l: Decoder[Either[SystemPayload, T]] = summon[Decoder[SystemPayload]].map(Left.apply)
       val r: Decoder[Either[SystemPayload, T]] = b.map(Right.apply)
       l or r
     }
 
-    def e[T](implicit b: Encoder[T]): Encoder[Payload[T]] = new Encoder[Payload[T]] {
+    def e[T](using b: Encoder[T]): Encoder[Payload[T]] = new Encoder[Payload[T]] {
 
       override def apply(a: Payload[T]): Json =
-        a.fold(l => implicitly[Encoder[SystemPayload]].apply(l), r => b(r))
+        a.fold(l => summon[Encoder[SystemPayload]].apply(l), r => b(r))
     }
   }
 
@@ -119,7 +119,7 @@ package object agent {
     }
 
     // Modal.time defaults to the time of decoding
-    implicit val codecForSystemPayload: Codec.AsObject[SystemPayload] =
+    given codecForSystemPayload: Codec.AsObject[SystemPayload] =
       FreshDefault(ConfiguredCodec.derived[SystemPayload], "time", onlyForType = Some("MODAL"))(
         Json.fromLong(System.currentTimeMillis())
       )
@@ -146,13 +146,13 @@ package object agent {
 
   object Message {
 
-    def decoder[T](implicit decoder: Decoder[T]): Decoder[Message[T]] = {
-      implicit val payloadDec: Decoder[Payload[T]] = Payload.h[T]
+    def decoder[T](using decoder: Decoder[T]): Decoder[Message[T]] = {
+      given payloadDec: Decoder[Payload[T]] = Payload.h[T]
       ConfiguredDecoder.derived[Message[T]]
     }
 
-    def encoder[T](implicit encoder: Encoder[T]): Encoder.AsObject[Message[T]] = {
-      implicit val payloadEnc: Encoder[Payload[T]] = Payload.e[T]
+    def encoder[T](using encoder: Encoder[T]): Encoder.AsObject[Message[T]] = {
+      given payloadEnc: Encoder[Payload[T]] = Payload.e[T]
       ConfiguredEncoder.derived[Message[T]]
     }
   }

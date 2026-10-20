@@ -105,7 +105,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
 
   object State {
 
-    implicit val decoder: Decoder[State] = implicitly[Decoder[StateStorage]].map(ss =>
+    given decoder: Decoder[State] = summon[Decoder[StateStorage]].map(ss =>
       State(
         ss.triggers.map(t => t.message -> t.nodes).toMap,
         ss.exclusions,
@@ -114,7 +114,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
       )
     )
 
-    implicit val encoder: Encoder[State] = implicitly[Encoder[StateStorage]].contramap[State](s =>
+    given encoder: Encoder[State] = summon[Encoder[StateStorage]].contramap[State](s =>
       StateStorage(
         s.triggers.toList.map(t => Trigger(t._1, t._2)),
         s.exclusions,
@@ -133,7 +133,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
 
   def onEvent(
     user: String
-  )(state: State, event: Event)(implicit script: Map[String, Node]): State = {
+  )(state: State, event: Event)(using script: Map[String, Node]): State = {
     val currentNodes = event.nodes
     lazy val triggeredNodes: Map[Message, List[Node]] =
       currentNodes
@@ -238,7 +238,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
   def onCommand(
     user: String,
     actuator: ActorRef[Actuator.Command[Content]]
-  )(state: State, command: Command)(implicit script: Map[String, Node]): Effect[Event, State] = {
+  )(state: State, command: Command)(using script: Map[String, Node]): Effect[Event, State] = {
     val commandName = getCommandName(command)
     val time = System.nanoTime()
     if (commandName.nonEmpty) logger.warn("START: " + getCommandName(command));
@@ -398,7 +398,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
     ret
   }
 
-  def ub(userScenario: Scenario, actuator: ActorRef[Actuator.Command[Content]])(implicit
+  def ub(userScenario: Scenario, actuator: ActorRef[Actuator.Command[Content]])(using
     script: Map[String, Node]
   ) =
     Behaviors.setup[Command] { ctx =>
@@ -429,7 +429,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
 
   def createUserScenario(
     actuatorRef: ActorRef[Actuator.Command[Content]]
-  )(actorContext: ActorContext[_], created: Sensor.Event.Created)(implicit
+  )(actorContext: ActorContext[_], created: Sensor.Event.Created)(using
     script: Map[String, Node]
   ): Either[String, ActorRef[Command]] =
     if (created.scenario.id.isBlank) Left("empty user ID not allowed")
@@ -440,7 +440,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
 
   def sendMessage(
     action: Action
-  )(implicit actorSystem: ActorSystem[_]): Future[Done] = {
+  )(using actorSystem: ActorSystem[_]): Future[Done] = {
     val actionJson = action.asJson.toString()
     val redisKey = s"action-${action.session.scenario}-${action.receiver}"
     val hashKey = action.id
@@ -456,7 +456,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
     Behaviors.setup[Command] { ctx =>
       val sensorRef = ctx.self
       val actuatorBehavior = Behaviors.setup[Actuator.Command[Content]] { actx =>
-        implicit val system = ctx.system
+        given system: ActorSystem[?] = ctx.system
         actuator.behaviorFromFuture("graphscript", sensorRef, sendMessage)
       }
       val actuatorRef: ActorRef[Actuator.Command[Content]] =
@@ -469,7 +469,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
           if (created.scenario.engine == "graphscript")
             Try {
               val scn = created.scenario
-              implicit val script: Map[String, Node] = createScript(scn)
+              given script: Map[String, Node] = createScript(scn)
               val actor: Behavior[Sensor.Command[EventPayload]] =
                 sensor.apply(
                   scn.id,

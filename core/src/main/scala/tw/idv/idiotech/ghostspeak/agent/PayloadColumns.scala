@@ -48,14 +48,14 @@ object PayloadColumns extends LazyLogging {
   }
 
   /** At startup: check, and widen if ghostspeak.widen-payload-columns is set. */
-  def check()(implicit system: ActorSystem[_]): Unit = {
+  def check()(using system: ActorSystem[_]): Unit = {
     val config = system.settings.config
     val widen = config.hasPath("ghostspeak.widen-payload-columns") &&
       config.getBoolean("ghostspeak.widen-payload-columns")
     check(config, widen, checkTimeout = 30.seconds)
   }
 
-  def check(config: Config, widen: Boolean, checkTimeout: FiniteDuration)(implicit
+  def check(config: Config, widen: Boolean, checkTimeout: FiniteDuration)(using
     system: ActorSystem[_]
   ): Unit = {
     val slickDb =

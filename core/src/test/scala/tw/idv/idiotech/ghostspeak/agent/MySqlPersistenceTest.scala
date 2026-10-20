@@ -81,7 +81,7 @@ class MySqlPersistenceTest extends AnyWordSpec with Matchers with BeforeAndAfter
   }
 
   private var testKit: ActorTestKit = _
-  private implicit def system: ActorSystem[_] = testKit.system
+  private given system: ActorSystem[_] = testKit.system
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -217,7 +217,7 @@ class MySqlPersistenceTest extends AnyWordSpec with Matchers with BeforeAndAfter
       )
       try
         noException should be thrownBy
-          PayloadColumns.check(unreachable.system.settings.config, widen = true, 10.seconds)(
+          PayloadColumns.check(unreachable.system.settings.config, widen = true, 10.seconds)(using
             unreachable.system
           )
       finally unreachable.shutdownTestKit()

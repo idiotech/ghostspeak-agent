@@ -93,9 +93,9 @@ class ModelTest extends AnyFlatSpec with Matchers with LazyLogging {
 //      Left(SystemPayload.Modal(Modality.Done)),
     "romeo and juliet"
   )
-//    implicit val geofenceSchema = Json.schema[Condition.Geofence]("Geofence")
-//    implicit val contentSchema = Json.schema[Content]("Content")
-//    implicit val popupSchema = Json.schema[Content.Popup]("Popup")
+//    given geofenceSchema = Json.schema[Condition.Geofence]("Geofence")
+//    given contentSchema = Json.schema[Content]("Content")
+//    given popupSchema = Json.schema[Content.Popup]("Popup")
 
 //    val schema = Json.schema[BaseAction[Content]]
 //    logger.info(schema.asCirce(Draft04()))

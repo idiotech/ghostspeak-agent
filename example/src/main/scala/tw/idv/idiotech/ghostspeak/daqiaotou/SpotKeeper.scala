@@ -125,7 +125,7 @@ class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPa
 
   def sendMessage(
     action: Action[Content]
-  )(implicit actorSystem: ActorSystem[_], encoder: Encoder[Action[Content]]): Future[Done] = {
+  )(using actorSystem: ActorSystem[_], encoder: Encoder[Action[Content]]): Future[Done] = {
     val actionJson = action.asJson.printWith(Printer.spaces2)
     val redisKey = s"action-${action.session.scenario}-${action.receiver}"
     val hashKey = action.id
@@ -138,7 +138,7 @@ class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPa
     Behaviors.setup[Command] { ctx =>
       val sensorRef: ActorRef[Command] = ctx.self
       val actuatorBehavior = Behaviors.setup[Actuator.Command[Content]] { actx =>
-        implicit val system = ctx.system
+        given system: ActorSystem[?] = ctx.system
         actuator.behaviorFromFuture("spotkeeper", sensorRef, sendMessage)
       }
       val actuatorRef: ActorRef[Actuator.Command[Content]] =
@@ -237,7 +237,7 @@ object SpotKeeper {
   object Spot {
 
     // a Spot uploaded without an id gets a new one, as the constructor does
-    implicit val codecForSpot: Codec.AsObject[Spot] =
+    given codecForSpot: Codec.AsObject[Spot] =
       FreshDefault(ConfiguredCodec.derived[Spot], "id")(
         Json.fromString(s"SPOT-${UUID.randomUUID()}")
       )

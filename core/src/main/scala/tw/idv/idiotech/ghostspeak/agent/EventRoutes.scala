@@ -35,15 +35,15 @@ class EventRoutes[T: Decoder](
 
   import org.apache.pekko.actor.typed.scaladsl.AskPattern.schedulerFromActorSystem
   import org.apache.pekko.actor.typed.scaladsl.AskPattern.Askable
-  implicit val jsonStreamingSupport: JsonEntityStreamingSupport = EntityStreamingSupport.json()
-  implicit val decoder: Decoder[Message[T]] = Message.decoder[T]
-  implicit val ac: ActorSystem[_] = system
+  given jsonStreamingSupport: JsonEntityStreamingSupport = EntityStreamingSupport.json()
+  given decoder: Decoder[Message[T]] = Message.decoder[T]
+  given ac: ActorSystem[_] = system
   import Sensor.Command._
 
   // asking someone requires a timeout and a scheduler, if the timeout hits without response
   // the ask is failed with a TimeoutException
-  implicit val timeout: Timeout = 3.seconds
-  implicit val ec: ExecutionContextExecutor = system.executionContext
+  given timeout: Timeout = 3.seconds
+  given ec: ExecutionContextExecutor = system.executionContext
 
   private def getScenarios(
     q: ActorRef[StatusReply[String]] => Query[T],

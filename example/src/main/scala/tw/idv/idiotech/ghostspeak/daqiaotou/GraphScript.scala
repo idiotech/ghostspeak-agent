@@ -86,7 +86,7 @@ object GraphScript {
         children
       )
 
-    def childMap(user: String)(implicit map: Map[String, Node]) =
+    def childMap(user: String)(using map: Map[String, Node]) =
       children
         .flatMap(name => map.get(name).map(_.replace(user)).map(n => n.triggers.map(_ -> n)))
         .flatten

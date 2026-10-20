@@ -93,7 +93,7 @@ class EventRoutes[T: Decoder](
             parse(msg).fold(
               e => complete(StatusCodes.InternalServerError -> e.getMessage),
               j =>
-                implicitly[Decoder[List[Scenario]]]
+                summon[Decoder[List[Scenario]]]
                   .decodeJson(j)
                   .fold(
                     e => complete(StatusCodes.InternalServerError -> s"invalid scenario: $e $j"),

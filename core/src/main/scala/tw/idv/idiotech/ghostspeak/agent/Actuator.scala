@@ -32,8 +32,8 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
   val Event: Actuator.Event.type = Actuator.Event
   val State: Actuator.State.type = Actuator.State
 
-  implicit val eventCodec: Codec.AsObject[Event] = Actuator.Event.codecForEvent[T]
-  implicit val stateCodec: Codec.AsObject[State] = Actuator.State.codecForState[T]
+  given eventCodec: Codec.AsObject[Event] = Actuator.Event.codecForEvent[T]
+  given stateCodec: Codec.AsObject[State] = Actuator.State.codecForState[T]
 
   case object TimerKey
   import Command._
@@ -197,8 +197,8 @@ object Actuator {
 
     object Performance {
 
-      implicit def codecForPerformance[T: Encoder: Decoder]: Codec.AsObject[Performance[T]] = {
-        implicit val actionCodec: Codec[Action[T]] =
+      given codecForPerformance[T: Encoder: Decoder]: Codec.AsObject[Performance[T]] = {
+        given actionCodec: Codec[Action[T]] =
           Codec.from(Action.decoder[T], Action.encoder[T])
         Codec.AsObject.derived[Performance[T]]
       }
@@ -209,11 +209,11 @@ object Actuator {
 
     object ActionDone {
 
-      implicit def codecForActionDone[T: Encoder: Decoder]: Codec.AsObject[ActionDone[T]] =
+      given codecForActionDone[T: Encoder: Decoder]: Codec.AsObject[ActionDone[T]] =
         Codec.AsObject.derived[ActionDone[T]]
     }
 
-    implicit def codecForEvent[T: Encoder: Decoder]: Codec.AsObject[Event[T]] =
+    given codecForEvent[T: Encoder: Decoder]: Codec.AsObject[Event[T]] =
       ConfiguredCodec.derived[Event[T]]
   }
 
@@ -222,7 +222,7 @@ object Actuator {
 
   object State {
 
-    implicit def codecForState[T: Encoder: Decoder]: Codec.AsObject[State[T]] =
+    given codecForState[T: Encoder: Decoder]: Codec.AsObject[State[T]] =
       Codec.AsObject.derived[State[T]]
   }
 

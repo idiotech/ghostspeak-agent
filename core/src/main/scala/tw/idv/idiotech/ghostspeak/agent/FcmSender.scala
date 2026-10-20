@@ -21,7 +21,7 @@ import io.circe.parser.decode
 import scala.concurrent.Future
 
 object FcmSender extends LazyLogging {
-  private implicit val configuration: Configuration = Configuration.default.withSnakeCaseMemberNames
+  private given configuration: Configuration = Configuration.default.withSnakeCaseMemberNames
 
   case class FcmConfig(projectId: String, privateKey: String, clientEmail: String)
       derives ConfiguredCodec {
@@ -41,7 +41,7 @@ object FcmSender extends LazyLogging {
   def send[T](
     action: Action[T],
     logPerf: (Action[T], String) => Unit = (_: Action[T], _: String) => ()
-  )(implicit actorSystem: ActorSystem[_], encoder: Encoder[Action[T]]): Future[Done] =
+  )(using actorSystem: ActorSystem[_], encoder: Encoder[Action[T]]): Future[Done] =
     Source
       .single {
         logger.info(s"sending action: ${action.asJson.toString()} to receiver: ${action.receiver}")

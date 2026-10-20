@@ -15,7 +15,7 @@ import scala.collection.immutable
 
 package object daqiaotou {
 
-  implicit val configuration: Configuration = Configuration.default
+  given configuration: Configuration = Configuration.default
     .withDiscriminator("type")
     .withScreamingSnakeCaseConstructorNames
     .withDefaults
@@ -306,10 +306,10 @@ package object daqiaotou {
     case class PerformDirectly(action: Action) extends EventPayload
   }
 
-  implicit lazy val contentEncoder: Encoder.AsObject[Action] = Action.encoder[Content]
-  implicit lazy val contentDecoder: Decoder[Action] = Action.decoder[Content]
-  implicit lazy val messageEncoder: Encoder.AsObject[Message] = Message.encoder[EventPayload]
-  implicit lazy val messageDecoder: Decoder[Message] = Message.decoder[EventPayload]
+  given contentEncoder: Encoder.AsObject[Action] = Action.encoder[Content]
+  given contentDecoder: Decoder[Action] = Action.decoder[Content]
+  given messageEncoder: Encoder.AsObject[Message] = Message.encoder[EventPayload]
+  given messageDecoder: Decoder[Message] = Message.decoder[EventPayload]
 
   case class PerfLog(user: String, action: String, stage: String) derives ConfiguredCodec
 }

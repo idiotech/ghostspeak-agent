@@ -5,7 +5,7 @@ import scalikejdbc._
 object PerformanceLogger {
   Class.forName("com.mysql.jdbc.Driver")
   val conf = config.mysql
-  implicit val session: AutoSession.type = AutoSession
+  given session: AutoSession.type = AutoSession
   ConnectionPool.singleton(
     s"jdbc:mysql://${conf.host}:${conf.port}/${conf.database}",
     conf.username,

@@ -209,11 +209,11 @@ object Sensor {
       private[Event] def newUniqueId: Json = Json.fromString(UUID.randomUUID().toString)
 
       // a Created without a uniqueId (older events) gets a new one, as the constructor does
-      implicit val codecForCreated: Codec.AsObject[Created] =
+      given codecForCreated: Codec.AsObject[Created] =
         FreshDefault(ConfiguredCodec.derived[Created], "uniqueId")(newUniqueId)
     }
 
-    implicit val codecForEvent: Codec.AsObject[Event] =
+    given codecForEvent: Codec.AsObject[Event] =
       FreshDefault(ConfiguredCodec.derived[Event], "uniqueId", onlyForType = Some("CREATED"))(
         Created.newUniqueId
       )
@@ -246,11 +246,11 @@ object Sensor {
     // Snapshots store each scenario once, in `scenarios`, and each category as the list of its
     // scenario ids in order (newest first, as `add` builds it), rather than repeating every
     // Created (template included) once per category.
-    implicit val encoder: Encoder[State] = Encoder.forProduct2("scenarios", "categories") { s =>
+    given encoder: Encoder[State] = Encoder.forProduct2("scenarios", "categories") { s =>
       (s.scenarios, s.scenariosByCategory.view.mapValues(_.map(_.scenario.id)).toMap)
     }
 
-    implicit val decoder: Decoder[State] = Decoder.instance { c =>
+    given decoder: Decoder[State] = Decoder.instance { c =>
       for {
         scenarios  <- c.get[Map[String, Created]]("scenarios")
         categories <- c.get[Option[Map[String, List[String]]]]("categories")
