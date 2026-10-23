@@ -17,7 +17,7 @@ import org.apache.pekko
 import pekko.annotation.InternalApi
 import pekko.http.scaladsl.HttpExt
 import pekko.http.scaladsl.marshalling.Marshal
-import pekko.http.scaladsl.model._
+import pekko.http.scaladsl.model.*
 import pekko.http.scaladsl.unmarshalling.{ FromResponseUnmarshaller, Unmarshal, Unmarshaller }
 import pekko.stream.Materializer
 import pekko.stream.connectors.google.GoogleSettings
@@ -27,7 +27,7 @@ import pekko.stream.connectors.google.firebase.fcm.{
   FcmSuccessResponse
 }
 import pekko.stream.connectors.google.http.GoogleHttp
-import pekko.stream.connectors.google.implicits._
+import pekko.stream.connectors.google.implicits.*
 
 import scala.annotation.nowarn
 import scala.concurrent.Future
@@ -37,7 +37,7 @@ import scala.concurrent.Future
 @nowarn("msg=deprecated")
 @InternalApi
 private[fcm] class FcmSender {
-  import FcmJsonSupport._
+  import FcmJsonSupport.*
 
   /** Use org.apache.pekko.stream.connectors.google.firebase.fcm.v1.impl.FcmSender */
   @deprecated(

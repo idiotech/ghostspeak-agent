@@ -1,0 +1,12 @@
+{
+  "id" : "m1",
+  "actionId" : "a1",
+  "receiver" : "ghost",
+  "sender" : "Romeo",
+  "payload" : {
+    "text" : "yes",
+    "asVariable" : "answer",
+    "type" : "TEXT"
+  },
+  "scenarioId" : "scn-1"
+}

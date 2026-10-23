@@ -1,7 +1,11 @@
 package tw.idv.idiotech.ghostspeak.agent
 
-import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors }
+import com.typesafe.scalalogging.LazyLogging
+import io.circe.{ Codec, Decoder, Encoder, Json }
+import io.circe.derivation.ConfiguredCodec
+import io.circe.syntax.*
 import org.apache.pekko.actor.typed.{ ActorRef, Behavior }
+import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors }
 import org.apache.pekko.pattern.StatusReply
 import org.apache.pekko.persistence.typed.{ PersistenceId, RecoveryCompleted }
 import org.apache.pekko.persistence.typed.scaladsl.{
@@ -10,10 +14,7 @@ import org.apache.pekko.persistence.typed.scaladsl.{
   ReplyEffect,
   RetentionCriteria
 }
-import com.typesafe.scalalogging.LazyLogging
-import io.circe.{ Decoder, Encoder }
-import io.circe.generic.extras.ConfiguredJsonCodec
-import io.circe.syntax._
+
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Event.{ Created, Destroyed }
 
 import java.util.UUID
@@ -21,23 +22,22 @@ import java.util.UUID
 class Sensor[P: Encoder: Decoder] extends LazyLogging {
 
   import Sensor.Command
-  import Sensor.Command._
-
+  import Sensor.Command.*
   import Sensor.Event
-  import Sensor.Event._
+  import Sensor.Event.*
   import Sensor.State
 
   type CreatorScenarioActor = (
-    ActorContext[_],
+    ActorContext[?],
     Created
   ) => Either[String, ActorRef[Command[P]]]
 
   type Reff = ReplyEffect[Event, State]
 
-  def getChild(ctx: ActorContext[_], name: String) =
+  def getChild(ctx: ActorContext[?], name: String) =
     ctx.child(name).map(_.asInstanceOf[ActorRef[Command[P]]])
 
-  def getChildren(ctx: ActorContext[_]): Iterable[ActorRef[Command[P]]] =
+  def getChildren(ctx: ActorContext[?]): Iterable[ActorRef[Command[P]]] =
     ctx.children.map(_.asInstanceOf[ActorRef[Command[P]]])
 
   def onCommand(
@@ -51,7 +51,7 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
           .fold[StatusReply[String]] {
             logger.info(
               s"no such scenario: ${message.scenarioId} $id in children ${ctx.children
-                .map(_.path)} at ${state.scenarios.map(p => p._1 + p._2.uniqueId)} for message $message"
+                  .map(_.path)} at ${state.scenarios.map(p => p._1 + p._2.uniqueId)} for message $message"
             )
             StatusReply.Error("no such scenario")
           } { actor =>
@@ -142,7 +142,7 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
     handle: OnCommand = onCommand _,
     snapshotEvery: Int = Sensor.SnapshotEvery
   ): Behavior[Command[P]] =
-    Behaviors.setup { context: ActorContext[Command[P]] =>
+    Behaviors.setup { (context: ActorContext[Command[P]]) =>
       EventSourcedBehavior
         .withEnforcedReplies[Command[P], Event, State](
           persistenceId = PersistenceId.ofUniqueId(s"sensor-$name"),
@@ -155,7 +155,6 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
           val scns = state.scenarios.values.map(s => createScenario(context, s))
           logger.info(s"====== recovery complete for $name")
           scns.foreach(println)
-
         }
     }
 
@@ -195,19 +194,29 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
 
 object Sensor {
 
-  @ConfiguredJsonCodec
   sealed trait Event extends EventBase
 
   object Event {
     case class Destroyed(scenarioId: String) extends Event
 
-    @ConfiguredJsonCodec
     case class Created(scenario: Scenario, uniqueId: String = UUID.randomUUID().toString)
         extends Event
+
+    object Created {
+      private[Event] def newUniqueId: Json = Json.fromString(UUID.randomUUID().toString)
+
+      // a Created without a uniqueId (older events) gets a new one, as the constructor does
+      given codecForCreated: Codec.AsObject[Created] =
+        FreshDefault(ConfiguredCodec.derived[Created], "uniqueId")(newUniqueId)
+    }
+
+    given codecForEvent: Codec.AsObject[Event] =
+      FreshDefault(ConfiguredCodec.derived[Event], "uniqueId", onlyForType = Some("CREATED"))(
+        Created.newUniqueId
+      )
   }
 
-  @ConfiguredJsonCodec
-  case class Identifier(engine: String, scenarioId: String)
+  case class Identifier(engine: String, scenarioId: String) derives ConfiguredCodec
 
   case class State(
     scenarios: Map[String, Created] = Map.empty,
@@ -230,14 +239,31 @@ object Sensor {
   }
 
   object State {
-    // Snapshots store only `scenarios`: `scenariosByCategory` repeats every Created (template
-    // included) once per category, so it is rebuilt on load instead of being written out.
-    implicit val encoder: Encoder[State] = Encoder.forProduct1("scenarios")(_.scenarios)
 
-    implicit val decoder: Decoder[State] =
-      Decoder.forProduct1("scenarios")((scenarios: Map[String, Created]) =>
-        scenarios.values.foldLeft(State())(_ add _)
+    // Snapshots store each scenario once, in `scenarios`, and each category as the list of its
+    // scenario ids in order (newest first, as `add` builds it), rather than repeating every
+    // Created (template included) once per category.
+    given encoder: Encoder[State] = Encoder.forProduct2("scenarios", "categories") { s =>
+      (s.scenarios, s.scenariosByCategory.view.mapValues(_.map(_.scenario.id)).toMap)
+    }
+
+    given decoder: Decoder[State] = Decoder.instance { c =>
+      for {
+        scenarios  <- c.get[Map[String, Created]]("scenarios")
+        categories <- c.get[Option[Map[String, List[String]]]]("categories")
+      } yield State(
+        scenarios,
+        categories match {
+          case Some(ids) => ids.view.mapValues(_.flatMap(scenarios.get)).toMap
+          // snapshots written before the category lists were stored: rebuild them; the order
+          // within a category is then the map's, not the original insertion order
+          case None =>
+            scenarios.values.toList
+              .flatMap(c => c.scenario.metadata.categories.distinct.map(_ -> c))
+              .groupMap(_._1)(_._2)
+        }
       )
+    }
   }
 
   // Root sensors hold one Created per scenario, so their journals stay short.

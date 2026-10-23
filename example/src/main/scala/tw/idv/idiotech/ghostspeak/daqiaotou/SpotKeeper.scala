@@ -1,18 +1,16 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
+import SpotKeeper.*
+import com.typesafe.scalalogging.LazyLogging
+import io.circe.{ Codec, Decoder, Encoder, Json, Printer }
+import io.circe.derivation.ConfiguredCodec
+import io.circe.syntax.*
 import org.apache.pekko.Done
-import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors }
 import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem, Behavior }
+import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors }
 import org.apache.pekko.persistence.typed.PersistenceId
 import org.apache.pekko.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
-import cats.implicits._
-import com.typesafe.scalalogging.LazyLogging
-import io.circe.generic.extras.ConfiguredJsonCodec
-import io.circe.syntax._
-import io.circe.{ Decoder, Encoder, Printer }
-import tw.idv.idiotech.ghostspeak.agent.Actuator.Command.Perform
-import tw.idv.idiotech.ghostspeak.agent.Sensor.Command
-import tw.idv.idiotech.ghostspeak.agent.SystemPayload.Join
+
 import tw.idv.idiotech.ghostspeak.agent.{
   Action,
   Actuator,
@@ -24,11 +22,14 @@ import tw.idv.idiotech.ghostspeak.agent.{
   Session,
   SystemPayload
 }
+import tw.idv.idiotech.ghostspeak.agent.Actuator.Command.Perform
+import tw.idv.idiotech.ghostspeak.agent.FreshDefault
+import tw.idv.idiotech.ghostspeak.agent.Sensor.Command
+import tw.idv.idiotech.ghostspeak.agent.SystemPayload.Join
 
 import java.util.UUID
 import scala.concurrent.Future
 import scala.util.Try
-import SpotKeeper._
 
 class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPayload])
     extends LazyLogging {
@@ -110,7 +111,7 @@ class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPa
     sensorRef: ActorRef[Command],
     actuatorRef: ActorRef[Actuator.Command[Content]]
   )(
-    actorContext: ActorContext[_],
+    actorContext: ActorContext[?],
     created: Sensor.Event.Created
   ): Either[String, ActorRef[Command]] =
     Right(
@@ -122,12 +123,12 @@ class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPa
 
   def sendMessage(
     action: Action[Content]
-  )(implicit actorSystem: ActorSystem[_], encoder: Encoder[Action[Content]]): Future[Done] = {
+  )(using actorSystem: ActorSystem[?], encoder: Encoder[Action[Content]]): Future[Done] = {
     val actionJson = action.asJson.printWith(Printer.spaces2)
     val redisKey = s"action-${action.session.scenario}-${action.receiver}"
     val hashKey = action.id
     logger.debug(s"saving action to redis: $redisKey $hashKey")
-    redis.withClient(r => r.hset(redisKey, hashKey, actionJson))
+    redis.hset(redisKey, hashKey, actionJson)
     FcmSender.send(action)
   }
 
@@ -135,7 +136,7 @@ class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPa
     Behaviors.setup[Command] { ctx =>
       val sensorRef: ActorRef[Command] = ctx.self
       val actuatorBehavior = Behaviors.setup[Actuator.Command[Content]] { actx =>
-        implicit val system = ctx.system
+        given system: ActorSystem[?] = ctx.system
         actuator.behaviorFromFuture("spotkeeper", sensorRef, sendMessage)
       }
       val actuatorRef: ActorRef[Actuator.Command[Content]] =
@@ -169,12 +170,10 @@ class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPa
           else Left("not a graphscript scenario")
       )
     }
-
 }
 
 object SpotKeeper {
 
-  @ConfiguredJsonCodec
   case class Spot(
     id: String = s"SPOT-${UUID.randomUUID()}",
     title: String,
@@ -233,8 +232,16 @@ object SpotKeeper {
     )
   }
 
-  @ConfiguredJsonCodec
-  sealed trait SpotPayload
+  object Spot {
+
+    // a Spot uploaded without an id gets a new one, as the constructor does
+    given codecForSpot: Codec.AsObject[Spot] =
+      FreshDefault(ConfiguredCodec.derived[Spot], "id")(
+        Json.fromString(s"SPOT-${UUID.randomUUID()}")
+      )
+  }
+
+  sealed trait SpotPayload derives ConfiguredCodec
 
   // need to maintain an outer instance
   object SpotPayload {
@@ -244,14 +251,11 @@ object SpotKeeper {
     case class Dump(user: String) extends SpotPayload
   }
 
-  @ConfiguredJsonCodec
-  case class State(spots: List[Spot]) extends EventBase
+  case class State(spots: List[Spot]) extends EventBase derives ConfiguredCodec
 
-  @ConfiguredJsonCodec
-  sealed trait Event extends EventBase
+  sealed trait Event extends EventBase derives ConfiguredCodec
 
   object Event {
     case class Uploaded(spot: Spot) extends Event
   }
-
 }

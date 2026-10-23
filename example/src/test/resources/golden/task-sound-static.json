@@ -1,0 +1,16 @@
+{
+  "url" : "https://example.com/a.mp3",
+  "volumeSetting" : {
+    "speechLength" : 12,
+    "fadeOutSeconds" : 5,
+    "fadeInSeconds" : 2,
+    "mainVolume" : {
+      "speechLength" : 10,
+      "fadeOutSeconds" : 3,
+      "fadeInSeconds" : 1
+    },
+    "type" : "STATIC_VOLUME"
+  },
+  "mode" : "MAIN",
+  "type" : "SOUND"
+}

@@ -1,32 +1,19 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
-import enumeratum.{ CirceEnum, Enum, EnumEntry }
-import enumeratum.EnumEntry.UpperSnakecase
-import io.circe.generic.extras.ConfiguredJsonCodec
-import json.schema.typeHint
-import tw.idv.idiotech.ghostspeak.agent.util.substitute
-import tw.idv.idiotech.ghostspeak.daqiaotou.BeaconType.findValues
+import io.circe.derivation.ConfiguredCodec
 
-import java.time.{
-  Clock,
-  Instant,
-  LocalDate,
-  LocalDateTime,
-  LocalTime,
-  ZoneId,
-  ZoneOffset,
-  ZonedDateTime
-}
-import scala.collection.immutable
-import scala.concurrent.duration.Duration
+import tw.idv.idiotech.ghostspeak.agent.JsonEnum
+import tw.idv.idiotech.ghostspeak.agent.util.substitute
+
+import java.time.{ Clock, Instant, LocalDateTime, LocalTime, ZonedDateTime, ZoneId }
 import scala.util.Random
 
 object GraphScript {
 
   val defaultZone = ZoneId.of("Asia/Taipei")
 
-  @ConfiguredJsonCodec
-  case class ActTime(target: Option[LocalTime], minAfter: Long, range: Long) {
+  case class ActTime(target: Option[LocalTime], minAfter: Long, range: Long)
+      derives ConfiguredCodec {
 
     def time(clock: Clock = Clock.system(defaultZone)): Long = {
       println(s"calculating time for $this")
@@ -55,32 +42,27 @@ object GraphScript {
     }
   }
 
-  @ConfiguredJsonCodec
   case class Performance(action: Action, time: Option[ActTime] = None, delay: Long = 0)
+      derives ConfiguredCodec
 
-  @typeHint[String]
-  sealed trait Comparison extends EnumEntry
-
-  object Comparison extends Enum[Comparison] with CirceEnum[Comparison] {
-    val values: immutable.IndexedSeq[Comparison] = findValues
-
-    case object >= extends Comparison with UpperSnakecase
-
-    case object <= extends Comparison with UpperSnakecase
-
-    case object == extends Comparison with UpperSnakecase
-
+// how a Precondition compares its variable; written as the operator in JSON
+  enum Comparison(val symbol: String) {
+    case AtLeast extends Comparison(">=")
+    case AtMost extends Comparison("<=")
+    case EqualTo extends Comparison("==")
   }
 
-  @ConfiguredJsonCodec
-  case class Precondition(name: String, comparison: Comparison, value: Int)
+  object Comparison extends JsonEnum[Comparison] {
+    override def jsonName(c: Comparison): String = c.symbol
+  }
+
+  case class Precondition(name: String, comparison: Comparison, value: Int) derives ConfiguredCodec
 
   // state
   // 1. 劇本： node map HashMap<Id, Node>
   // 2. HashMap<Event, Node>
   // 3. Matching event -> Node
 
-  @ConfiguredJsonCodec
   case class Node(
     name: String,
     triggers: List[Message],
@@ -88,7 +70,7 @@ object GraphScript {
     preconditions: List[Precondition] = Nil,
     exclusiveWith: Set[String],
     children: List[String]
-  ) {
+  ) derives ConfiguredCodec {
 
     def replace(user: String): Node =
       Node(
@@ -100,7 +82,7 @@ object GraphScript {
         children
       )
 
-    def childMap(user: String)(implicit map: Map[String, Node]) =
+    def childMap(user: String)(using map: Map[String, Node]) =
       children
         .flatMap(name => map.get(name).map(_.replace(user)).map(n => n.triggers.map(_ -> n)))
         .flatten

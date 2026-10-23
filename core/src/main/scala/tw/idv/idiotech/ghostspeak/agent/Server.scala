@@ -1,14 +1,14 @@
 package tw.idv.idiotech.ghostspeak.agent
 
-import org.apache.pekko.actor.typed.scaladsl.Behaviors
-import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem, Behavior, PostStop }
-import org.apache.pekko.http.scaladsl.Http.ServerBinding
-import org.apache.pekko.http.scaladsl.Http
-import org.apache.pekko.persistence.jdbc.testkit.scaladsl.SchemaUtils
 import io.circe.Decoder
+import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem, Behavior, PostStop }
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.Http.ServerBinding
+import org.apache.pekko.persistence.jdbc.testkit.scaladsl.SchemaUtils
 
-import scala.concurrent.duration.Duration
 import scala.concurrent.{ Await, Future }
+import scala.concurrent.duration.Duration
 import scala.util.{ Failure, Success }
 
 object Server {
@@ -24,15 +24,15 @@ object Server {
     routing: (
       ActorRef[Sensor.Command[P]],
       ActorRef[CategoryManager.Command],
-      ActorSystem[_]
+      ActorSystem[?]
     ) => EventRoutes[P],
     host: String,
     port: Int
   ): Behavior[Msg] =
     Behaviors.setup { ctx =>
-      implicit val system = ctx.system
+      given system: ActorSystem[?] = ctx.system
       Await.result(SchemaUtils.createIfNotExists(), Duration.Inf)
-      Await.result(SnapshotSchemaMigration(), Duration.Inf)
+      PayloadColumns.check()
       val dummySensor: ActorRef[Sensor.Command[P]] = ctx.spawn(behavior, "RootSensor")
       val categoryManager: ActorRef[CategoryManager.Command] =
         ctx.spawn(CategoryManager(), "CategoryManager")

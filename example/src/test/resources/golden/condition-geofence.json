@@ -1,0 +1,8 @@
+{
+  "location" : {
+    "lat" : 24.1,
+    "lon" : 120.6
+  },
+  "radius" : 14,
+  "type" : "GEOFENCE"
+}

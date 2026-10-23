@@ -1,0 +1,6 @@
+{
+  "beaconId" : "beacon-1",
+  "threshold" : -70,
+  "mode" : "ENTER",
+  "type" : "BEACON"
+}

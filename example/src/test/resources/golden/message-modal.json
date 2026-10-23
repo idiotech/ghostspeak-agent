@@ -1,0 +1,12 @@
+{
+  "id" : "m1",
+  "actionId" : "a1",
+  "receiver" : "ghost",
+  "sender" : "Romeo",
+  "payload" : {
+    "modality" : "DONE",
+    "time" : 1700000000000,
+    "type" : "MODAL"
+  },
+  "scenarioId" : "scn-1"
+}

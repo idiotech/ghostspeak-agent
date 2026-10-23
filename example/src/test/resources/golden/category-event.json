@@ -1,0 +1,15 @@
+{
+  "state" : {
+    "categories" : [
+      {
+        "id" : "c1",
+        "name" : "Drama",
+        "order" : 1,
+        "hidden" : false,
+        "displayType" : "CAROUSEL",
+        "displayCount" : 5
+      }
+    ]
+  },
+  "type" : "UPLOADED"
+}

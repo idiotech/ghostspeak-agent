@@ -1,18 +1,19 @@
 package tw.idv.idiotech.ghostspeak.agent
 
 import io.circe.parser.decode
-import io.circe.syntax._
+import io.circe.syntax.*
 import org.apache.pekko.Done
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.persistence.testkit.scaladsl.EventSourcedBehaviorTestKit
 import org.apache.pekko.persistence.testkit.scaladsl.EventSourcedBehaviorTestKit.SerializationSettings
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.wordspec.AnyWordSpecLike
+
 import tw.idv.idiotech.ghostspeak.agent.Actuator.Command.{ Perform, Timeout }
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Command.Sense
 
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class ActuatorTest
     extends ScalaTestWithActorTestKit(PersistenceTestConfig.config)
@@ -112,6 +113,28 @@ class ActuatorTest
       val restored = esTestKit.restart().state
       restored.pendingActions.size shouldBe 101
       restored.pendingActions.map(_.startTime) shouldBe startTimes.toSet
+    }
+  }
+
+  "Actuator" should {
+    "snapshot at the interval it is given" in {
+      val every10 =
+        EventSourcedBehaviorTestKit[Actuator.Command[String], actuator.Event, actuator.State](
+          system,
+          actuator.behaviorFromFuture(
+            "every-10",
+            sensor.ref,
+            _ => Future.successful(Done),
+            snapshotEvery = 10
+          ),
+          SerializationSettings.disabled
+        )
+      (1 to 25).foreach(i => every10.runCommand(Perform(action(s"a$i"), inOneHour(i.toLong))))
+      every10.snapshotTestKit.get
+        .persistedInStorage("actuator-every-10")
+        .map(_._1.sequenceNr) shouldBe
+      Seq(10L, 20L)
+      every10.restart().state.pendingActions.size shouldBe 25
     }
   }
 

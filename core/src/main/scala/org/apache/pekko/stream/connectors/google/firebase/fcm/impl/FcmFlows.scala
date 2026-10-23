@@ -17,10 +17,10 @@ import org.apache.pekko
 import pekko.NotUsed
 import pekko.annotation.InternalApi
 import pekko.http.scaladsl.Http
-import pekko.stream.connectors.google.auth.{ Credentials, ServiceAccountCredentials }
-import pekko.stream.connectors.google.{ GoogleAttributes, GoogleSettings }
 import pekko.stream.{ Attributes, Materializer }
-import pekko.stream.connectors.google.firebase.fcm._
+import pekko.stream.connectors.google.{ GoogleAttributes, GoogleSettings }
+import pekko.stream.connectors.google.auth.{ Credentials, ServiceAccountCredentials }
+import pekko.stream.connectors.google.firebase.fcm.*
 import pekko.stream.scaladsl.Flow
 
 import scala.concurrent.Future

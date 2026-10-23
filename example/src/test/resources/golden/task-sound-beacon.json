@@ -1,0 +1,17 @@
+{
+  "url" : "https://example.com/c.mp3",
+  "volumeSetting" : {
+    "beaconId" : "beacon-1",
+    "minValue" : -90,
+    "minVolume" : 0.1,
+    "maxValue" : -40,
+    "mainVolume" : {
+      "speechLength" : 10,
+      "fadeOutSeconds" : 3,
+      "fadeInSeconds" : 1
+    },
+    "type" : "BEACON_VOLUME"
+  },
+  "mode" : "LOOP",
+  "type" : "SOUND"
+}

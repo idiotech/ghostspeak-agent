@@ -1,10 +1,11 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
 import io.circe.parser.decode
-import io.circe.syntax._
+import io.circe.syntax.*
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
-import tw.idv.idiotech.ghostspeak.agent.{ Actuator, Sensor, SystemPayload, Message => BaseMessage }
+
+import tw.idv.idiotech.ghostspeak.agent.{ Actuator, Message as BaseMessage, Sensor, SystemPayload }
 
 class ScenarioStateTest extends AnyFlatSpec with Matchers {
 

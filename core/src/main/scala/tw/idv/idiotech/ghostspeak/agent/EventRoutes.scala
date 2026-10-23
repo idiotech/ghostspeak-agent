@@ -1,49 +1,47 @@
 package tw.idv.idiotech.ghostspeak.agent
 
 import com.github.pjfanning.pekkohttpcirce.FailFastCirceSupport
-import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem }
-import org.apache.pekko.http.scaladsl.common.EntityStreamingSupport
-import org.apache.pekko.util.Timeout
-import org.apache.pekko.http.scaladsl.server.Directives._
-import org.apache.pekko.http.scaladsl.model.{ HttpMethods, StatusCodes }
-import org.apache.pekko.http.scaladsl.server.Route
-import org.apache.pekko.http.scaladsl.model.ContentTypes._
-import org.apache.pekko.http.scaladsl.model.headers.`Content-Type`
-import org.apache.pekko.pattern.StatusReply
 import com.typesafe.scalalogging.LazyLogging
-import io.circe.Decoder
-import io.circe.Json
-import io.circe.generic.extras.ConfiguredJsonCodec
+import io.circe.{ Decoder, Json }
+import io.circe.derivation.ConfiguredCodec
 import io.circe.parser.decode
-import io.circe.syntax._
+import io.circe.syntax.*
+import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem }
 import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
 import org.apache.pekko.http.cors.scaladsl.model.HttpOriginMatcher
 import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
+import org.apache.pekko.http.scaladsl.common.{ EntityStreamingSupport, JsonEntityStreamingSupport }
+import org.apache.pekko.http.scaladsl.model.{ HttpMethods, StatusCodes }
+import org.apache.pekko.http.scaladsl.server.Directives.*
+import org.apache.pekko.http.scaladsl.server.Route
+import org.apache.pekko.pattern.StatusReply
+import org.apache.pekko.util.Timeout
+
 import tw.idv.idiotech.ghostspeak.agent.EventRoutes.ScenarioPayload
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Identifier
 
-import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.{ ExecutionContextExecutor, Future }
+import scala.concurrent.duration.*
 import scala.util.{ Failure, Success }
 
 class EventRoutes[T: Decoder](
   sensor: ActorRef[Sensor.Command[T]],
   categoryManager: ActorRef[CategoryManager.Command],
-  system: ActorSystem[_]
+  system: ActorSystem[?]
 ) extends FailFastCirceSupport
     with LazyLogging {
 
-  import org.apache.pekko.actor.typed.scaladsl.AskPattern.schedulerFromActorSystem
   import org.apache.pekko.actor.typed.scaladsl.AskPattern.Askable
-  implicit val jsonStreamingSupport = EntityStreamingSupport.json()
-  implicit val decoder = Message.decoder[T]
-  implicit val ac = system
-  import Sensor.Command._
+  import org.apache.pekko.actor.typed.scaladsl.AskPattern.schedulerFromActorSystem
+  given jsonStreamingSupport: JsonEntityStreamingSupport = EntityStreamingSupport.json()
+  given decoder: Decoder[Message[T]] = Message.decoder[T]
+  given ac: ActorSystem[?] = system
+  import Sensor.Command.*
 
   // asking someone requires a timeout and a scheduler, if the timeout hits without response
   // the ask is failed with a TimeoutException
-  implicit val timeout: Timeout = 3.seconds
-  implicit val ec = system.executionContext
+  given timeout: Timeout = 3.seconds
+  given ec: ExecutionContextExecutor = system.executionContext
 
   private def getScenarios(
     q: ActorRef[StatusReply[String]] => Query[T],
@@ -271,12 +269,11 @@ class EventRoutes[T: Decoder](
     .withAllowedOrigins(HttpOriginMatcher.Default(agentConfig.corsDomainList))
 
   lazy val theEventRoutes: Route = cors(corsSettings) {
-    concat(routes: _*)
+    concat(routes*)
   }
 }
 
 object EventRoutes {
 
-  @ConfiguredJsonCodec
-  case class ScenarioPayload(template: Json, metadata: Metadata)
+  case class ScenarioPayload(template: Json, metadata: Metadata) derives ConfiguredCodec
 }

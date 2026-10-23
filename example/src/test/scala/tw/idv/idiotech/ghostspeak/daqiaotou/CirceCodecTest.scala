@@ -2,8 +2,9 @@ package tw.idv.idiotech.ghostspeak.daqiaotou
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
+
 import tw.idv.idiotech.ghostspeak.agent.{ Actuator, Metadata, Scenario, Sensor, Session }
-import tw.idv.idiotech.ghostspeak.agent.{ Action => BaseAction }
+import tw.idv.idiotech.ghostspeak.agent.Action as BaseAction
 import tw.idv.idiotech.ghostspeak.daqiaotou.SpotKeeper.SpotPayload
 
 // CirceSerializer delegates to CirceCodec, so these round-trips go through the same
@@ -31,7 +32,7 @@ class CirceCodecTest extends AnyFlatSpec with Matchers {
     codec.fromBinary(codec.toBinary(o), Some(o.getClass))
 
   "the snapshot codec" must "round-trip a user scenario state" in {
-    val codec = new CirceCodec(scenarioCreator, graphActuator)
+    val codec = new CirceCodec(scenarioCreator)
     val state = scenarioCreator.State(
       Map.empty,
       Map("action-1" -> List("node-1")),
@@ -42,14 +43,14 @@ class CirceCodecTest extends AnyFlatSpec with Matchers {
   }
 
   it must "refuse a user scenario snapshot written without variables and strings" in {
-    val codec = new CirceCodec(scenarioCreator, graphActuator)
+    val codec = new CirceCodec(scenarioCreator)
     val legacy = """{"triggers":[],"exclusions":{}}""".getBytes("UTF-8")
     an[Exception] must be thrownBy
     codec.fromBinary(legacy, Some(classOf[scenarioCreator.State]))
   }
 
   it must "round-trip a sensor state" in {
-    val codec = new CirceCodec(scenarioCreator, graphActuator)
+    val codec = new CirceCodec(scenarioCreator)
     val created = Sensor.Event.Created(
       Scenario("s1", "graphscript", "[]", metadata = Metadata(categories = List("cat")))
     )
@@ -58,19 +59,18 @@ class CirceCodecTest extends AnyFlatSpec with Matchers {
   }
 
   it must "round-trip an actuator state" in {
-    val codec = new CirceCodec(scenarioCreator, graphActuator)
+    val codec = new CirceCodec(scenarioCreator)
     val state = graphActuator.State(Set(graphActuator.Event.Performance(action, 1000L)))
     roundTrip(codec, state) mustBe state
   }
 
-  it must "restore Performances that belong to the actuator it was given" in {
-    // The spotkeeper actuator's State has the same runtime class as the graphscript one, so the
-    // codec must decode with the actuator of the running engine, not always the graphscript one.
-    val codec = new CirceCodec(scenarioCreator, spotActuator)
-    val performance = spotActuator.Event.Performance(action, 1000L)
-    val restored = roundTrip(codec, spotActuator.State(Set(performance)))
+  it must "restore actuator data that any actuator can handle, whatever the engine" in {
+    // The graphscript and spotkeeper actuators share Actuator.Event[Content]: what one wrote,
+    // the other recovers and completes, so decoding does not depend on the engine setting.
+    val codec = new CirceCodec(scenarioCreator)
+    val performance = graphActuator.Event.Performance(action, 1000L)
+    val restored = roundTrip(codec, graphActuator.State(Set(performance)))
       .asInstanceOf[spotActuator.State]
-    // completing the action must remove it from the restored state
     val done = spotActuator.Event.ActionDone(Set(performance))
     spotActuator.eventHandler(restored, done).pendingActions mustBe empty
   }

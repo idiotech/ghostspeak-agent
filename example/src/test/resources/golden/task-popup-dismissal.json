@@ -1,0 +1,6 @@
+{
+  "destinations" : [
+    "ALERT"
+  ],
+  "type" : "POPUP_DISMISSAL"
+}

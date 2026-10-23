@@ -1,0 +1,6 @@
+{
+  "caller" : "Juliet",
+  "status" : "CONNECTING",
+  "portrait" : "p.png",
+  "type" : "INCOMING_CALL"
+}

@@ -1,0 +1,46 @@
+{
+  "id" : "m1",
+  "actionId" : "a1",
+  "receiver" : "ghost",
+  "sender" : "Romeo",
+  "payload" : {
+    "action" : {
+      "id" : "direct",
+      "receiver" : "Romeo",
+      "sender" : "Juliet",
+      "content" : {
+        "task" : {
+          "text" : "Do you love me?",
+          "choices" : [
+            "yes",
+            "no"
+          ],
+          "allowTextReply" : true,
+          "pictures" : [
+            "https://example.com/a.jpg"
+          ],
+          "destinations" : [
+            "APP",
+            "NOTIFICATION"
+          ],
+          "closeAlertAfterReply" : false,
+          "clearDialog" : true,
+          "type" : "POPUP"
+        },
+        "condition" : {
+          "type" : "ALWAYS"
+        },
+        "exclusiveWith" : [
+          "other"
+        ]
+      },
+      "session" : {
+        "scenario" : "romeo and juliet",
+        "chapter" : "chapter 1"
+      },
+      "description" : null
+    },
+    "type" : "PERFORM_DIRECTLY"
+  },
+  "scenarioId" : "scn-1"
+}
