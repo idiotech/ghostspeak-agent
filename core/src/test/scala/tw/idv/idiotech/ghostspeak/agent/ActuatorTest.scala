@@ -9,7 +9,7 @@ import org.apache.pekko.persistence.testkit.scaladsl.EventSourcedBehaviorTestKit
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.wordspec.AnyWordSpecLike
 
-import tw.idv.idiotech.ghostspeak.agent.Actuator.Command.{ Perform, Timeout }
+import tw.idv.idiotech.ghostspeak.agent.Actuator.Command.{ Cancel, Perform, Timeout }
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Command.Sense
 
 import scala.concurrent.Future
@@ -43,8 +43,8 @@ class ActuatorTest
     esTestKit.snapshotTestKit.foreach(_.clearAll())
   }
 
-  def action(id: String) =
-    Action[String](id, "user", "npc", s"content of $id", Session("scn", None))
+  def action(id: String, receiver: String = "user", scenario: String = "scn") =
+    Action[String](id, receiver, "npc", s"content of $id", Session(scenario, None))
   def inOneHour(offset: Long = 0) = System.currentTimeMillis() + 1.hour.toMillis + offset
 
   "Actuator" should {
@@ -135,6 +135,37 @@ class ActuatorTest
         .map(_._1.sequenceNr) shouldBe
       Seq(10L, 20L)
       every10.restart().state.pendingActions.size shouldBe 25
+    }
+  }
+
+  "Cancel" should {
+    "drop only the pending actions of the user in the scenario" in {
+      val startTime = inOneHour()
+      val left = action("a", "user1", "story1")
+      val otherUser = action("b", "user2", "story1")
+      val otherScenario = action("c", "user1", "story2")
+      Seq(left, otherUser, otherScenario).foreach(a => esTestKit.runCommand(Perform(a, startTime)))
+
+      val result = esTestKit.runCommand(Cancel[String]("user1", "story1"))
+
+      result.event shouldBe ActionDone(Set(Performance(left, startTime)))
+      result.state.pendingActions.map(_.action) shouldBe Set(otherUser, otherScenario)
+    }
+
+    "persist nothing when the user has nothing pending" in {
+      esTestKit.runCommand(Perform(action("a", "user2", "story1"), inOneHour()))
+
+      val result = esTestKit.runCommand(Cancel[String]("user1", "story1"))
+
+      result.hasNoEvents shouldBe true
+      result.state.pendingActions.map(_.action.id) shouldBe Set("a")
+    }
+
+    "stay cancelled after a restart" in {
+      esTestKit.runCommand(Perform(action("a", "user1", "story1"), inOneHour()))
+      esTestKit.runCommand(Cancel[String]("user1", "story1"))
+
+      esTestKit.restart().state.pendingActions shouldBe empty
     }
   }
 
