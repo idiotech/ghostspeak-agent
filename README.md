@@ -61,9 +61,10 @@ At build time, `IMAGE_TAG` (default `localtest`) tags the Docker image built by
 
 ### Payload columns
 
-At startup the server checks that the journal and snapshot payload columns are `LONGBLOB`. A
-`BLOB` column holds at most 64 KB, so the server logs the `ALTER TABLE` that widens it; run it
-by hand, or start one instance once with `WIDEN_PAYLOAD_COLUMNS=true`.
+At startup the server checks that the journal and snapshot payload columns are `MEDIUMBLOB`
+(16 MB) or `LONGBLOB`. A `BLOB` column holds at most 64 KB, so the server logs the `ALTER TABLE`
+that widens it to `LONGBLOB`; run it by hand, or start one instance once with
+`WIDEN_PAYLOAD_COLUMNS=true`.
 
 The `ALTER TABLE` copies each table and locks it for writes meanwhile, which takes a while on a
 large journal. It runs before the HTTP port is bound and has no timeout, so the instance answers

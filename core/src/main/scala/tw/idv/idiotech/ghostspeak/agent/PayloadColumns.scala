@@ -15,11 +15,12 @@ import scala.util.control.NonFatal
   * snapshot of a sensor holds every scenario, so either can be bigger: in strict mode the insert
   * fails, and otherwise MySQL truncates it into JSON that no longer decodes.
   *
-  * At startup the payload columns are checked. If one is still a BLOB, the server logs the SQL that
-  * widens it to LONGBLOB, and runs it only when ghostspeak.widen-payload-columns
-  * (WIDEN_PAYLOAD_COLUMNS=true) is set: the ALTER copies the whole table and locks it meanwhile, so
-  * it belongs in one deliberate deploy (or done by hand), not in every pod's startup. Nothing here
-  * stops the server from starting: a failed check or ALTER is logged.
+  * At startup the payload columns are checked. MEDIUMBLOB (16 MB) and LONGBLOB are big enough. If
+  * one is smaller, the server logs the SQL that widens it to LONGBLOB, and runs it only when
+  * ghostspeak.widen-payload-columns (WIDEN_PAYLOAD_COLUMNS=true) is set: the ALTER copies the whole
+  * table and locks it meanwhile, so it belongs in one deliberate deploy (or done by hand), not in
+  * every pod's startup. Nothing here stops the server from starting: a failed check or ALTER is
+  * logged.
   */
 object PayloadColumns extends LazyLogging {
 
@@ -27,6 +28,21 @@ object PayloadColumns extends LazyLogging {
     def qualifiedTable: String = if (schema.isEmpty) s"`$table`" else s"`$schema`.`$table`"
     def widenSql: String = s"ALTER TABLE $qualifiedTable MODIFY `$column` LONGBLOB NOT NULL"
     override def toString: String = s"$qualifiedTable.`$column`"
+  }
+
+  // the most a value of each BLOB type holds
+  private val capacities =
+    Map("tinyblob" -> "255 bytes", "blob" -> "64 KB", "mediumblob" -> "16 MB", "longblob" -> "4 GB")
+
+  /** Why a payload column of this DATA_TYPE is too small, or None when it is big enough. */
+  def tooSmall(dataType: String): Option[String] = dataType.toLowerCase match {
+    case "mediumblob" | "longblob" => None
+    case t                         =>
+      Some(
+        capacities
+          .get(t)
+          .fold(s"$t, not a MEDIUMBLOB or LONGBLOB")(c => s"$t, which holds at most $c")
+      )
   }
 
   /** The event payload and snapshot payload columns, with the tables and schemas configured. */
@@ -77,18 +93,17 @@ object PayloadColumns extends LazyLogging {
               ),
               checkTimeout
             )
-            dataType match {
-              case Some(t) if t.equalsIgnoreCase("longblob") => ()
-              case Some(t) if widen                          =>
+            dataType.map(t => (t, tooSmall(t))) match {
+              case Some((_, None))             => ()
+              case Some((t, Some(_))) if widen =>
                 logger.warn(s"widening $c from $t to LONGBLOB: ${c.widenSql}")
                 // no timeout: the ALTER takes as long as copying the table does
                 Await.result(db.run(sqlu"#${c.widenSql}").map(_ => ()), Duration.Inf)
                 logger.warn(s"widened $c to LONGBLOB")
-              case Some(t) =>
+              case Some((_, Some(why))) =>
                 logger.error(
-                  s"$c is $t, which holds at most 64 KB; larger events or snapshots will fail " +
-                    s"or be truncated. Widen it with: ${c.widenSql}; or restart once with " +
-                    "WIDEN_PAYLOAD_COLUMNS=true"
+                  s"$c is $why; larger events or snapshots will fail or be truncated. Widen it " +
+                    s"with: ${c.widenSql}; or restart once with WIDEN_PAYLOAD_COLUMNS=true"
                 )
               case None =>
                 logger.warn(s"payload column $c not found; not checking it")
