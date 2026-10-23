@@ -10,10 +10,10 @@ import scala.util.Using
   * ("action-<scenario>-<user>"), mapping action IDs to the action JSON not yet fetched by the
   * client.
   */
-class RedisStore(host: String, port: Int, timeoutMs: Int = 0) {
+class RedisStore(host: String, port: Int, timeoutMs: Int = RedisStore.DefaultTimeoutMs) {
 
-  // Like the redisclient pool this replaces: no cap on connections, up to 8 kept idle, and by
-  // default (timeoutMs = 0) no connect or read timeout.
+  // No cap on connections, up to 8 kept idle. The calls block, so callers that can run them off
+  // the actor threads do so on Pekko's blocking-I/O dispatcher.
   private val poolConfig = {
     val c = new JedisPoolConfig()
     c.setMaxTotal(-1)
@@ -39,4 +39,10 @@ class RedisStore(host: String, port: Int, timeoutMs: Int = 0) {
     withClient(_.del(key))
 
   def close(): Unit = pool.close()
+}
+
+object RedisStore {
+  // long enough for a slow call, short enough that a Redis that stopped answering does not hold
+  // threads forever (Jedis's own default is 2 s); 0 waits indefinitely
+  val DefaultTimeoutMs = 10000
 }

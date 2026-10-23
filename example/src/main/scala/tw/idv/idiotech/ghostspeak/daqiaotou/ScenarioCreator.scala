@@ -314,6 +314,8 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
             logger.info(s"user $user left")
             val redisKey = s"action-${message.scenarioId}-$user"
             logger.debug(s"deleting user from redis: $redisKey")
+            // blocking on purpose: the delete must finish before this user's next actions are
+            // written, or it could remove them
             redis.del(redisKey)
             // delayed actions of the left run would otherwise reach the user's next run
             actuator ! Cancel(user, message.scenarioId)
@@ -444,9 +446,10 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
     val redisKey = s"action-${action.session.scenario}-${action.receiver}"
     val hashKey = action.id
     logger.debug(s"saving action to redis: $redisKey $hashKey")
-    redis.hset(redisKey, hashKey, actionJson)
-    logPerf(action, "fcm_sending")
-    FcmSender.send(action, logPerf)
+    onRedis(_.hset(redisKey, hashKey, actionJson)).flatMap { _ =>
+      logPerf(action, "fcm_sending")
+      FcmSender.send(action, logPerf)
+    }(using actorSystem.executionContext)
   }
 
   var spawnTime = 0L;
@@ -468,11 +471,13 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
           if (created.scenario.engine == "graphscript")
             Try {
               val scn = created.scenario
-              given script: Map[String, Node] = createScript(scn)
+              // a val, not a given: givens are lazy, and the template must be decoded here,
+              // inside the Try, so an invalid one is refused before the scenario is persisted
+              val script: Map[String, Node] = createScript(scn)
               val actor: Behavior[Sensor.Command[EventPayload]] =
                 sensor.apply(
                   scn.id,
-                  createUserScenario(actuatorRef),
+                  (ctx, created) => createUserScenario(actuatorRef)(ctx, created)(using script),
                   sensor.onCommandPerUser,
                   Sensor.PerUserSnapshotEvery
                 )

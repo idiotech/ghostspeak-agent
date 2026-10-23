@@ -154,7 +154,7 @@ class RedisStoreTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     }
   }
 
-  it must "by default keep waiting past Jedis's own 2 s timeout, as redisclient did" in {
+  it must "by default wait longer than Jedis's own 2 s timeout" in {
     requireRedis()
     withSilentServer { port =>
       val untimed = new RedisStore("127.0.0.1", port)
@@ -163,7 +163,7 @@ class RedisStoreTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
       call.setDaemon(true)
       call.start()
       call.join(3000)
-      // still waiting after 3 s; closing the server afterwards ends the call
+      // still waiting after 3 s (the default is 10 s); closing the server ends the call
       try withClue(s"the call ended with $outcome: ")(call.isAlive mustBe true)
       finally untimed.close()
     }
