@@ -2,6 +2,7 @@ package tw.idv.idiotech.ghostspeak.daqiaotou
 
 import com.typesafe.config.ConfigFactory
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.pattern.StatusReply
 import org.apache.pekko.persistence.testkit.PersistenceTestKitSnapshotPlugin
 import org.apache.pekko.persistence.testkit.scaladsl.EventSourcedBehaviorTestKit
 import org.apache.pekko.persistence.testkit.scaladsl.EventSourcedBehaviorTestKit.SerializationSettings
@@ -81,6 +82,23 @@ class ScenarioCreatorTest
         message(Right(EventPayload.Text("yes")), Some("ask")).copy(sender = "u1", id = "m1")
       user.runCommand(Sensor.Command.Sense(reply))
       actuator.expectMessageType[Actuator.Command.Perform[Content]].action.id shouldBe "thanks"
+    }
+  }
+
+  "creating a scenario" should {
+    "refuse a template that is not a valid script, persisting nothing" in {
+      val root =
+        EventSourcedBehaviorTestKit[Sensor.Command[EventPayload], Sensor.Event, Sensor.State](
+          system,
+          creator.scenarioBehavior,
+          SerializationSettings.disabled
+        )
+      val result = root.runCommand[StatusReply[String]](r =>
+        Sensor.Command.Create[EventPayload](Scenario("bad", "graphscript", "not a script"), r)
+      )
+      result.reply.isError shouldBe true
+      result.reply.getError.getMessage should include("invalid template")
+      result.hasNoEvents shouldBe true
     }
   }
 

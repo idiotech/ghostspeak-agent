@@ -468,11 +468,13 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
           if (created.scenario.engine == "graphscript")
             Try {
               val scn = created.scenario
-              given script: Map[String, Node] = createScript(scn)
+              // a val, not a given: givens are lazy, and the template must be decoded here,
+              // inside the Try, so an invalid one is refused before the scenario is persisted
+              val script: Map[String, Node] = createScript(scn)
               val actor: Behavior[Sensor.Command[EventPayload]] =
                 sensor.apply(
                   scn.id,
-                  createUserScenario(actuatorRef),
+                  (ctx, created) => createUserScenario(actuatorRef)(ctx, created)(using script),
                   sensor.onCommandPerUser,
                   Sensor.PerUserSnapshotEvery
                 )
