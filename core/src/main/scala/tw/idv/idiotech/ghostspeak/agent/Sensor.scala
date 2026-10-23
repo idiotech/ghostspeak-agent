@@ -203,17 +203,15 @@ object Sensor {
         extends Event
 
     object Created {
-      private[Event] def newUniqueId: Json = Json.fromString(UUID.randomUUID().toString)
+      private def newUniqueId: Json = Json.fromString(UUID.randomUUID().toString)
 
       // a Created without a uniqueId (older events) gets a new one, as the constructor does
       given codecForCreated: Codec.AsObject[Created] =
         FreshDefault(ConfiguredCodec.derived[Created], "uniqueId")(newUniqueId)
     }
 
-    given codecForEvent: Codec.AsObject[Event] =
-      FreshDefault(ConfiguredCodec.derived[Event], "uniqueId", onlyForType = Some("CREATED"))(
-        Created.newUniqueId
-      )
+    // derivation uses Created's own codec, FreshDefault included, for the CREATED case
+    given codecForEvent: Codec.AsObject[Event] = ConfiguredCodec.derived[Event]
   }
 
   case class Identifier(engine: String, scenarioId: String) derives ConfiguredCodec
