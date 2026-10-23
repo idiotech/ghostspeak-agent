@@ -77,6 +77,9 @@ class PersistenceConfigTest extends AnyFlatSpec with Matchers {
     val store = config.getConfig("jdbc-snapshot-store-replay-on-error")
     store.getBoolean("snapshot-is-optional") mustBe true
     store.getString("use-shared-db") mustBe "slick"
-    store.getString("class") mustBe config.getString("jdbc-snapshot-store.class")
+    store.getString("class") mustBe classOf[ReplayOnErrorSnapshotStore].getName
+    Class
+      .forName(config.getString("jdbc-snapshot-store.class"))
+      .isAssignableFrom(classOf[ReplayOnErrorSnapshotStore]) mustBe true
   }
 }
