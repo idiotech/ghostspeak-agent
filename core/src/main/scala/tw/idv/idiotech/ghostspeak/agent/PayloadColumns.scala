@@ -55,11 +55,11 @@ object PayloadColumns extends LazyLogging {
     check(config, widen, checkTimeout = 30.seconds)
   }
 
+  /** Checks the columns `config` names, in the database `config` configures. */
   def check(config: Config, widen: Boolean, checkTimeout: FiniteDuration)(using
     system: ActorSystem[?]
   ): Unit = {
-    val slickDb =
-      SlickExtension(system).database(system.settings.config.getConfig("jdbc-snapshot-store"))
+    val slickDb = SlickExtension(system).database(config.getConfig("jdbc-snapshot-store"))
     slickDb.profile match {
       case _: MySQLProfile =>
         import MySQLProfile.api.*
