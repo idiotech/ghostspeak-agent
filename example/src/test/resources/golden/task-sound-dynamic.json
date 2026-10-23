@@ -1,0 +1,15 @@
+{
+  "url" : "https://example.com/b.mp3",
+  "volumeSetting" : {
+    "center" : {
+      "lat" : 24.1,
+      "lon" : 120.6
+    },
+    "radius" : 30,
+    "minVolume" : 0.2,
+    "mainVolume" : null,
+    "type" : "DYNAMIC_VOLUME"
+  },
+  "mode" : "BACKGROUND",
+  "type" : "SOUND"
+}

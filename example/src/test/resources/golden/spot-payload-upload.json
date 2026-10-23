@@ -1,0 +1,15 @@
+{
+  "spot" : {
+    "id" : "SPOT-1",
+    "title" : "Balcony",
+    "text" : "Look up",
+    "images" : [
+      "a.png"
+    ],
+    "location" : {
+      "lat" : 24.1,
+      "lon" : 120.6
+    }
+  },
+  "type" : "UPLOAD"
+}

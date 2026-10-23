@@ -2,8 +2,8 @@ package tw.idv.idiotech.ghostspeak.agent
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
-import tw.idv.idiotech.ghostspeak.agent.Sensor.Event.Created
-import tw.idv.idiotech.ghostspeak.agent.Sensor.Event.Destroyed
+
+import tw.idv.idiotech.ghostspeak.agent.Sensor.Event.{ Created, Destroyed }
 
 class StateTest extends AnyFlatSpec with Matchers {
 
@@ -16,7 +16,7 @@ class StateTest extends AnyFlatSpec with Matchers {
     false,
     None,
     1,
-    Metadata(List("cat 1"))
+    Metadata(categories = List("cat 1"))
   )
 
   val scenario2 = Scenario(
@@ -28,7 +28,7 @@ class StateTest extends AnyFlatSpec with Matchers {
     false,
     None,
     2,
-    Metadata(List("cat 2"))
+    Metadata(categories = List("cat 2"))
   )
 
   val scenario3 = Scenario(
@@ -40,7 +40,7 @@ class StateTest extends AnyFlatSpec with Matchers {
     false,
     None,
     3,
-    Metadata(List("cat 1"))
+    Metadata(categories = List("cat 1"))
   )
 
   val scenario4 = Scenario(
@@ -52,7 +52,7 @@ class StateTest extends AnyFlatSpec with Matchers {
     false,
     None,
     4,
-    Metadata(List("cat 2"))
+    Metadata(categories = List("cat 2"))
   )
   val created1 = Created(scenario1)
   val created2 = Created(scenario2)

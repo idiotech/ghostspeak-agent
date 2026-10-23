@@ -1,0 +1,5 @@
+{
+  "id" : "a-sound",
+  "fadeOutSeconds" : 4,
+  "type" : "SILENCE"
+}

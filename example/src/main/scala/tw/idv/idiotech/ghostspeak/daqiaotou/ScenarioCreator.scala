@@ -1,6 +1,12 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
-import com.softwaremill.quicklens._
+import cats.implicits.*
+import com.softwaremill.quicklens.*
+import com.typesafe.scalalogging.LazyLogging
+import io.circe.{ Decoder, Encoder }
+import io.circe.derivation.ConfiguredCodec
+import io.circe.parser.decode
+import io.circe.syntax.*
 import org.apache.pekko.Done
 import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem, Behavior }
 import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors }
@@ -10,7 +16,8 @@ import org.apache.pekko.persistence.typed.scaladsl.{
   EventSourcedBehavior,
   RetentionCriteria
 }
-import tw.idv.idiotech.ghostspeak.agent.Actuator.Command.{ Cancel, Perform }
+
+import tw.idv.idiotech.ghostspeak.agent
 import tw.idv.idiotech.ghostspeak.agent.{
   Actuator,
   EventBase,
@@ -20,30 +27,19 @@ import tw.idv.idiotech.ghostspeak.agent.{
   Session,
   SystemPayload
 }
-import io.circe.parser.decode
-import io.circe.syntax._
-import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.{ Comparison, Node, Precondition }
-import cats.implicits._
-import com.typesafe.scalalogging.LazyLogging
-import io.circe.{ Decoder, Encoder }
-import io.circe.generic.extras.ConfiguredJsonCodec
-import tw.idv.idiotech.ghostspeak.daqiaotou.Task.VariableUpdates
-
-import java.util.UUID
-import scala.concurrent.Future
-import scala.concurrent.ExecutionContext.Implicits.global
-import org.apache.pekko.persistence.Persistence
-import tw.idv.idiotech.ghostspeak.agent
+import tw.idv.idiotech.ghostspeak.agent.Actuator.Command.{ Cancel, Perform }
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Command
+import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.{ Comparison, Node, Precondition }
 import tw.idv.idiotech.ghostspeak.daqiaotou.ScenarioCreator.{
   commandTime,
   eventTime,
   getEffectTime,
-  logTime,
   performTime
 }
+import tw.idv.idiotech.ghostspeak.daqiaotou.Task.VariableUpdates
 
-import scala.annotation.unused
+import java.util.UUID
+import scala.concurrent.Future
 import scala.util.Try
 
 object ScenarioCreator {
@@ -61,11 +57,19 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
   type NodeId = String
   type ActionId = String
 
-  @ConfiguredJsonCodec
-  case class Trigger(message: Message, nodes: List[Node])
+  case class Trigger(message: Message, nodes: List[Node]) derives ConfiguredCodec
 
-  @ConfiguredJsonCodec
-  case class StateStorage(triggers: List[Trigger], exclusions: Map[ActionId, List[NodeId]])
+  // variables and strings are required, with no defaults, on purpose. Snapshots written before
+  // they were stored lack both fields, so they fail to decode instead of silently coming back
+  // empty. With jdbc-snapshot-store.snapshot-is-optional = true, Pekko then skips such a
+  // snapshot and rebuilds the state by replaying the user's whole journal (events are never
+  // deleted), which restores the real variables and strings.
+  case class StateStorage(
+    triggers: List[Trigger],
+    exclusions: Map[ActionId, List[NodeId]],
+    variables: Map[String, Int],
+    strings: Map[String, String]
+  ) derives ConfiguredCodec
 
   case class State(
     triggers: Map[Message, List[Node]],
@@ -77,9 +81,9 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
     def apply(update: VariableUpdate): State = {
       val prevValue = variables.getOrElse(update.name, 0)
       val newValue: Int = update.operation match {
-        case Operation.+   => prevValue + update.value
-        case Operation.-   => prevValue - update.value
-        case Operation.`=` => update.value
+        case Operation.Plus  => prevValue + update.value
+        case Operation.Minus => prevValue - update.value
+        case Operation.Set   => update.value
       }
       copy(variables = variables + (update.name -> newValue))
     }
@@ -90,9 +94,9 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
         .get(precondition.name)
         .fold(false)(v =>
           precondition.comparison match {
-            case Comparison.>= => v >= precondition.value
-            case Comparison.<= => v <= precondition.value
-            case Comparison.== => v == precondition.value
+            case Comparison.AtLeast => v >= precondition.value
+            case Comparison.AtMost  => v <= precondition.value
+            case Comparison.EqualTo => v == precondition.value
           }
         )
     def check(preconds: List[Precondition]): Boolean = preconds.forall(check)
@@ -100,30 +104,35 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
 
   object State {
 
-    implicit val decoder: Decoder[State] = implicitly[Decoder[StateStorage]].map(ss =>
+    given decoder: Decoder[State] = summon[Decoder[StateStorage]].map(ss =>
       State(
         ss.triggers.map(t => t.message -> t.nodes).toMap,
         ss.exclusions,
-        Map.empty
+        ss.variables,
+        ss.strings
       )
     )
 
-    implicit val encoder = implicitly[Encoder[StateStorage]].contramap[State](s =>
-      StateStorage(s.triggers.toList.map(t => Trigger(t._1, t._2)), s.exclusions)
+    given encoder: Encoder[State] = summon[Encoder[StateStorage]].contramap[State](s =>
+      StateStorage(
+        s.triggers.toList.map(t => Trigger(t._1, t._2)),
+        s.exclusions,
+        s.variables,
+        s.strings
+      )
     )
   }
 
-  @ConfiguredJsonCodec
   case class Event(
     nodes: List[Node],
     message: Message,
     variableUpdates: List[VariableUpdate],
     strings: List[StringVariable] = Nil
-  ) extends EventBase
+  ) extends EventBase derives ConfiguredCodec
 
   def onEvent(
     user: String
-  )(state: State, event: Event)(implicit script: Map[String, Node]): State = {
+  )(state: State, event: Event)(using script: Map[String, Node]): State = {
     val currentNodes = event.nodes
     lazy val triggeredNodes: Map[Message, List[Node]] =
       currentNodes
@@ -198,14 +207,13 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
 
   def textMatches(reply: String, answer: String): Boolean =
     answer match {
-      case regexPattern(text) => text.r.matches(reply)
+      case regexPattern(text)    => text.r.matches(reply)
       case containsPattern(text) =>
         reply.filterNot(_.isWhitespace).contains(text.filterNot(_.isWhitespace))
       case text => text.filterNot(_.isWhitespace) == reply.filterNot(_.isWhitespace)
     }
 
-  @ConfiguredJsonCodec
-  case class StringVariable(name: String, value: String)
+  case class StringVariable(name: String, value: String) derives ConfiguredCodec
   private case class NodesAndVariables(nodes: List[Node], variable: Option[StringVariable])
 
   private def replaceString(text: String, strings: Map[String, String]): String =
@@ -229,7 +237,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
   def onCommand(
     user: String,
     actuator: ActorRef[Actuator.Command[Content]]
-  )(state: State, command: Command)(implicit script: Map[String, Node]): Effect[Event, State] = {
+  )(state: State, command: Command)(using script: Map[String, Node]): Effect[Event, State] = {
     val commandName = getCommandName(command)
     val time = System.nanoTime()
     if (commandName.nonEmpty) logger.warn("START: " + getCommandName(command));
@@ -276,7 +284,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
                 )
                 action.content.task match {
                   case vu: VariableUpdates => vu.updates
-                  case _ =>
+                  case _                   =>
                     actuator ! Perform(action, startTime)
                     Nil
                 }
@@ -306,7 +314,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
             logger.info(s"user $user left")
             val redisKey = s"action-${message.scenarioId}-$user"
             logger.debug(s"deleting user from redis: $redisKey")
-            redis.withClient(r => r.del(redisKey))
+            redis.del(redisKey)
             // delayed actions of the left run would otherwise reach the user's next run
             actuator ! Cancel(user, message.scenarioId)
             Effect.persist(Event(List(Node.leave), message, Nil))
@@ -317,21 +325,19 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
             val forComparison = message.forComparison.copy(payload = fakeTextPayload)
             def findMatch(matcher: (String, String) => Boolean): Option[List[NodesAndVariables]] =
               Option(
-                state.triggers.flatMap {
-                  case (k, v) =>
-                    k.payload match {
-                      case Right(EventPayload.Text(answer, asVariable)) =>
-                        if (
-                          k.copy(payload = fakeTextPayload) == forComparison && matcher(
-                            reply,
-                            answer
-                          )
-                        ) {
-                          Some(NodesAndVariables(v, asVariable.map(n => StringVariable(n, reply))))
-                        } else None
-                      case Left(_) => None
-                    }
-                  case _ => None
+                state.triggers.flatMap { case (k, v) =>
+                  k.payload match {
+                    case Right(EventPayload.Text(answer, asVariable)) =>
+                      if (
+                        k.copy(payload = fakeTextPayload) == forComparison && matcher(
+                          reply,
+                          answer
+                        )
+                      ) {
+                        Some(NodesAndVariables(v, asVariable.map(n => StringVariable(n, reply))))
+                      } else None
+                    case _ => None // triggers for other payloads
+                  }
                 }.toList
               ).filter(_.nonEmpty)
 
@@ -375,10 +381,10 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
         if (message.sender != "!you123")
           s"COMMAND: ${message.sender}, ${message.actionId.getOrElse("")}"
         else ""
-      case Command.Broadcast(message, replyTo)                                         => "braodcast"
-      case Command.Create(scenario, replyTo)                                           => "create"
+      case Command.Broadcast(message, replyTo) => "braodcast"
+      case Command.Create(scenario, replyTo)   => "create"
       case Command.Query(isPublic, isFeatured, category, scenarioId, passode, replyTo) => "query"
-//      case Command.Destroy(scenarioId, replyTo) => "destroy"
+      case Command.Destroy(scenarioId, replyTo)                                        => "destroy"
     }
 
   def createScript(scenario: Scenario) = {
@@ -391,7 +397,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
     ret
   }
 
-  def ub(userScenario: Scenario, actuator: ActorRef[Actuator.Command[Content]])(implicit
+  def ub(userScenario: Scenario, actuator: ActorRef[Actuator.Command[Content]])(using
     script: Map[String, Node]
   ) =
     Behaviors.setup[Command] { ctx =>
@@ -416,11 +422,13 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
           }
         }
         .withRetention(RetentionCriteria.snapshotEvery(100, 2))
+        // see jdbc-snapshot-store-replay-on-error in application.conf
+        .withSnapshotPluginId("jdbc-snapshot-store-replay-on-error")
     }
 
   def createUserScenario(
     actuatorRef: ActorRef[Actuator.Command[Content]]
-  )(actorContext: ActorContext[_], created: Sensor.Event.Created)(implicit
+  )(actorContext: ActorContext[?], created: Sensor.Event.Created)(using
     script: Map[String, Node]
   ): Either[String, ActorRef[Command]] =
     if (created.scenario.id.isBlank) Left("empty user ID not allowed")
@@ -431,12 +439,12 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
 
   def sendMessage(
     action: Action
-  )(implicit actorSystem: ActorSystem[_]): Future[Done] = {
+  )(using actorSystem: ActorSystem[?]): Future[Done] = {
     val actionJson = action.asJson.toString()
     val redisKey = s"action-${action.session.scenario}-${action.receiver}"
     val hashKey = action.id
     logger.debug(s"saving action to redis: $redisKey $hashKey")
-    redis.withClient(r => r.hset(redisKey, hashKey, actionJson))
+    redis.hset(redisKey, hashKey, actionJson)
     logPerf(action, "fcm_sending")
     FcmSender.send(action, logPerf)
   }
@@ -447,7 +455,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
     Behaviors.setup[Command] { ctx =>
       val sensorRef = ctx.self
       val actuatorBehavior = Behaviors.setup[Actuator.Command[Content]] { actx =>
-        implicit val system = ctx.system
+        given system: ActorSystem[?] = ctx.system
         actuator.behaviorFromFuture("graphscript", sensorRef, sendMessage)
       }
       val actuatorRef: ActorRef[Actuator.Command[Content]] =
@@ -460,9 +468,14 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
           if (created.scenario.engine == "graphscript")
             Try {
               val scn = created.scenario
-              implicit val script: Map[String, Node] = createScript(scn)
+              given script: Map[String, Node] = createScript(scn)
               val actor: Behavior[Sensor.Command[EventPayload]] =
-                sensor.apply(scn.id, createUserScenario(actuatorRef), sensor.onCommandPerUser)
+                sensor.apply(
+                  scn.id,
+                  createUserScenario(actuatorRef),
+                  sensor.onCommandPerUser,
+                  Sensor.PerUserSnapshotEvery
+                )
               ctx.spawn(
                 actor,
                 if (created.uniqueId.nonEmpty) created.uniqueId else UUID.randomUUID().toString
@@ -478,5 +491,4 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
           else Left("not a graphscript scenario")
       )
     }
-
 }

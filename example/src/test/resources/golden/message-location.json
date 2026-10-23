@@ -1,0 +1,12 @@
+{
+  "id" : "m1",
+  "actionId" : "a1",
+  "receiver" : "ghost",
+  "sender" : "Romeo",
+  "payload" : {
+    "lat" : 24.1,
+    "lon" : 120.6,
+    "type" : "LOCATION"
+  },
+  "scenarioId" : "scn-1"
+}

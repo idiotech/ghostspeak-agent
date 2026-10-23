@@ -1,20 +1,17 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
 import com.typesafe.scalalogging.LazyLogging
-import json._
-import io.circe.syntax._
 import io.circe.parser.decode
+import io.circe.syntax.*
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
-import tw.idv.idiotech.ghostspeak.agent.{ Action => BaseAction, _ }
-import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.{ defaultZone, ActTime, Performance }
 
+import tw.idv.idiotech.ghostspeak.agent.{ Action as BaseAction, * }
+import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.{ defaultZone, ActTime }
+
+import java.time.{ Clock, Instant, LocalTime, ZonedDateTime }
 import java.time.temporal.ChronoUnit
-import java.time.{ Clock, Instant, LocalDateTime, LocalTime, ZonedDateTime }
-import scala.concurrent.duration._
-//import json.schema._
-import com.github.andyglow.jsonschema.AsCirce._
-import json.schema.Version._
+import scala.concurrent.duration.*
 
 class ModelTest extends AnyFlatSpec with Matchers with LazyLogging {
 
@@ -50,6 +47,7 @@ class ModelTest extends AnyFlatSpec with Matchers with LazyLogging {
     ZonedDateTime.ofInstant(Instant.ofEpochMilli(actTime.time(clock)), defaultZone) mustBe now
       .withHour(21)
       .withMinute(10)
+      .withSecond(10)
     val actTime2 = ActTime(Some(LocalTime.of(20, 10)), 1.hours.toMillis, 0)
     ZonedDateTime.ofInstant(Instant.ofEpochMilli(actTime2.time(clock)), defaultZone) mustBe now
       .plusDays(1)
@@ -96,9 +94,9 @@ class ModelTest extends AnyFlatSpec with Matchers with LazyLogging {
 //      Left(SystemPayload.Modal(Modality.Done)),
     "romeo and juliet"
   )
-//    implicit val geofenceSchema = Json.schema[Condition.Geofence]("Geofence")
-//    implicit val contentSchema = Json.schema[Content]("Content")
-//    implicit val popupSchema = Json.schema[Content.Popup]("Popup")
+//    given geofenceSchema = Json.schema[Condition.Geofence]("Geofence")
+//    given contentSchema = Json.schema[Content]("Content")
+//    given popupSchema = Json.schema[Content.Popup]("Popup")
 
 //    val schema = Json.schema[BaseAction[Content]]
 //    logger.info(schema.asCirce(Draft04()))

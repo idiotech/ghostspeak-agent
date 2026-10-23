@@ -1,0 +1,16 @@
+{
+  "name" : "rj",
+  "displayName" : "Romeo and Juliet",
+  "description" : "a tragedy",
+  "featured" : true,
+  "public" : true,
+  "passcode" : "1234",
+  "owner" : "owner@example.com",
+  "ordinal" : 42,
+  "categories" : [
+    "drama",
+    "classic"
+  ],
+  "details" : "details",
+  "image" : "cover.png"
+}

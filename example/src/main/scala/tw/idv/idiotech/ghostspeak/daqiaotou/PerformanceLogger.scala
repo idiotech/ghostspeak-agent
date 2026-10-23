@@ -1,11 +1,11 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
-import scalikejdbc._
+import scalikejdbc.*
 
 object PerformanceLogger {
   Class.forName("com.mysql.jdbc.Driver")
   val conf = config.mysql
-  implicit val session = AutoSession
+  given session: AutoSession.type = AutoSession
   ConnectionPool.singleton(
     s"jdbc:mysql://${conf.host}:${conf.port}/${conf.database}",
     conf.username,

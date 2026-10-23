@@ -1,67 +1,196 @@
 package tw.idv.idiotech.ghostspeak.agent
 
-import org.apache.pekko.actor.testkit.typed.scaladsl.ActorTestKit
+import io.circe.parser.decode
+import io.circe.syntax.*
+import org.apache.pekko.Done
+import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
 import org.apache.pekko.persistence.testkit.scaladsl.EventSourcedBehaviorTestKit
 import org.apache.pekko.persistence.testkit.scaladsl.EventSourcedBehaviorTestKit.SerializationSettings
-import org.scalatest.BeforeAndAfterAll
-import org.scalatest.flatspec.AnyFlatSpec
-import org.scalatest.matchers.must.Matchers
-import tw.idv.idiotech.ghostspeak.agent.Actuator.Command
-import tw.idv.idiotech.ghostspeak.agent.Actuator.Command.{ Cancel, Perform }
+import org.scalatest.BeforeAndAfterEach
+import org.scalatest.wordspec.AnyWordSpecLike
+
+import tw.idv.idiotech.ghostspeak.agent.Actuator.Command.{ Cancel, Perform, Timeout }
+import tw.idv.idiotech.ghostspeak.agent.Sensor.Command.Sense
 
 import scala.concurrent.Future
+import scala.concurrent.duration.*
 
-class ActuatorTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
+class ActuatorTest
+    extends ScalaTestWithActorTestKit(PersistenceTestConfig.config)
+    with AnyWordSpecLike
+    with BeforeAndAfterEach {
 
-  private val testKit = ActorTestKit("ActuatorTest", EventSourcedBehaviorTestKit.config)
+  val actuator = new Actuator[String, String]
+  import actuator.Event.{ ActionDone, Performance }
 
-  override def afterAll(): Unit = testKit.shutdownTestKit()
+  val name = "test"
+  val persistenceId = s"actuator-$name"
+  val sensor = createTestProbe[Sensor.Command[String]]()
 
-  private val actuator = new Actuator[String, String]
+  val esTestKit = EventSourcedBehaviorTestKit[
+    Actuator.Command[String],
+    actuator.Event,
+    actuator.State
+  ](
+    system,
+    actuator.behaviorFromFuture(name, sensor.ref, _ => Future.successful(Done)),
+    SerializationSettings.disabled
+  )
 
-  private def action(id: String, receiver: String, scenario: String) =
-    Action[String](id, receiver, "ghost", "content", Session(scenario, None))
-
-  private def actuatorKit() = {
-    val sensor = testKit.createTestProbe[Sensor.Command[String]]()
-    EventSourcedBehaviorTestKit[Command[String], actuator.Event, actuator.State](
-      testKit.system,
-      actuator.behaviorFromFuture("test", sensor.ref, _ => Future.successful(())),
-      SerializationSettings.disabled
-    )
+  override def beforeEach(): Unit = {
+    super.beforeEach()
+    esTestKit.clear()
+    esTestKit.snapshotTestKit.foreach(_.clearAll())
   }
 
-  // far enough ahead that no timer fires during the test
-  private val later = System.currentTimeMillis() + 3600000
+  def action(id: String, receiver: String = "user", scenario: String = "scn") =
+    Action[String](id, receiver, "npc", s"content of $id", Session(scenario, None))
+  def inOneHour(offset: Long = 0) = System.currentTimeMillis() + 1.hour.toMillis + offset
 
-  "Cancel" must "drop only the pending actions of the user in the scenario" in {
-    val kit = actuatorKit()
-    val left = action("a", "user1", "story1")
-    val otherUser = action("b", "user2", "story1")
-    val otherScenario = action("c", "user1", "story2")
-    Seq(left, otherUser, otherScenario).foreach(a => kit.runCommand(Perform(a, later)))
+  "Actuator" should {
 
-    val result = kit.runCommand(Cancel[String]("user1", "story1"))
+    "persist a Performance for a delayed action" in {
+      val startTime = inOneHour()
+      val result = esTestKit.runCommand(Perform(action("a1"), startTime))
+      result.event shouldBe Performance(action("a1"), startTime)
+      result.state.pendingActions shouldBe Set(Performance(action("a1"), startTime))
+      sensor.expectNoMessage(100.millis)
+    }
 
-    result.events must contain only actuator.Event.ActionDone(Set(actuator.Event.Performance(left, later)))
-    result.state.pendingActions.map(_.action) must contain theSameElementsAs Seq(otherUser, otherScenario)
+    "perform an action that is already due without persisting it" in {
+      val result = esTestKit.runCommand(Perform(action("now"), System.currentTimeMillis() - 1))
+      result.hasNoEvents shouldBe true
+      result.state.pendingActions shouldBe empty
+      def nextModality() = {
+        val message = sensor.expectMessageType[Sense[String]].message
+        message.actionId shouldBe Some("now")
+        message.payload.left.toOption.collect { case SystemPayload.Modal(m, _) => m }
+      }
+      nextModality() shouldBe Some(Modality.Doing)
+      // then Done, once performAction's future completes
+      nextModality() shouldBe Some(Modality.Done)
+    }
+
+    "not persist anything on Timeout when no action is due" in {
+      esTestKit.runCommand(Perform(action("later"), inOneHour()))
+      val result = esTestKit.runCommand(Timeout[String]())
+      result.hasNoEvents shouldBe true
+      result.state.pendingActions.map(_.action.id) shouldBe Set("later")
+      sensor.expectNoMessage(100.millis)
+    }
+
+    "not persist anything on Timeout when nothing is pending" in {
+      val result = esTestKit.runCommand(Timeout[String]())
+      result.hasNoEvents shouldBe true
+      esTestKit.persistenceTestKit.expectNothingPersisted(persistenceId)
+    }
+
+    "perform due actions on Timeout and persist them as done" in {
+      // a pending action whose start time passed while the server was down
+      val due = Performance(action("due"), System.currentTimeMillis() - 1000)
+      val later = Performance(action("later"), inOneHour())
+      esTestKit.persistenceTestKit.persistForRecovery(persistenceId, Seq(due, later))
+      esTestKit.restart().state.pendingActions shouldBe Set(due, later)
+
+      val result = esTestKit.runCommand(Timeout[String]())
+      result.event shouldBe ActionDone(Set(due))
+      result.state.pendingActions shouldBe Set(later)
+      sensor.expectMessageType[Sense[String]].message.actionId shouldBe Some("due") // Doing
+      sensor.expectMessageType[Sense[String]].message.actionId shouldBe Some("due") // Done
+    }
+
+    "snapshot every 100 events and recover pending actions from it" in {
+      val startTimes = (1 to 101).map(i => inOneHour(i.toLong))
+      startTimes.zipWithIndex.foreach { case (t, i) =>
+        esTestKit.runCommand(Perform(action(s"a$i"), t))
+      }
+
+      val snapshots = esTestKit.snapshotTestKit.get.persistedInStorage(persistenceId)
+      snapshots.map(_._1.sequenceNr) shouldBe Seq(100L)
+      snapshots.head._2.asInstanceOf[actuator.State].pendingActions.size shouldBe 100
+
+      // recovery = snapshot at 100 + the one event after it
+      val restored = esTestKit.restart().state
+      restored.pendingActions.size shouldBe 101
+      restored.pendingActions.map(_.startTime) shouldBe startTimes.toSet
+    }
   }
 
-  it must "persist nothing when the user has nothing pending" in {
-    val kit = actuatorKit()
-    kit.runCommand(Perform(action("a", "user2", "story1"), later))
-
-    val result = kit.runCommand(Cancel[String]("user1", "story1"))
-
-    result.hasNoEvents mustBe true
-    result.state.pendingActions.map(_.action.id) must contain only "a"
+  "Actuator" should {
+    "snapshot at the interval it is given" in {
+      val every10 =
+        EventSourcedBehaviorTestKit[Actuator.Command[String], actuator.Event, actuator.State](
+          system,
+          actuator.behaviorFromFuture(
+            "every-10",
+            sensor.ref,
+            _ => Future.successful(Done),
+            snapshotEvery = 10
+          ),
+          SerializationSettings.disabled
+        )
+      (1 to 25).foreach(i => every10.runCommand(Perform(action(s"a$i"), inOneHour(i.toLong))))
+      every10.snapshotTestKit.get
+        .persistedInStorage("actuator-every-10")
+        .map(_._1.sequenceNr) shouldBe
+      Seq(10L, 20L)
+      every10.restart().state.pendingActions.size shouldBe 25
+    }
   }
 
-  it must "stay cancelled after a restart" in {
-    val kit = actuatorKit()
-    kit.runCommand(Perform(action("a", "user1", "story1"), later))
-    kit.runCommand(Cancel[String]("user1", "story1"))
+  "Cancel" should {
+    "drop only the pending actions of the user in the scenario" in {
+      val startTime = inOneHour()
+      val left = action("a", "user1", "story1")
+      val otherUser = action("b", "user2", "story1")
+      val otherScenario = action("c", "user1", "story2")
+      Seq(left, otherUser, otherScenario).foreach(a => esTestKit.runCommand(Perform(a, startTime)))
 
-    kit.restart().state.pendingActions mustBe empty
+      val result = esTestKit.runCommand(Cancel[String]("user1", "story1"))
+
+      result.event shouldBe ActionDone(Set(Performance(left, startTime)))
+      result.state.pendingActions.map(_.action) shouldBe Set(otherUser, otherScenario)
+    }
+
+    "persist nothing when the user has nothing pending" in {
+      esTestKit.runCommand(Perform(action("a", "user2", "story1"), inOneHour()))
+
+      val result = esTestKit.runCommand(Cancel[String]("user1", "story1"))
+
+      result.hasNoEvents shouldBe true
+      result.state.pendingActions.map(_.action.id) shouldBe Set("a")
+    }
+
+    "stay cancelled after a restart" in {
+      esTestKit.runCommand(Perform(action("a", "user1", "story1"), inOneHour()))
+      esTestKit.runCommand(Cancel[String]("user1", "story1"))
+
+      esTestKit.restart().state.pendingActions shouldBe empty
+    }
+  }
+
+  "earliestPending" should {
+    "return the earliest future start time, whatever the Set's iteration order" in {
+      val now = 1000000L
+      // more than 4 elements, so pendingActions is a HashSet with no particular order
+      val startTimes = Seq(now + 600, now + 300, now + 900, now + 100, now + 700, now + 500)
+      val pending = startTimes.zipWithIndex.map { case (t, i) => Performance(action(s"a$i"), t) }
+      val state = actuator.State((pending :+ Performance(action("past"), now - 50)).toSet)
+      actuator.earliestPending(state, now) shouldBe now + 100
+    }
+
+    "be Long.MaxValue when nothing is pending in the future" in {
+      val state = actuator.State(Set(Performance(action("past"), 10L)))
+      actuator.earliestPending(state, 1000L) shouldBe Long.MaxValue
+    }
+  }
+
+  "Actuator state" should {
+    "survive a JSON round-trip, as used for snapshots" in {
+      val state = actuator.State(
+        Set(Performance(action("a1"), 1000L), Performance(action("a2"), 2000L))
+      )
+      decode[actuator.State](state.asJson.noSpaces) shouldBe Right(state)
+    }
   }
 }

@@ -1,0 +1,164 @@
+{
+  "nodes" : [
+    {
+      "name" : "n1",
+      "triggers" : [
+        {
+          "id" : "m1",
+          "actionId" : "a1",
+          "receiver" : "ghost",
+          "sender" : "Romeo",
+          "payload" : {
+            "type" : "START"
+          },
+          "scenarioId" : "scn-1"
+        },
+        {
+          "id" : "m1",
+          "actionId" : null,
+          "receiver" : "ghost",
+          "sender" : "Romeo",
+          "payload" : {
+            "text" : "yes",
+            "asVariable" : null,
+            "type" : "TEXT"
+          },
+          "scenarioId" : "scn-1"
+        }
+      ],
+      "performances" : [
+        {
+          "action" : {
+            "id" : "p1",
+            "receiver" : "Romeo",
+            "sender" : "Juliet",
+            "content" : {
+              "task" : {
+                "text" : "Do you love me?",
+                "choices" : [
+                  "yes",
+                  "no"
+                ],
+                "allowTextReply" : true,
+                "pictures" : [
+                  "https://example.com/a.jpg"
+                ],
+                "destinations" : [
+                  "APP",
+                  "NOTIFICATION"
+                ],
+                "closeAlertAfterReply" : false,
+                "clearDialog" : true,
+                "type" : "POPUP"
+              },
+              "condition" : {
+                "type" : "ALWAYS"
+              },
+              "exclusiveWith" : [
+                "other"
+              ]
+            },
+            "session" : {
+              "scenario" : "romeo and juliet",
+              "chapter" : "chapter 1"
+            },
+            "description" : null
+          },
+          "time" : {
+            "target" : "21:10:05",
+            "minAfter" : 1000,
+            "range" : 60000
+          },
+          "delay" : 0
+        },
+        {
+          "action" : {
+            "id" : "p2",
+            "receiver" : "Romeo",
+            "sender" : "Juliet",
+            "content" : {
+              "task" : {
+                "url" : "https://example.com/a.mp3",
+                "volumeSetting" : {
+                  "speechLength" : 12,
+                  "fadeOutSeconds" : 5,
+                  "fadeInSeconds" : 2,
+                  "mainVolume" : {
+                    "speechLength" : 10,
+                    "fadeOutSeconds" : 3,
+                    "fadeInSeconds" : 1
+                  },
+                  "type" : "STATIC_VOLUME"
+                },
+                "mode" : "MAIN",
+                "type" : "SOUND"
+              },
+              "condition" : {
+                "location" : {
+                  "lat" : 24.1,
+                  "lon" : 120.6
+                },
+                "radius" : 14,
+                "type" : "GEOFENCE"
+              },
+              "exclusiveWith" : [
+                "other"
+              ]
+            },
+            "session" : {
+              "scenario" : "romeo and juliet",
+              "chapter" : "chapter 1"
+            },
+            "description" : null
+          },
+          "time" : null,
+          "delay" : 5000
+        }
+      ],
+      "preconditions" : [
+        {
+          "name" : "score",
+          "comparison" : ">=",
+          "value" : 3
+        },
+        {
+          "name" : "lives",
+          "comparison" : "==",
+          "value" : 1
+        }
+      ],
+      "exclusiveWith" : [
+        "n2"
+      ],
+      "children" : [
+        "n2",
+        "n3"
+      ]
+    }
+  ],
+  "message" : {
+    "id" : "m1",
+    "actionId" : "a1",
+    "receiver" : "ghost",
+    "sender" : "Romeo",
+    "payload" : {
+      "text" : "yes",
+      "asVariable" : null,
+      "type" : "TEXT"
+    },
+    "scenarioId" : "scn-1"
+  },
+  "variableUpdates" : [
+    {
+      "name" : "score",
+      "operation" : "+",
+      "value" : 1
+    }
+  ],
+  "strings" : [
+    {
+      "name" : "answer",
+      "value" : "yes"
+    }
+  ]
+}

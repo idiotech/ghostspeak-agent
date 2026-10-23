@@ -1,21 +1,18 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
-import cats.implicits._
+import cats.implicits.*
+import io.circe.{ Codec, Decoder, Json, ParsingFailure }
+import io.circe.parser.{ decode, parse }
+import io.circe.syntax.*
 import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem }
+import org.apache.pekko.actor.typed.scaladsl.AskPattern.{ schedulerFromActorSystem, Askable }
+import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.apache.pekko.http.scaladsl.server.Route
-import io.circe.{ Decoder, Json, ParsingFailure }
+import org.apache.pekko.pattern.StatusReply
+
 import tw.idv.idiotech.ghostspeak.agent
 import tw.idv.idiotech.ghostspeak.agent.{ CategoryManager, Scenario, Sensor }
-import org.apache.pekko.http.scaladsl.server.Directives._
-import org.apache.pekko.http.scaladsl.model.StatusCodes
-import org.apache.pekko.http.scaladsl.model.ContentTypes._
-import org.apache.pekko.http.scaladsl.model.headers.`Content-Type`
-import org.apache.pekko.pattern.StatusReply
-import io.circe.parser.{ decode, parse }
-import io.circe.syntax._
-import org.apache.pekko.actor.typed.scaladsl.AskPattern.schedulerFromActorSystem
-import org.apache.pekko.actor.typed.scaladsl.AskPattern.Askable
-import io.circe.generic.JsonCodec
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Identifier
 
 import scala.concurrent.Future
@@ -24,10 +21,10 @@ import scala.util.{ Failure, Success }
 class EventRoutes[T: Decoder](
   sensor: ActorRef[Sensor.Command[T]],
   cm: ActorRef[CategoryManager.Command],
-  system: ActorSystem[_]
+  system: ActorSystem[?]
 ) extends agent.EventRoutes[T](sensor, cm, system) {
 
-  import EventRoutes._
+  import EventRoutes.*
 
   override lazy val routes: List[Route] = List(
     pathPrefix("v1" / "scenario" / Segment / Segment / "user" / Segment / "actions") {
@@ -40,20 +37,19 @@ class EventRoutes[T: Decoder](
 //          )
             val fetch: Future[Map[String, String]] =
               for {
-                res <- Future(redis.withClient(c => c.hgetall[String, String](key)))
+                res <- Future(redis.hgetAll(key))
                 all <- {
 //                logger.info(s"getting action from redis: ${res.getOrElse(Map.empty)}")
-                  res.getOrElse(Map.empty).values.foreach { s =>
+                  res.values.foreach { s =>
                     decode[Action](s).fold(
                       error => logger.error(s"failed to parse action $s", error),
                       a => PerformanceLogger.insert(userId, a.id, "redis")
                     )
                   }
-                  Future.successful(res.getOrElse(Map.empty))
+                  Future.successful(res)
                 }
-                _ <- Future.traverse(all.keys)(actionId =>
-                  Future(redis.withClient(c => c.hdel(key, actionId)))
-                )
+                // one HDEL for all the fetched actions
+                _ <- Future(redis.hdel(key, all.keys.toSeq*))
               } yield all
             onComplete(fetch) {
               case Success(all) =>
@@ -78,7 +74,6 @@ class EventRoutes[T: Decoder](
             }
           }
         ret
-
     },
     pathPrefix("v1" / "scenario" / Segment / Segment / "resources") { (engine, scenarioId) =>
       get {
@@ -95,7 +90,7 @@ class EventRoutes[T: Decoder](
             parse(msg).fold(
               e => complete(StatusCodes.InternalServerError -> e.getMessage),
               j =>
-                implicitly[Decoder[List[Scenario]]]
+                summon[Decoder[List[Scenario]]]
                   .decodeJson(j)
                   .fold(
                     e => complete(StatusCodes.InternalServerError -> s"invalid scenario: $e $j"),
@@ -150,8 +145,7 @@ class EventRoutes[T: Decoder](
 
 object EventRoutes {
 
-  @JsonCodec
-  case class Resources(images: List[String], sounds: List[String])
+  case class Resources(images: List[String], sounds: List[String]) derives Codec.AsObject
 
   object Resources {
 
@@ -178,12 +172,12 @@ object EventRoutes {
           case Task.IntroImage(bgUrl, _, _, _, _, _)        => r
           case Task.ButtonStyle(bgColor, textColor)         => r
           case Task.PopupStyle(alertTextColor)              => r
-          case Task.VariableUpdates(_)                      => r
-          case Task.EndGame                                 => r
-          case Task.GuideImage(_)                           => r
-          case Task.GuideImageRemoval                       => r
-          case Task.Silence(_, _)                           => r
-          case Task.Friend(_, _, _)                         => r
+          case Task.VariableUpdates(_) | VariableUpdate(_, _, _) => r
+          case Task.EndGame                                      => r
+          case Task.GuideImage(_)                                => r
+          case Task.GuideImageRemoval                            => r
+          case Task.Silence(_, _)                                => r
+          case Task.Friend(_, _, _)                              => r
         }
       )
     }

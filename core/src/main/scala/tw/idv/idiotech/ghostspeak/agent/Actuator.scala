@@ -1,53 +1,44 @@
 package tw.idv.idiotech.ghostspeak.agent
 
-import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors, TimerScheduler }
-import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem, Behavior }
-import org.apache.pekko.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
-import org.apache.pekko.persistence.typed.PersistenceId
 import com.typesafe.scalalogging.LazyLogging
-import io.circe.generic.JsonCodec
-import io.circe.generic.extras.ConfiguredJsonCodec
-import io.circe.{ Decoder, Encoder }
-import org.virtuslab.psh.annotation.SerializabilityTrait
+import io.circe.{ Codec, Decoder, Encoder }
+import io.circe.derivation.ConfiguredCodec
+import org.apache.pekko.actor.typed.{ ActorRef, Behavior }
+import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors, TimerScheduler }
+import org.apache.pekko.persistence.typed.PersistenceId
+import org.apache.pekko.persistence.typed.scaladsl.{
+  Effect,
+  EventSourcedBehavior,
+  RetentionCriteria
+}
+
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Command.Sense
 
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.{ Failure, Success }
 
 class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
 
-  implicit def actionDecoder: Decoder[Action[T]] = Action.decoder[T]
-  implicit def actionEncoder: Encoder[Action[T]] = Action.encoder[T]
+  import Actuator.*
 
-  import Actuator._
+  // Events and state are the same types for every actuator (see the companion), so any
+  // actuator, whatever its engine, can decode what another one persisted.
+  type Event = Actuator.Event[T]
+  type State = Actuator.State[T]
+  type PendingAction = Actuator.Event.Performance[T]
+  val Event: Actuator.Event.type = Actuator.Event
+  val State: Actuator.State.type = Actuator.State
 
-  @ConfiguredJsonCodec
-  sealed trait Event extends EventBase
+  given eventCodec: Codec.AsObject[Event] = Actuator.Event.codecForEvent[T]
+  given stateCodec: Codec.AsObject[State] = Actuator.State.codecForState[T]
 
-  object Event {
-
-    @JsonCodec
-    case class Performance(action: Action[T], startTime: Long)
-        extends Event
-        with Ordered[Performance] {
-      override def compare(that: Performance): Int = startTime.compare(that.startTime)
-    }
-
-    @JsonCodec
-    case class ActionDone(actions: Set[Performance] = Set.empty) extends Event
-  }
-  type PendingAction = Event.Performance
-
-  @JsonCodec
-  case class State(pendingActions: Set[PendingAction] = Set.empty) extends EventBase
-
-  case object TimerKey extends SerializabilityTrait
-  import Command._
-  import Event._
+  case object TimerKey
+  import Actuator.Event.*
+  import Command.*
 
   type Discover = (
-    ActorContext[_],
+    ActorContext[?],
     Action[T],
     ActorRef[Command[T]]
   ) => Option[ActorRef[Command[T]]]
@@ -78,11 +69,7 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
           Effect.none
         } else {
           logger.info(s"delaying execution: ${action.id}")
-          val earliest =
-            state.pendingActions
-              .map(_.startTime)
-              .find(_ > System.currentTimeMillis())
-              .getOrElse(Long.MaxValue)
+          val earliest = earliestPending(state, System.currentTimeMillis())
           if (startTime <= earliest) {
             logger.info(s"set timer for ${action.id} after ${remainingTime.millis}")
             timer.startSingleTimer(TimerKey, Timeout(), remainingTime.millis)
@@ -96,7 +83,8 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
       case Timeout() =>
         val current = System.currentTimeMillis()
         logger.info(
-          s"total queue at $current: ${state.pendingActions.map(x => s"${x.action.id} ${x.startTime}")}"
+          s"total queue at $current: ${state.pendingActions
+              .map(x => s"${x.action.id} ${x.startTime}")}"
         )
         val toExecute = state.pendingActions.filter(_.startTime <= current)
         logger.info(s"ready to execute: ${toExecute.map(_.action.id)}")
@@ -109,7 +97,7 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
             )
             timer.startSingleTimer(TimerKey, Timeout(), (p.startTime - current).millis)
           }
-        Effect.persist(ActionDone(toExecute))
+        if (toExecute.isEmpty) Effect.none else Effect.persist(ActionDone(toExecute))
       case Cancel(receiver, scenario) =>
         // a user who left a scenario must not get the actions still scheduled for it, e.g. after a restart
         val cancelled = state.pendingActions.filter(p =>
@@ -128,8 +116,17 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
     }
   }
 
+  // Start time of the next pending action that is still in the future: the one the timer is
+  // currently set for. pendingActions is an unordered Set, so this must be the minimum.
+  private[agent] def earliestPending(state: State, now: Long): Long =
+    state.pendingActions.iterator
+      .map(_.startTime)
+      .filter(_ > now)
+      .minOption
+      .getOrElse(Long.MaxValue)
+
   def eventHandler(state: State, event: Event): State = event match {
-    case p: Performance =>
+    case p: Performance[T] =>
       logger.debug(s"adding to state: ${p.action.id}")
       val ret = State(state.pendingActions ++ Set(p))
       logger.debug(s"latest state: ${state.pendingActions.map(_.action.id)}")
@@ -139,31 +136,29 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
       val ret = State(state.pendingActions diff actions)
       logger.debug(s"latest state: ${state.pendingActions.map(_.action.id)}")
       ret
-    case _ =>
-      logger.error(s"match error for $event")
-      state
   }
 
-  private def behavior(name: String, sensor: ActorRef[Sensor.Command[P]])(
+  private def behavior(name: String, sensor: ActorRef[Sensor.Command[P]], snapshotEvery: Int)(
     commandHandlerFrom: GenCommandHandler[T, P]
   ): Behavior[Command[T]] = Behaviors.withTimers { timer =>
     Behaviors.setup { ctx =>
       val commandHandler = commandHandlerFrom(ctx, sensor, timer)
       EventSourcedBehavior[Command[T], Event, State](
         persistenceId = PersistenceId.ofUniqueId(s"actuator-$name"),
-        emptyState = State(),
+        emptyState = State[T](),
         commandHandler = commandHandler,
         eventHandler = eventHandler
-      )
+      ).withRetention(RetentionCriteria.snapshotEvery(snapshotEvery, 2))
     }
   }
 
   def behaviorFromChild(
     name: String,
     sensor: ActorRef[Sensor.Command[P]],
-    discover: Discover
+    discover: Discover,
+    snapshotEvery: Int = Actuator.SnapshotEvery
   ): Behavior[Command[T]] =
-    behavior(name, sensor) { (ctx, sensor, timer) =>
+    behavior(name, sensor, snapshotEvery) { (ctx, sensor, timer) =>
       commandHandler(sensor, timer) { action =>
         discover(ctx, action, ctx.self).foreach { a =>
           a ! Perform(action, System.currentTimeMillis())
@@ -174,9 +169,10 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
   def behaviorFromFuture(
     name: String,
     sensor: ActorRef[Sensor.Command[P]],
-    performFuture: Action[T] => Future[_]
+    performFuture: Action[T] => Future[?],
+    snapshotEvery: Int = Actuator.SnapshotEvery
   ): Behavior[Command[T]] =
-    behavior(name, sensor) { (ctx, sensor, timer) =>
+    behavior(name, sensor, snapshotEvery) { (ctx, sensor, timer) =>
       commandHandler(sensor, timer) { action =>
         ctx.pipeToSelf(performFuture(action)) {
           case Success(_) =>
@@ -191,6 +187,51 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
 }
 
 object Actuator {
+
+  // the journal holds a Performance per delayed action and an ActionDone per batch performed,
+  // while the state is only the actions still pending
+  val SnapshotEvery = 100
+
+  sealed trait Event[T] extends EventBase
+
+  object Event {
+
+    case class Performance[T](action: Action[T], startTime: Long)
+        extends Event[T]
+        with Ordered[Performance[T]] {
+      override def compare(that: Performance[T]): Int = startTime.compare(that.startTime)
+    }
+
+    object Performance {
+
+      given codecForPerformance[T: Encoder: Decoder]: Codec.AsObject[Performance[T]] = {
+        given actionCodec: Codec[Action[T]] =
+          Codec.from(Action.decoder[T], Action.encoder[T])
+        Codec.AsObject.derived[Performance[T]]
+      }
+    }
+
+    case class ActionDone[T](actions: Set[Performance[T]] = Set.empty[Performance[T]])
+        extends Event[T]
+
+    object ActionDone {
+
+      given codecForActionDone[T: Encoder: Decoder]: Codec.AsObject[ActionDone[T]] =
+        Codec.AsObject.derived[ActionDone[T]]
+    }
+
+    given codecForEvent[T: Encoder: Decoder]: Codec.AsObject[Event[T]] =
+      ConfiguredCodec.derived[Event[T]]
+  }
+
+  case class State[T](pendingActions: Set[Event.Performance[T]] = Set.empty[Event.Performance[T]])
+      extends EventBase
+
+  object State {
+
+    given codecForState[T: Encoder: Decoder]: Codec.AsObject[State[T]] =
+      Codec.AsObject.derived[State[T]]
+  }
 
   sealed trait Command[T] extends CommandBase
 

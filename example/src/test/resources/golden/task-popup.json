@@ -1,0 +1,18 @@
+{
+  "text" : "Do you love me?",
+  "choices" : [
+    "yes",
+    "no"
+  ],
+  "allowTextReply" : true,
+  "pictures" : [
+    "https://example.com/a.jpg"
+  ],
+  "destinations" : [
+    "APP",
+    "NOTIFICATION"
+  ],
+  "closeAlertAfterReply" : false,
+  "clearDialog" : true,
+  "type" : "POPUP"
+}
