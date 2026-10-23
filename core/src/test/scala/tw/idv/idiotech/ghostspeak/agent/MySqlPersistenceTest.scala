@@ -7,7 +7,13 @@ import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.pattern.StatusReply
 import org.apache.pekko.persistence.jdbc.db.SlickExtension
 import org.apache.pekko.persistence.jdbc.testkit.scaladsl.SchemaUtils
-import org.apache.pekko.persistence.typed.{ PersistenceId, RecoveryCompleted, RecoveryFailed }
+import org.apache.pekko.persistence.typed.{
+  PersistenceId,
+  RecoveryCompleted,
+  RecoveryFailed,
+  SnapshotCompleted,
+  SnapshotFailed
+}
 import org.apache.pekko.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
@@ -253,6 +259,14 @@ class MySqlPersistenceTest extends AnyWordSpec with Matchers with BeforeAndAfter
     }
   }
 
+  private val replayOnError = "jdbc-snapshot-store-replay-on-error"
+
+  private def applyEvent(state: Sensor.State, event: Sensor.Event): Sensor.State =
+    event match {
+      case c: Sensor.Event.Created   => state.add(c)
+      case d: Sensor.Event.Destroyed => state.del(d)
+    }
+
   // a sensor-shaped actor that reports how its recovery ended
   private def recovering(
     name: String,
@@ -263,17 +277,28 @@ class MySqlPersistenceTest extends AnyWordSpec with Matchers with BeforeAndAfter
       PersistenceId.ofUniqueId(s"sensor-$name"),
       Sensor.State(),
       (_, _) => Effect.none,
-      (state, event) =>
-        event match {
-          case c: Sensor.Event.Created   => state.add(c)
-          case d: Sensor.Event.Destroyed => state.del(d)
-        }
+      applyEvent
     ).receiveSignal {
       case (state, RecoveryCompleted) => report ! Right(state.scenarios.keySet)
       case (_, RecoveryFailed(e))     => report ! Left(e.getMessage)
     }
     snapshotPluginId.fold(behavior)(behavior.withSnapshotPluginId)
   }
+
+  // a sensor-shaped actor in the replay-on-error store that persists a Created for each command
+  // and snapshots after every event, reporting the snapshot's sequence number or why it failed
+  private def snapshotting(name: String, report: ActorRef[Either[String, Long]]) =
+    EventSourcedBehavior[String, Sensor.Event, Sensor.State](
+      PersistenceId.ofUniqueId(s"sensor-$name"),
+      Sensor.State(),
+      (_, id) => Effect.persist(Sensor.Event.Created(Scenario(id, "e", "[]"))),
+      applyEvent
+    ).snapshotWhen((_, _, _) => true)
+      .withSnapshotPluginId(replayOnError)
+      .receiveSignal {
+        case (_, SnapshotCompleted(metadata)) => report ! Right(metadata.sequenceNr)
+        case (_, SnapshotFailed(_, e))        => report ! Left(e.getMessage)
+      }
 
   // five Created events, then a snapshot at 5 that fails to decode, like a user-scenario
   // snapshot written before variables and strings were stored
@@ -301,8 +326,24 @@ class MySqlPersistenceTest extends AnyWordSpec with Matchers with BeforeAndAfter
       requireMySql()
       journalWithUnreadableSnapshot("lenient")
       val report = testKit.createTestProbe[Either[String, Set[String]]]()
-      testKit.spawn(recovering("lenient", Some("jdbc-snapshot-store-replay-on-error"), report.ref))
+      testKit.spawn(recovering("lenient", Some(replayOnError), report.ref))
       report.expectMessage(30.seconds, Right((1 to 5).map(i => s"s$i").toSet))
+    }
+
+    "not trip the replay-on-error store's circuit breaker" in {
+      requireMySql()
+      // more than the breaker's max-failures (5), as when a server starts with many of them
+      val names = (1 to 8).map(i => s"many-$i")
+      names.foreach(journalWithUnreadableSnapshot)
+      names.foreach { name =>
+        val report = testKit.createTestProbe[Either[String, Set[String]]]()
+        testKit.spawn(recovering(name, Some(replayOnError), report.ref))
+        report.expectMessage(30.seconds, Right((1 to 5).map(i => s"s$i").toSet))
+      }
+      // an open breaker would fail this save at once
+      val saved = testKit.createTestProbe[Either[String, Long]]()
+      testKit.spawn(snapshotting("after-many", saved.ref)) ! "s1"
+      saved.expectMessage(30.seconds, Right(1L))
     }
   }
 }
