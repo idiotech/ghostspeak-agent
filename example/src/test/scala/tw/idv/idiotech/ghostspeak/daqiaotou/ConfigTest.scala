@@ -19,8 +19,8 @@ class ConfigTest extends AnyFlatSpec with Matchers {
     c.getInt("app.redis.port") mustBe 6379
   }
 
-  they must "wait indefinitely by default, as before, unless REDIS_TIMEOUT_MS is set" in {
-    load("").getInt("app.redis.timeoutMs") mustBe 0
+  they must "time out after 10 s by default, unless REDIS_TIMEOUT_MS is set" in {
+    load("").getInt("app.redis.timeoutMs") mustBe 10000
     load("REDIS_TIMEOUT_MS = 1500").getInt("app.redis.timeoutMs") mustBe 1500
   }
 

@@ -4,16 +4,20 @@ import com.typesafe.config.ConfigFactory
 import io.circe.{ Decoder, Encoder }
 import io.circe.config.syntax.*
 import io.circe.derivation.{ Configuration, ConfiguredCodec }
+import org.apache.pekko.actor.typed.{ ActorSystem, DispatcherSelector }
 
 import tw.idv.idiotech.ghostspeak.agent.{ Action, JsonEnum, Message }
+
+import scala.concurrent.Future
 
 given configuration: Configuration = Configuration.default
   .withDiscriminator("type")
   .withScreamingSnakeCaseConstructorNames
   .withDefaults
 
-// timeoutMs: connect and read timeout; 0 waits indefinitely, like the redisclient it replaced
-case class RedisConf(host: String, port: Int, timeoutMs: Int = 0) derives ConfiguredCodec
+// timeoutMs: connect and read timeout; 0 waits indefinitely
+case class RedisConf(host: String, port: Int, timeoutMs: Int = RedisStore.DefaultTimeoutMs)
+    derives ConfiguredCodec
 
 case class IconConf(pending: String, arrived: String) derives ConfiguredCodec
 
@@ -36,6 +40,10 @@ lazy val config: DaqiaotouConf =
   ConfigFactory.load().as[DaqiaotouConf]("app").fold(throw _, identity)
 
 lazy val redis = new RedisStore(config.redis.host, config.redis.port, config.redis.timeoutMs)
+
+// runs a Redis call, which blocks, on Pekko's dispatcher for blocking I/O, off the actor threads
+def onRedis[A](call: RedisStore => A)(using system: ActorSystem[?]): Future[A] =
+  Future(call(redis))(using system.dispatchers.lookup(DispatcherSelector.blocking()))
 
 enum Destination {
   case App, Alert, Intro, Welcome, Notification, Dialer

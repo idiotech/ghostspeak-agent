@@ -37,7 +37,7 @@ class EventRoutes[T: Decoder](
 //          )
             val fetch: Future[Map[String, String]] =
               for {
-                res <- Future(redis.hgetAll(key))
+                res <- onRedis(_.hgetAll(key))
                 all <- {
 //                logger.info(s"getting action from redis: ${res.getOrElse(Map.empty)}")
                   res.values.foreach { s =>
@@ -49,7 +49,7 @@ class EventRoutes[T: Decoder](
                   Future.successful(res)
                 }
                 // one HDEL for all the fetched actions
-                _ <- Future(redis.hdel(key, all.keys.toSeq*))
+                _ <- onRedis(_.hdel(key, all.keys.toSeq*))
               } yield all
             onComplete(fetch) {
               case Success(all) =>

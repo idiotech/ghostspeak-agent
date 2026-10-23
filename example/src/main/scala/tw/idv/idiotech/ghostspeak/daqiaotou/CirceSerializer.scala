@@ -31,6 +31,7 @@ class CirceCodec(val scenarioCreator: ScenarioCreator) {
         eb match {
           case e: scenarioCreator.Event => e.asJson
           case e: scenarioCreator.State => e.asJson
+          // the type argument is erased; every actuator these engines persist acts on Content
           case e: Actuator.Event[?]     => e.asInstanceOf[Actuator.Event[Content]].asJson
           case e: Actuator.State[?]     => e.asInstanceOf[Actuator.State[Content]].asJson
           case e: agent.Sensor.Event    => e.asJson
