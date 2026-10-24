@@ -213,8 +213,8 @@ object Task {
   case class ButtonStyle(backgroundColor: String, textColor: String) extends Task
 
   // Popup style
-  // The colors of a popup window
-  case class PopupStyle(alertTextColor: String) extends Task
+  // The colors of a popup window; panelColor tints the blurred picture behind it, e.g. "#59202020"
+  case class PopupStyle(alertTextColor: String, panelColor: Option[String] = None) extends Task
 
   // Variable update
   // The operation to update the value of a variable

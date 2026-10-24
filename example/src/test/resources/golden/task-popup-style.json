@@ -1,4 +1,5 @@
 {
   "alertTextColor" : "#ff0000",
+  "panelColor" : null,
   "type" : "POPUP_STYLE"
 }
