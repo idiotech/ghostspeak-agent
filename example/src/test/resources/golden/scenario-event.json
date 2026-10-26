@@ -99,6 +99,7 @@
                   "lon" : 120.6
                 },
                 "radius" : 14,
+                "mode" : "ARRIVE",
                 "type" : "GEOFENCE"
               },
               "exclusiveWith" : [
