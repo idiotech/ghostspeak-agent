@@ -282,6 +282,7 @@ class GoldenJsonTest extends AnyFlatSpec with Matchers {
     List(SoundType.Main, SoundType.Background, SoundType.Loop)
   )
   golden[List[BeaconType]]("enum-beacon-type", List(BeaconType.Enter, BeaconType.Exit))
+  golden[List[GeofenceMode]]("enum-geofence-mode", List(GeofenceMode.Arrive, GeofenceMode.Sight))
   golden[List[IncomingCallType]](
     "enum-incoming-call-type",
     List(IncomingCallType.Connecting, IncomingCallType.Connected, IncomingCallType.Disconnected)

@@ -63,6 +63,13 @@ enum BeaconType {
 
 object BeaconType extends JsonEnum[BeaconType]
 
+// When a geofence runs its action: on arriving at the center, or on coming within sight of it
+enum GeofenceMode {
+  case Arrive, Sight
+}
+
+object GeofenceMode extends JsonEnum[GeofenceMode]
+
 enum IncomingCallType {
   case Connecting, Connected, Disconnected
 }
@@ -253,7 +260,10 @@ object Condition {
     // Geographic coordinates
     location: Location,
     // The radius of the geofence in meters.
-    radius: Int
+    radius: Int,
+    // ARRIVE: the player has to walk to the center, the radius only arms the fence; SIGHT: the action runs as
+    // soon as the player is inside the radius
+    mode: GeofenceMode = GeofenceMode.Arrive
   ) extends Condition
 
   // Beacon
