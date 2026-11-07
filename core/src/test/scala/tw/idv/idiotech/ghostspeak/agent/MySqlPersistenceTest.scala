@@ -191,6 +191,14 @@ class MySqlPersistenceTest extends AnyWordSpec with Matchers with BeforeAndAfter
       payloadTypes shouldBe (("blob", "blob"))
     }
 
+    "be left alone when MEDIUMBLOB, even with widening on" in {
+      requireMySql()
+      sql(s"ALTER TABLE $database.event_journal MODIFY event_payload MEDIUMBLOB NOT NULL")
+      sql(s"ALTER TABLE $database.snapshot MODIFY snapshot_payload MEDIUMBLOB NOT NULL")
+      checkColumns(system.settings.config, widen = true)
+      payloadTypes shouldBe (("mediumblob", "mediumblob"))
+    }
+
     "be found in the configured schema" in {
       requireMySql()
       resetPayloadColumns()
