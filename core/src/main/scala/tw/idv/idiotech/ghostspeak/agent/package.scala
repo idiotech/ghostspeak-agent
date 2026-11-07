@@ -155,7 +155,9 @@ case class Metadata(
   ordinal: Long = 9999999999999L,
   categories: List[String] = Nil,
   details: Option[String] = None,
-  image: Option[String] = None
+  image: Option[String] = None,
+  // the app shows an arrow for every pending trigger, instead of only once the player is stuck
+  alwaysShowTriggers: Boolean = false
 ) derives ConfiguredCodec
 
 case class Scenario(
