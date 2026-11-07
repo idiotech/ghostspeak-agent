@@ -16,6 +16,7 @@
       "classic"
     ],
     "details" : "details",
-    "image" : "cover.png"
+    "image" : "cover.png",
+    "alwaysShowTriggers" : false
   }
 }
