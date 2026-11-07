@@ -316,6 +316,44 @@ class GoldenJsonTest extends AnyFlatSpec with Matchers {
     """{"type":"SOUND","url":"u","volumeSetting":{"type":"STATIC_VOLUME"},"mode":"MAIN"}""",
     Task.Sound("u", Volume.StaticVolume(mainVolume = None), SoundType.Main)
   )
+  // stories from before geofences had a mode: an ARRIVE fence, which was the only kind. The editor
+  // writes the beacon's mode (ENTER or EXIT, or null) on a geofence too, which used to be ignored.
+  legacy[Condition](
+    "condition-geofence-no-mode",
+    """{"type":"GEOFENCE","location":{"lat":24.1,"lon":120.6},"radius":14}""",
+    Condition.Geofence(location, 14)
+  )
+  legacy[Condition](
+    "condition-geofence-beacon-enter-mode",
+    """{"type":"GEOFENCE","location":{"lat":24.1,"lon":120.6},"radius":14,"mode":"ENTER"}""",
+    Condition.Geofence(location, 14)
+  )
+  legacy[Condition](
+    "condition-geofence-beacon-exit-mode",
+    """{"type":"GEOFENCE","location":{"lat":24.1,"lon":120.6},"radius":14,"mode":"EXIT"}""",
+    Condition.Geofence(location, 14)
+  )
+  legacy[Condition](
+    "condition-geofence-null-mode",
+    """{"type":"GEOFENCE","location":{"lat":24.1,"lon":120.6},"radius":14,"mode":null}""",
+    Condition.Geofence(location, 14)
+  )
+  legacy[Condition](
+    "condition-geofence-sight-mode",
+    """{"type":"GEOFENCE","location":{"lat":24.1,"lon":120.6},"radius":14,"mode":"SIGHT"}""",
+    Condition.Geofence(location, 14, GeofenceMode.Sight)
+  )
+  rejected[Condition](
+    "condition-geofence-unknown-mode",
+    """{"type":"GEOFENCE","location":{"lat":24.1,"lon":120.6},"radius":14,"mode":"NOWHERE"}"""
+  )
+  legacy[Content](
+    "content-geofence-beacon-mode",
+    """{"task":{"type":"END_GAME"},
+       "condition":{"type":"GEOFENCE","location":{"lat":24.1,"lon":120.6},
+                    "radius":14,"mode":"ENTER"}}""",
+    Content(Task.EndGame, Condition.Geofence(location, 14))
+  )
   legacy[Content](
     "content-minimal",
     """{"task":{"type":"END_GAME"},"condition":{"type":"ALWAYS"}}""",

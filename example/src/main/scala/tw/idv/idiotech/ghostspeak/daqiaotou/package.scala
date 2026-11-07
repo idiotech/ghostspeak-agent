@@ -1,7 +1,7 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
 import com.typesafe.config.ConfigFactory
-import io.circe.{ Decoder, Encoder }
+import io.circe.{ Codec, Decoder, Encoder }
 import io.circe.config.syntax.*
 import io.circe.derivation.{ Configuration, ConfiguredCodec }
 import org.apache.pekko.actor.typed.{ ActorSystem, DispatcherSelector }
@@ -265,6 +265,26 @@ object Condition {
     // soon as the player is inside the radius
     mode: GeofenceMode = GeofenceMode.Arrive
   ) extends Condition
+
+  object Geofence {
+
+    // The editor writes one condition object whatever the type, so a geofence carries the beacon's
+    // mode (ENTER or EXIT, or null) too. Until geofences had modes of their own that key was
+    // ignored, so a fence with one is an ARRIVE fence, the only kind there was.
+    private val beaconModes = Set("ENTER", "EXIT")
+
+    private val derived: Codec.AsObject[Geofence] = ConfiguredCodec.derived[Geofence]
+
+    given Codec.AsObject[Geofence] = Codec.AsObject.from(
+      Decoder.instance { c =>
+        val mode = c.downField("mode").focus
+        if (mode.exists(m => m.isNull || m.asString.exists(beaconModes)))
+          derived.tryDecode(c.withFocus(_.mapObject(_.remove("mode"))))
+        else derived(c)
+      },
+      derived
+    )
+  }
 
   // Beacon
   // Beacon condition for action
