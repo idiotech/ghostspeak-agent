@@ -2,7 +2,7 @@ package tw.idv.idiotech.ghostspeak.agent
 
 import com.github.pjfanning.pekkohttpcirce.FailFastCirceSupport
 import com.typesafe.scalalogging.LazyLogging
-import io.circe.{ Decoder, Json }
+import io.circe.{ Codec, Decoder, Json }
 import io.circe.derivation.ConfiguredCodec
 import io.circe.parser.decode
 import io.circe.syntax.*
@@ -12,12 +12,13 @@ import org.apache.pekko.http.cors.scaladsl.model.HttpOriginMatcher
 import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 import org.apache.pekko.http.scaladsl.common.{ EntityStreamingSupport, JsonEntityStreamingSupport }
 import org.apache.pekko.http.scaladsl.model.{ HttpMethods, StatusCodes }
+import org.apache.pekko.http.scaladsl.model.headers.{ Authorization, OAuth2BearerToken }
+import org.apache.pekko.http.scaladsl.server.{ Directive1, Route, StandardRoute }
 import org.apache.pekko.http.scaladsl.server.Directives.*
-import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.pattern.StatusReply
 import org.apache.pekko.util.Timeout
 
-import tw.idv.idiotech.ghostspeak.agent.EventRoutes.ScenarioPayload
+import tw.idv.idiotech.ghostspeak.agent.EventRoutes.{ ScenarioPayload, StaffCode }
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Identifier
 
 import scala.concurrent.{ ExecutionContextExecutor, Future }
@@ -27,7 +28,8 @@ import scala.util.{ Failure, Success }
 class EventRoutes[T: Decoder](
   sensor: ActorRef[Sensor.Command[T]],
   categoryManager: ActorRef[CategoryManager.Command],
-  system: ActorSystem[?]
+  system: ActorSystem[?],
+  staffAuth: StaffAuth = StaffAuth.fromConfig()
 ) extends FailFastCirceSupport
     with LazyLogging {
 
@@ -42,6 +44,24 @@ class EventRoutes[T: Decoder](
   // the ask is failed with a TimeoutException
   given timeout: Timeout = 3.seconds
   given ec: ExecutionContextExecutor = system.executionContext
+
+  // true for a valid staff token, false when none is sent; any other credential is refused, so
+  // that staff with a stale token see an error rather than a list missing unpublished stories
+  private val staffAccess: Directive1[Boolean] =
+    optionalHeaderValueByType(Authorization).flatMap {
+      case None => provide(false)
+      case Some(Authorization(OAuth2BearerToken(token))) if staffAuth.isValid(token) =>
+        provide(true)
+      case Some(_) =>
+        StandardRoute.toDirective[Tuple1[Boolean]](
+          complete(StatusCodes.Unauthorized -> "invalid or expired staff token")
+        )
+    }
+
+  // story passcodes are for staff only; players type them, they are never handed out
+  private def withoutPasscode(staff: Boolean)(json: Json): Json =
+    if (staff) json
+    else json.hcursor.downField("metadata").downField("passcode").delete.top.getOrElse(json)
 
   private def getScenarios(
     q: ActorRef[StatusReply[String]] => Query[T],
@@ -194,21 +214,41 @@ class EventRoutes[T: Decoder](
     },
     pathPrefix("v1" / "scenario" / Segment / Segment) { (engine, scenarioId) =>
       get {
-        getScenarios(
-          x => Query[T](None, None, None, Some(Identifier(engine, scenarioId)), None, x),
-          _.asJson
-        )
+        staffAccess { staff =>
+          getScenarios(
+            x => Query[T](None, None, None, Some(Identifier(engine, scenarioId)), None, x),
+            s => withoutPasscode(staff)(s.asJson)
+          )
+        }
       }
     },
     pathPrefix("v1" / "scenario") {
       parameters("public".optional, "category".optional, "featured".optional, "passcode".optional) {
         (`public`, category, featured, passcode) =>
-          val isPublic = `public`.map(_.toBoolean)
-          val isFeatured = `featured`.map(_.toBoolean)
-          getScenarios(
-            x => Query[T](isPublic, isFeatured, category, None, passcode, x),
-            _.asJson.mapObject(_.remove("template").remove("engine"))
-          )
+          staffAccess { staff =>
+            // without a staff token only published stories are listed, unless a passcode
+            // picks out a story
+            val isPublic =
+              if (staff || passcode.isDefined) `public`.map(_.toBoolean) else Some(true)
+            val isFeatured = `featured`.map(_.toBoolean)
+            getScenarios(
+              x => Query[T](isPublic, isFeatured, category, None, passcode, x),
+              s => withoutPasscode(staff)(s.asJson.mapObject(_.remove("template").remove("engine")))
+            )
+          }
+      }
+    },
+    pathPrefix("v1" / "staff" / "session") {
+      pathEnd {
+        post {
+          entity(as[StaffCode]) { body =>
+            staffAuth
+              .issue(body.code)
+              .fold(complete(StatusCodes.Unauthorized -> "wrong staff code"))(t =>
+                complete(StatusCodes.OK, List(), t.asJson)
+              )
+          }
+        }
       }
     },
     pathPrefix("v1" / "category") {
@@ -264,7 +304,7 @@ class EventRoutes[T: Decoder](
 
   cors()
 
-  val corsSettings = CorsSettings(system.classicSystem)
+  lazy val corsSettings = CorsSettings(system.classicSystem)
     .withAllowedMethods(Seq(HttpMethods.GET, HttpMethods.PUT, HttpMethods.DELETE, HttpMethods.POST))
     .withAllowedOrigins(HttpOriginMatcher.Default(agentConfig.corsDomainList))
 
@@ -276,4 +316,6 @@ class EventRoutes[T: Decoder](
 object EventRoutes {
 
   case class ScenarioPayload(template: Json, metadata: Metadata) derives ConfiguredCodec
+
+  case class StaffCode(code: String) derives Codec.AsObject
 }

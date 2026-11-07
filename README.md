@@ -55,9 +55,24 @@ Environment variables, read by `core/src/main/resources/application.conf` and
 | `REDIS_TIMEOUT_MS` | `10000` | Redis connect and read timeout; `0` waits indefinitely. |
 | `FCM_KEY_FILE` | a developer's path, so **required** in practice | The Firebase service-account JSON for push messages. A missing file is not detected at startup: the first push fails. |
 | `PENDING_ICON`, `ARRIVED_ICON` | empty | Map-marker icon URLs for the spotkeeper engine. |
+| `STAFF_CODE` | empty: staff access off | The shared staff code; see below. Use at least 16 random characters, and keep it out of git. |
 
 At build time, `IMAGE_TAG` (default `localtest`) tags the Docker image built by
 `sbt example/Docker/publishLocal`.
+
+### Staff code
+
+`POST /v1/staff/session` with `{"code": "<STAFF_CODE>"}` answers `{"token": "...", "expiresAt": <epoch millis>}`,
+or `401` for a wrong code or when `STAFF_CODE` is unset. The token lasts 12 hours. Clients send it as
+`Authorization: Bearer <token>`.
+
+Without a token, `GET /v1/scenario` lists published stories only, whatever `public` says, unless
+`passcode` is given; with a valid token it lists as asked. An invalid or expired token is a `401`.
+Story passcodes are left out of `GET /v1/scenario` and `GET /v1/scenario/{engine}/{id}` responses
+unless the token is valid.
+
+Tokens are signed with a key derived from the code, so changing `STAFF_CODE` and restarting revokes
+all of them.
 
 ### Payload columns
 

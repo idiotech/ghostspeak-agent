@@ -46,6 +46,7 @@ ThisBuild / libraryDependencies ++= Seq(
   "org.apache.logging.log4j" % "log4j-core" % log4jVersion,
   "org.apache.logging.log4j" % "log4j-api" % log4jVersion,
   "org.apache.pekko" %% "pekko-persistence-testkit" % pekkoVersion % Test,
+  "org.apache.pekko" %% "pekko-http-testkit" % pekkoHttpVersion % Test,
   "org.scalatest" %% "scalatest" % "3.2.19" % Test
 )
 
