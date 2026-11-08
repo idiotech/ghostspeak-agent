@@ -172,19 +172,18 @@ class EventRoutes[T: Decoder](
       pathEnd {
         delete {
           logger.debug(s"############ HTTP DELETE: /v1/scenario/$engine/$scenarioId")
-          val ret: Route = onComplete {
-            sensor.askWithStatus[String](x => Destroy[T](scenarioId, x)).recover { case e =>
-              logger.error("failed to delete scenario", e)
+          // a refused Destroy ("doesn't exist") or a timed-out ask is the client's error to see;
+          // it used to be swallowed here and answered with DELETED
+          val ret: Route =
+            onComplete(sensor.askWithStatus[String](x => Destroy[T](scenarioId, x))) {
+              case Success(_) =>
+                logger.debug(s"############ Finished HTTP DELETE: /v1/scenario/$engine/$scenarioId")
+                complete("DELETED")
+              case Failure(StatusReply.ErrorMessage(reason)) =>
+                complete(StatusCodes.InternalServerError -> reason)
+              case Failure(e) =>
+                complete(StatusCodes.InternalServerError -> e.getMessage)
             }
-          } {
-            case Success(msg) =>
-              logger.debug(s"############ Finished HTTP DELETE: /v1/scenario/$engine/$scenarioId")
-              complete("DELETED")
-            case Failure(StatusReply.ErrorMessage(reason)) =>
-              complete(StatusCodes.InternalServerError -> reason)
-            case Failure(e) =>
-              complete(StatusCodes.InternalServerError -> e.getMessage)
-          }
           ret
         }
       }

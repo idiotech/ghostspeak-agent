@@ -82,6 +82,14 @@ class EventRoutesTest extends ScalaTestWithActorTestKit with AnyWordSpecLike {
       finish(f)._1 shouldBe StatusCodes.OK
     }
 
+    "report a DELETE the sensor refuses, instead of claiming DELETED" in {
+      val f = send(HttpMethods.DELETE, "/v1/scenario/graphscript/nope")
+      sensor.expectMessageType[Destroy[String]].replyTo ! StatusReply.Error("doesn't exist")
+      val (status, body) = finish(f)
+      status shouldBe StatusCodes.InternalServerError
+      body should include("doesn't exist")
+    }
+
     "replace the scenario on PUT with overwrite" in {
       val f = send(HttpMethods.PUT, "/v1/scenario/graphscript/s1?overwrite=true", payload)
       val r = sensor.expectMessageType[Replace[String]]
