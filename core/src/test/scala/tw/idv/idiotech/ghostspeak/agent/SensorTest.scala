@@ -10,7 +10,7 @@ import org.apache.pekko.persistence.testkit.scaladsl.EventSourcedBehaviorTestKit
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.wordspec.AnyWordSpecLike
 
-import tw.idv.idiotech.ghostspeak.agent.Sensor.Command.{ Create, Destroy }
+import tw.idv.idiotech.ghostspeak.agent.Sensor.Command.{ Create, Destroy, Replace }
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Event.{ Created, Destroyed }
 
 import java.util.UUID
@@ -33,12 +33,15 @@ class SensorTest
     system,
     sensor(
       name,
-      (ctx, created) => {
-        spawned.add(created.scenario.id)
-        val childName =
-          if (created.uniqueId.nonEmpty) created.uniqueId else UUID.randomUUID().toString
-        Right(ctx.spawn(Behaviors.ignore[Sensor.Command[String]], childName))
-      }
+      (ctx, created) =>
+        // a template the creator cannot decode, as ScenarioCreator refuses one
+        if (created.scenario.template == "invalid") Left("bad template")
+        else {
+          spawned.add(created.scenario.id)
+          val childName =
+            if (created.uniqueId.nonEmpty) created.uniqueId else UUID.randomUUID().toString
+          Right(ctx.spawn(Behaviors.ignore[Sensor.Command[String]], childName))
+        }
     ),
     SerializationSettings.disabled
   )
@@ -50,7 +53,10 @@ class SensorTest
     spawned.clear()
   }
 
-  def scenario(id: String) = Scenario(id, "graphscript", "[]")
+  def scenario(id: String, template: String = "[]") = Scenario(id, "graphscript", template)
+
+  def replace(id: String, template: String) =
+    esTestKit.runCommand[StatusReply[String]](r => Replace[String](scenario(id, template), r))
 
   def create(id: String) =
     esTestKit.runCommand[StatusReply[String]](r => Create[String](scenario(id), r))
@@ -76,6 +82,35 @@ class SensorTest
       val result = esTestKit.runCommand[StatusReply[String]](r => Destroy[String]("s1", r))
       result.event shouldBe Destroyed("s1")
       result.state.scenarios shouldBe empty
+    }
+
+    "replace an existing scenario once its new definition has spawned" in {
+      create("s1")
+      val before = esTestKit.getState().scenarios("s1").uniqueId
+      val result = replace("s1", "[1]")
+      result.reply shouldBe StatusReply.Success("created")
+      val after = result.state.scenarios("s1")
+      after.scenario shouldBe scenario("s1", "[1]")
+      after.uniqueId should not be before
+      result.events shouldBe Seq(Destroyed("s1"), Created(scenario("s1", "[1]"), after.uniqueId))
+      spawned.asScala.toList shouldBe List("s1", "s1")
+    }
+
+    "keep the existing scenario when its replacement is refused" in {
+      create("s1")
+      val before = esTestKit.getState().scenarios("s1")
+      val result = replace("s1", "invalid")
+      result.reply.isError shouldBe true
+      result.hasNoEvents shouldBe true
+      result.state.scenarios("s1") shouldBe before
+      spawned.asScala.toList shouldBe List("s1")
+    }
+
+    "create a scenario asked to be replaced when it does not exist yet" in {
+      val result = replace("s1", "[]")
+      result.reply shouldBe StatusReply.Success("created")
+      result.eventOfType[Created].scenario shouldBe scenario("s1")
+      result.state.scenarios.keySet shouldBe Set("s1")
     }
 
     "snapshot every 100 events and respawn every scenario after recovery" in {

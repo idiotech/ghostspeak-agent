@@ -91,6 +91,28 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
                 .thenReply(replyTo)(_ => StatusReply.Success("created"))
           )
       else Effect.reply(replyTo)(StatusReply.Error("already exists"))
+    case Replace(scenario, replyTo) =>
+      if (scenario.id.isBlank)
+        Effect.reply(replyTo)(StatusReply.Error("scenario name cannot be null"))
+      else
+        // the new definition is spawned, and so decoded, before anything is persisted: one the creator
+        // refuses leaves the existing scenario running, where destroying first would have lost it
+        createChild(ctx, Created(scenario, ""))
+          .fold[Reff](
+            e => Effect.reply(replyTo)(StatusReply.Error(s"invalid scenario: $e")),
+            actor => {
+              val replaced = state.scenarios.get(scenario.id).toList.map { previous =>
+                getChild(ctx, previous.uniqueId).foreach { a =>
+                  logger.info(s"stopping $a, replaced")
+                  ctx.stop(a)
+                }
+                Destroyed(scenario.id)
+              }
+              Effect
+                .persist(replaced :+ Created(scenario, actor.path.name))
+                .thenReply(replyTo)(_ => StatusReply.Success("created"))
+            }
+          )
     case Destroy(id, replyTo) =>
       state.scenarios
         .get(id)
@@ -297,6 +319,12 @@ object Sensor {
     ) extends Command[P]
 
     case class Destroy[P](scenarioId: String, replyTo: ActorRef[StatusReply[String]])
+        extends Command[P]
+
+    /** Create the scenario, or replace the one with the same id. The replacement is accepted before
+      * the old one goes, so a refused definition changes nothing.
+      */
+    case class Replace[P](scenario: Scenario, replyTo: ActorRef[StatusReply[String]])
         extends Command[P]
   }
 }

@@ -122,82 +122,81 @@ class EventRoutes[T: Decoder](
         }
       )
     },
+    // exact paths only: a longer path under a scenario (such as a client's actions poll with an
+    // empty user segment) used to fall through to these routes and act on the whole scenario
     pathPrefix("v1" / "scenario" / Segment / Segment) { (engine, scenarioId) =>
-      parameters(
-        "overwrite".optional
-      ) { overwriteParam =>
-        val overwrite = overwriteParam.fold(false)(_ == "true")
-        put {
-          entity(as[ScenarioPayload]) { payload =>
-            logger.debug(
-              s"############ HTTP PUT: /v1/scenario/$engine/$scenarioId?overwrite=$overwriteParam"
-            )
-            val ret: Route = onComplete {
-              val deletion = if (overwrite) {
-                logger.debug("overwriting!")
-                sensor.askWithStatus[String](x => Destroy[T](scenarioId, x)).recover { case e =>
-                  logger.error("failed to delete scenario", e)
-                }
-              } else Future.unit
-              deletion.flatMap { _ =>
-                sensor.askWithStatus[String](x =>
-                  Create[T](
-                    Scenario(
-                      scenarioId,
-                      engine,
-                      payload.template.toString,
-                      payload.metadata.name,
-                      payload.metadata.displayName.filter(d => d != "null" && d != "undefined"),
-                      payload.metadata.public,
-                      payload.metadata.owner,
-                      payload.metadata.ordinal,
-                      payload.metadata
-                    ),
-                    x
+      pathEnd {
+        parameters(
+          "overwrite".optional
+        ) { overwriteParam =>
+          val overwrite = overwriteParam.fold(false)(_ == "true")
+          put {
+            entity(as[ScenarioPayload]) { payload =>
+              logger.debug(
+                s"############ HTTP PUT: /v1/scenario/$engine/$scenarioId?overwrite=$overwriteParam"
+              )
+              val scenario = Scenario(
+                scenarioId,
+                engine,
+                payload.template.toString,
+                payload.metadata.name,
+                payload.metadata.displayName.filter(d => d != "null" && d != "undefined"),
+                payload.metadata.public,
+                payload.metadata.owner,
+                payload.metadata.ordinal,
+                payload.metadata
+              )
+              // overwriting replaces the scenario only once the new definition is accepted, so a
+              // rejected template leaves the existing scenario in place instead of deleting it
+              val ret: Route = onComplete {
+                if (overwrite) sensor.askWithStatus[String](x => Replace[T](scenario, x))
+                else sensor.askWithStatus[String](x => Create[T](scenario, x))
+              } {
+                case Success(msg) =>
+                  logger.debug(
+                    s"############ Finished HTTP PUT: /v1/scenario/$engine/$scenarioId?overwrite=$overwriteParam"
                   )
-                )
+                  complete(msg)
+                case Failure(StatusReply.ErrorMessage(reason)) =>
+                  complete(StatusCodes.InternalServerError -> reason)
+                case Failure(e) =>
+                  complete(StatusCodes.InternalServerError -> e.getMessage)
               }
-            } {
-              case Success(msg) =>
-                logger.debug(
-                  s"############ Finished HTTP PUT: /v1/scenario/$engine/$scenarioId?overwrite=$overwriteParam"
-                )
-                complete(msg)
-              case Failure(StatusReply.ErrorMessage(reason)) =>
-                complete(StatusCodes.InternalServerError -> reason)
-              case Failure(e) =>
-                complete(StatusCodes.InternalServerError -> e.getMessage)
+              ret
             }
-            ret
           }
         }
       }
     },
     pathPrefix("v1" / "scenario" / Segment / Segment) { (engine, scenarioId) =>
-      delete {
-        logger.debug(s"############ HTTP DELETE: /v1/scenario/$engine/$scenarioId")
-        val ret: Route = onComplete {
-          sensor.askWithStatus[String](x => Destroy[T](scenarioId, x)).recover { case e =>
-            logger.error("failed to delete scenario", e)
+      pathEnd {
+        delete {
+          logger.debug(s"############ HTTP DELETE: /v1/scenario/$engine/$scenarioId")
+          val ret: Route = onComplete {
+            sensor.askWithStatus[String](x => Destroy[T](scenarioId, x)).recover { case e =>
+              logger.error("failed to delete scenario", e)
+            }
+          } {
+            case Success(msg) =>
+              logger.debug(s"############ Finished HTTP DELETE: /v1/scenario/$engine/$scenarioId")
+              complete("DELETED")
+            case Failure(StatusReply.ErrorMessage(reason)) =>
+              complete(StatusCodes.InternalServerError -> reason)
+            case Failure(e) =>
+              complete(StatusCodes.InternalServerError -> e.getMessage)
           }
-        } {
-          case Success(msg) =>
-            logger.debug(s"############ Finished HTTP DELETE: /v1/scenario/$engine/$scenarioId")
-            complete("DELETED")
-          case Failure(StatusReply.ErrorMessage(reason)) =>
-            complete(StatusCodes.InternalServerError -> reason)
-          case Failure(e) =>
-            complete(StatusCodes.InternalServerError -> e.getMessage)
+          ret
         }
-        ret
       }
     },
     pathPrefix("v1" / "scenario" / Segment / Segment) { (engine, scenarioId) =>
-      get {
-        getScenarios(
-          x => Query[T](None, None, None, Some(Identifier(engine, scenarioId)), None, x),
-          _.asJson
-        )
+      pathEnd {
+        get {
+          getScenarios(
+            x => Query[T](None, None, None, Some(Identifier(engine, scenarioId)), None, x),
+            _.asJson
+          )
+        }
       }
     },
     pathPrefix("v1" / "scenario") {
