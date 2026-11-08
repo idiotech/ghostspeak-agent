@@ -200,14 +200,23 @@ class EventRoutes[T: Decoder](
       }
     },
     pathPrefix("v1" / "scenario") {
-      parameters("public".optional, "category".optional, "featured".optional, "passcode".optional) {
-        (`public`, category, featured, passcode) =>
+      // exactly /v1/scenario, or /v1/scenario/{engine} as the app asks by passcode; an instance
+      // serves one engine, so the segment selects nothing. Anything longer that no route above
+      // claimed is nothing, not the whole list.
+      (pathEnd | path(Segment).tflatMap(_ => pass)) {
+        parameters(
+          "public".optional,
+          "category".optional,
+          "featured".optional,
+          "passcode".optional
+        ) { (`public`, category, featured, passcode) =>
           val isPublic = `public`.map(_.toBoolean)
           val isFeatured = `featured`.map(_.toBoolean)
           getScenarios(
             x => Query[T](isPublic, isFeatured, category, None, passcode, x),
             _.asJson.mapObject(_.remove("template").remove("engine"))
           )
+        }
       }
     },
     pathPrefix("v1" / "category") {
