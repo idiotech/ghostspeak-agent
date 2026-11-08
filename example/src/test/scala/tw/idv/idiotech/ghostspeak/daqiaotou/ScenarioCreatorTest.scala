@@ -2,9 +2,13 @@ package tw.idv.idiotech.ghostspeak.daqiaotou
 
 import com.typesafe.config.ConfigFactory
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.ActorRef
 import org.apache.pekko.pattern.StatusReply
 import org.apache.pekko.persistence.testkit.PersistenceTestKitSnapshotPlugin
-import org.apache.pekko.persistence.testkit.scaladsl.EventSourcedBehaviorTestKit
+import org.apache.pekko.persistence.testkit.scaladsl.{
+  EventSourcedBehaviorTestKit,
+  SnapshotTestKit
+}
 import org.apache.pekko.persistence.testkit.scaladsl.EventSourcedBehaviorTestKit.SerializationSettings
 import org.scalatest.wordspec.AnyWordSpecLike
 
@@ -12,6 +16,7 @@ import tw.idv.idiotech.ghostspeak.agent.{
   Action as BaseAction,
   Actuator,
   Message as BaseMessage,
+  ReplayOnErrorSnapshotStore,
   Scenario,
   Sensor,
   Session,
@@ -85,6 +90,61 @@ class ScenarioCreatorTest
     }
   }
 
+  "a user scenario recovered without its snapshot" should {
+    val snapshots = SnapshotTestKit(system)
+
+    def userActor(id: String, actuator: ActorRef[Actuator.Command[Content]]) =
+      EventSourcedBehaviorTestKit[Sensor.Command[EventPayload], creator.Event, creator.State](
+        system,
+        creator.ub(Scenario(id, "graphscript", ""), actuator)(using script),
+        SerializationSettings.disabled
+      )
+
+    def reply(id: String) =
+      message(Right(EventPayload.Text("yes")), Some("ask")).copy(sender = id, id = "m1")
+
+    "write a snapshot of the replayed state, once" in {
+      val actuator = createTestProbe[Actuator.Command[Content]]()
+      val user = userActor("u2", actuator.ref)
+      val pid = "scn-graphscript-u2"
+      user.runCommand(Sensor.Command.Sense(reply("u2")))
+      val replayed = user.getState()
+      snapshots.expectNothingPersisted(pid)
+
+      // what the replay-on-error store records when this actor's snapshot does not decode
+      ReplayOnErrorSnapshotStore.snapshotSkipped(pid)
+      user.restart()
+
+      snapshots.expectNextPersisted(pid, replayed)
+      user.getState() shouldBe replayed
+      val marker = user.persistenceTestKit.persistedInStorage(pid).last.asInstanceOf[creator.Event]
+      marker.message.id shouldBe creator.Event.SnapshotAfterReplay
+      marker.nodes shouldBe empty
+
+      // the record is consumed: a later start, with the snapshot loaded, writes nothing
+      user.restart()
+      snapshots.expectNothingPersisted(pid)
+      user.persistenceTestKit.persistedInStorage(pid) should have size 2
+    }
+
+    "write nothing when its snapshot was loaded" in {
+      val actuator = createTestProbe[Actuator.Command[Content]]()
+      val user = userActor("u3", actuator.ref)
+      val pid = "scn-graphscript-u3"
+      user.runCommand(Sensor.Command.Sense(reply("u3")))
+      user.restart()
+      snapshots.expectNothingPersisted(pid)
+      user.persistenceTestKit.persistedInStorage(pid) should have size 1
+    }
+
+    "leave the state alone when the snapshot marker is replayed" in {
+      val snapshotState =
+        creator.State(Map.empty, Map("a" -> List("n")), Map("score" -> 2), Map("k" -> "v"))
+      val marker = creator.Event.snapshotAfterReplay("u4", "graphscript")
+      creator.onEvent("u4")(snapshotState, marker)(using script) shouldBe snapshotState
+    }
+  }
+
   "creating a scenario" should {
     "refuse a template that is not a valid script, persisting nothing" in {
       val root =
@@ -107,6 +167,10 @@ class ScenarioCreatorTest
       creator.getCommandName(
         Sensor.Command.Destroy[EventPayload]("scn", createTestProbe[Any]().ref)
       ) shouldBe "destroy"
+      creator.getCommandName(
+        Sensor.Command
+          .Replace[EventPayload](Scenario("scn", "graphscript", "[]"), createTestProbe[Any]().ref)
+      ) shouldBe "replace"
     }
   }
 

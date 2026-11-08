@@ -70,3 +70,11 @@ The `ALTER TABLE` copies each table and locks it for writes meanwhile, which tak
 large journal. It runs before the HTTP port is bound and has no timeout, so the instance answers
 nothing until it is done. Run it in a maintenance window, and disable or extend the readiness and
 liveness probes for that start, or the orchestrator may kill the instance mid-copy.
+
+### Old snapshots
+
+A user-scenario snapshot written before variables and strings were stored no longer decodes. The
+actor skips it and replays its whole journal, which restores the real values, then writes a
+snapshot in the current format at once, so the replay happens only at the first start after the
+upgrade. The log says `Snapshot of <id> does not decode` for the skip and `writing a snapshot for
+<user> after replaying the whole journal` for the fix.

@@ -336,6 +336,9 @@ class MySqlPersistenceTest extends AnyWordSpec with Matchers with BeforeAndAfter
       val report = testKit.createTestProbe[Either[String, Set[String]]]()
       testKit.spawn(recovering("lenient", Some(replayOnError), report.ref))
       report.expectMessage(30.seconds, Right((1 to 5).map(i => s"s$i").toSet))
+      // recorded for the actor, which writes a fresh snapshot once recovered (user scenarios do)
+      ReplayOnErrorSnapshotStore.wasSnapshotSkipped("sensor-lenient") shouldBe true
+      ReplayOnErrorSnapshotStore.wasSnapshotSkipped("sensor-lenient") shouldBe false
     }
 
     "not trip the replay-on-error store's circuit breaker" in {
