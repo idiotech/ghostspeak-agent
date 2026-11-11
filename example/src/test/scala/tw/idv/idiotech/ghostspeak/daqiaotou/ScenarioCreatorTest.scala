@@ -118,7 +118,8 @@ class ScenarioCreatorTest
       snapshots.expectNextPersisted(pid, replayed)
       user.getState() shouldBe replayed
       val marker = user.persistenceTestKit.persistedInStorage(pid).last.asInstanceOf[creator.Event]
-      marker.message.id shouldBe creator.Event.SnapshotAfterReplay
+      marker.message.id should startWith(creator.Event.SnapshotAfterReplay)
+      marker.isSnapshotAfterReplay shouldBe true
       marker.nodes shouldBe empty
 
       // the record is consumed: a later start, with the snapshot loaded, writes nothing
@@ -135,6 +136,29 @@ class ScenarioCreatorTest
       user.restart()
       snapshots.expectNothingPersisted(pid)
       user.persistenceTestKit.persistedInStorage(pid) should have size 1
+    }
+
+    "still run a client's message that reuses the marker id" in {
+      val actuator = createTestProbe[Actuator.Command[Content]]()
+      val user = userActor("u5", actuator.ref)
+      // a player's reply that happens to carry the reserved id: it comes from the player, not "system"
+      val clash = reply("u5").copy(id = creator.Event.SnapshotAfterReplay)
+      creator.Event.isSnapshotAfterReplay(clash) shouldBe false
+      user.runCommand(Sensor.Command.Sense(clash))
+      actuator.expectMessageType[Actuator.Command.Perform[Content]].action.id shouldBe "thanks"
+    }
+
+    "recognise only its own marker" in {
+      val marker = creator.Event.snapshotAfterReplay("u6", "graphscript").message
+      creator.Event.isSnapshotAfterReplay(marker) shouldBe true
+      creator.getCommandName(Sensor.Command.Sense(marker)) shouldBe ""
+      // the bare reserved id, or the prefix with another suffix, is a client's message
+      creator.Event.isSnapshotAfterReplay(
+        marker.copy(id = creator.Event.SnapshotAfterReplay)
+      ) shouldBe false
+      creator.Event.isSnapshotAfterReplay(
+        marker.copy(id = creator.Event.SnapshotAfterReplay + ":x")
+      ) shouldBe false
     }
 
     "leave the state alone when the snapshot marker is replayed" in {

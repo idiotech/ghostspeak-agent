@@ -134,18 +134,29 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
     /** The event persisted after a recovery that skipped an unreadable snapshot, only so that a
       * snapshot of the replayed state gets written; it changes nothing.
       */
-    def isSnapshotAfterReplay: Boolean = nodes.isEmpty && message.id == Event.SnapshotAfterReplay
+    def isSnapshotAfterReplay: Boolean =
+      nodes.isEmpty && message.id.startsWith(Event.SnapshotAfterReplay)
   }
 
   object Event {
-    // a reserved message id: clients generate theirs
+    // a reserved message id prefix: clients generate their own ids
     val SnapshotAfterReplay = "snapshot-after-replay"
+
+    // A client's event reaches a user's actor as the same Sense, from the same user, as the marker
+    // the actor sends itself, so no field of the message can tell them apart. The marker's id
+    // carries a random suffix chosen at startup instead: no client can send it, and a client
+    // message that reuses the bare prefix still reaches the triggers.
+    private val markerId = s"$SnapshotAfterReplay:${java.util.UUID.randomUUID()}"
+
+    /** The marker this process sends itself, and only that. */
+    def isSnapshotAfterReplay(message: agent.Message[EventPayload]): Boolean =
+      message.id == markerId
 
     def snapshotAfterReplay(user: String, scenarioId: String): Event =
       Event(
         Nil,
         agent.Message[EventPayload](
-          SnapshotAfterReplay,
+          markerId,
           None,
           "system",
           user,
@@ -270,9 +281,9 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
     val ret: Effect[Event, State] = command match {
       // sent to itself after a recovery that skipped an unreadable snapshot: persisting this
       // no-op event is what makes the behavior write a snapshot of the replayed state
-      case Sensor.Command.Sense(message, _) if message.id == Event.SnapshotAfterReplay =>
+      case Sensor.Command.Sense(message, _) if Event.isSnapshotAfterReplay(message) =>
         logger.info(s"writing a snapshot for $user after replaying the whole journal")
-        Effect.persist(Event.snapshotAfterReplay(user, message.scenarioId))
+        Effect.persist(Event(Nil, message, Nil))
       case Sensor.Command.Sense(message, replyTo) =>
         def simplyPerform(action: Action) = {
           val performStart = System.nanoTime()
@@ -410,7 +421,9 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
 
   def getCommandName(command: Command): String =
     command match {
-      case Command.Sense(message, replyTo) =>
+      // the snapshot marker is not a player's command: no START / FINISH warnings for it
+      case Command.Sense(message, _) if Event.isSnapshotAfterReplay(message) => ""
+      case Command.Sense(message, replyTo)                                   =>
         if (message.sender != "!you123")
           s"COMMAND: ${message.sender}, ${message.actionId.getOrElse("")}"
         else ""
