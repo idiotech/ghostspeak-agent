@@ -105,12 +105,30 @@ class EventRoutesTest extends ScalaTestWithActorTestKit with AnyWordSpecLike {
       finish(f)._1 shouldBe StatusCodes.OK
     }
 
-    "report a DELETE the sensor refuses, instead of claiming DELETED" in {
+    "answer 404 to a DELETE of a scenario the sensor does not have, instead of claiming DELETED" in {
       val f = send(HttpMethods.DELETE, "/v1/scenario/graphscript/nope")
-      sensor.expectMessageType[Destroy[String]].replyTo ! StatusReply.Error("doesn't exist")
+      sensor.expectMessageType[Destroy[String]].replyTo ! StatusReply.Error(
+        EventRoutes.NoSuchScenario
+      )
+      val (status, body) = finish(f)
+      status shouldBe StatusCodes.NotFound
+      body should include(EventRoutes.NoSuchScenario)
+    }
+
+    "answer 500 with the reason to any other refused DELETE" in {
+      val f = send(HttpMethods.DELETE, "/v1/scenario/graphscript/s1")
+      sensor.expectMessageType[Destroy[String]].replyTo ! StatusReply.Error("journal unavailable")
       val (status, body) = finish(f)
       status shouldBe StatusCodes.InternalServerError
-      body should include("doesn't exist")
+      body should include("journal unavailable")
+    }
+
+    "answer 503, not a refusal, when the DELETE is not confirmed in time" in {
+      val f = send(HttpMethods.DELETE, "/v1/scenario/graphscript/slow")
+      sensor.expectMessageType[Destroy[String]] // never answered: the 3 s ask times out
+      val (status, body) = finish(f)
+      status shouldBe StatusCodes.ServiceUnavailable
+      body should include(EventRoutes.DeleteNotConfirmed)
     }
 
     "replace the scenario on PUT with overwrite" in {

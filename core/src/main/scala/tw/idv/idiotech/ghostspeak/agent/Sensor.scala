@@ -117,7 +117,7 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
       state.scenarios
         .get(id)
         .fold[ReplyEffect[Event, State]] {
-          Effect.reply(replyTo)(StatusReply.Error("doesn't exist"))
+          Effect.reply(replyTo)(StatusReply.Error(EventRoutes.NoSuchScenario))
         } { created =>
           ctx.child(created.uniqueId).foreach { a =>
             logger.info(s"stopping $a")
