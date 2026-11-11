@@ -199,10 +199,10 @@ class EventRoutes[T: Decoder](
       }
     },
     pathPrefix("v1" / "scenario") {
-      // exactly /v1/scenario, or /v1/scenario/{engine} as the app asks by passcode; an instance
-      // serves one engine, so the segment selects nothing. Anything longer that no route above
-      // claimed is nothing, not the whole list.
-      (pathEnd | path(Segment).tflatMap(_ => pass)) {
+      // exactly /v1/scenario, or /v1/scenario/{engine} as the app asks by passcode, each with or
+      // without a trailing slash; an instance serves one engine, so the segment selects nothing.
+      // Anything longer that no route above claimed is nothing, not the whole list.
+      (pathEndOrSingleSlash | path(Segment ~ Slash.?).tmap(_ => ())) {
         parameters(
           "public".optional,
           "category".optional,

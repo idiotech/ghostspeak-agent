@@ -21,9 +21,20 @@ import scala.concurrent.duration.*
   */
 class EventRoutesTest extends ScalaTestWithActorTestKit with AnyWordSpecLike {
 
-  // the routes' CORS settings read app.corsDomains from the default config
+  // the routes' CORS settings read app.corsDomains from the default config; the property is put
+  // back in afterAll so that suites sharing this JVM see the config they would see on their own
+  private val previousCorsDomains = Option(System.getProperty("app.corsDomains"))
   System.setProperty("app.corsDomains", "http://localhost")
   ConfigFactory.invalidateCaches()
+
+  override def afterAll(): Unit = {
+    previousCorsDomains match {
+      case Some(value) => System.setProperty("app.corsDomains", value)
+      case None        => System.clearProperty("app.corsDomains")
+    }
+    ConfigFactory.invalidateCaches()
+    super.afterAll()
+  }
 
   val sensor = createTestProbe[Sensor.Command[String]]()
   val categories = createTestProbe[CategoryManager.Command]()
@@ -62,6 +73,18 @@ class EventRoutesTest extends ScalaTestWithActorTestKit with AnyWordSpecLike {
       q.scenarioId shouldBe None
       q.replyTo ! StatusReply.Success("[]")
       finish(f) shouldBe (StatusCodes.OK, "[]")
+    }
+  }
+
+  "GET /v1/scenario with a trailing slash" should {
+    "still list the scenarios, as the prefix route did" in {
+      for (path <- Seq("/v1/scenario/?public=true", "/v1/scenario/graphscript/?passcode=1234")) {
+        val f = send(HttpMethods.GET, path)
+        val q = sensor.expectMessageType[Query[String]]
+        q.scenarioId shouldBe None
+        q.replyTo ! StatusReply.Success("[]")
+        finish(f) shouldBe (StatusCodes.OK, "[]")
+      }
     }
   }
 
