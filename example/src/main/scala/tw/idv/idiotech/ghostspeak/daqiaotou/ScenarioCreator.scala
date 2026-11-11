@@ -10,7 +10,7 @@ import io.circe.syntax.*
 import org.apache.pekko.Done
 import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem, Behavior }
 import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors }
-import org.apache.pekko.persistence.typed.PersistenceId
+import org.apache.pekko.persistence.typed.{ PersistenceId, RecoveryCompleted }
 import org.apache.pekko.persistence.typed.scaladsl.{
   Effect,
   EventSourcedBehavior,
@@ -22,6 +22,7 @@ import tw.idv.idiotech.ghostspeak.agent.{
   Actuator,
   EventBase,
   FcmSender,
+  ReplayOnErrorSnapshotStore,
   Scenario,
   Sensor,
   Session,
@@ -128,7 +129,43 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
     message: Message,
     variableUpdates: List[VariableUpdate],
     strings: List[StringVariable] = Nil
-  ) extends EventBase derives ConfiguredCodec
+  ) extends EventBase derives ConfiguredCodec {
+
+    /** The event persisted after a recovery that skipped an unreadable snapshot, only so that a
+      * snapshot of the replayed state gets written; it changes nothing.
+      */
+    def isSnapshotAfterReplay: Boolean =
+      nodes.isEmpty && message.id.startsWith(Event.SnapshotAfterReplay)
+  }
+
+  object Event {
+    // a reserved message id prefix: clients generate their own ids
+    val SnapshotAfterReplay = "snapshot-after-replay"
+
+    // A client's event reaches a user's actor as the same Sense, from the same user, as the marker
+    // the actor sends itself, so no field of the message can tell them apart. The marker's id
+    // carries a random suffix chosen at startup instead: no client can send it, and a client
+    // message that reuses the bare prefix still reaches the triggers.
+    private val markerId = s"$SnapshotAfterReplay:${java.util.UUID.randomUUID()}"
+
+    /** The marker this process sends itself, and only that. */
+    def isSnapshotAfterReplay(message: agent.Message[EventPayload]): Boolean =
+      message.id == markerId
+
+    def snapshotAfterReplay(user: String, scenarioId: String): Event =
+      Event(
+        Nil,
+        agent.Message[EventPayload](
+          markerId,
+          None,
+          "system",
+          user,
+          Left(SystemPayload.Ack),
+          scenarioId
+        ),
+        Nil
+      )
+  }
 
   def onEvent(
     user: String
@@ -242,6 +279,11 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
     val time = System.nanoTime()
     if (commandName.nonEmpty) logger.warn("START: " + getCommandName(command));
     val ret: Effect[Event, State] = command match {
+      // sent to itself after a recovery that skipped an unreadable snapshot: persisting this
+      // no-op event is what makes the behavior write a snapshot of the replayed state
+      case Sensor.Command.Sense(message, _) if Event.isSnapshotAfterReplay(message) =>
+        logger.info(s"writing a snapshot for $user after replaying the whole journal")
+        Effect.persist(Event(Nil, message, Nil))
       case Sensor.Command.Sense(message, replyTo) =>
         def simplyPerform(action: Action) = {
           val performStart = System.nanoTime()
@@ -379,7 +421,9 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
 
   def getCommandName(command: Command): String =
     command match {
-      case Command.Sense(message, replyTo) =>
+      // the snapshot marker is not a player's command: no START / FINISH warnings for it
+      case Command.Sense(message, _) if Event.isSnapshotAfterReplay(message) => ""
+      case Command.Sense(message, replyTo)                                   =>
         if (message.sender != "!you123")
           s"COMMAND: ${message.sender}, ${message.actionId.getOrElse("")}"
         else ""
@@ -387,6 +431,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
       case Command.Create(scenario, replyTo)   => "create"
       case Command.Query(isPublic, isFeatured, category, scenarioId, passode, replyTo) => "query"
       case Command.Destroy(scenarioId, replyTo)                                        => "destroy"
+      case Command.Replace(scenario, replyTo)                                          => "replace"
     }
 
   def createScript(scenario: Scenario) = {
@@ -407,25 +452,32 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
       val initial: Node = script("initial").replace(user)
       logger.debug(s"initial before = ${script("initial")}")
       logger.debug(s"initial after = $initial")
+      val persistenceId = PersistenceId.ofUniqueId(s"scn-${userScenario.engine}-$user")
       EventSourcedBehavior[Command, Event, State](
-        persistenceId = PersistenceId.ofUniqueId(s"scn-${userScenario.engine}-$user"),
+        persistenceId = persistenceId,
         emptyState = State(initial.triggers.map(_ -> List(initial)).toMap, Map.empty, Map.empty),
         commandHandler = onCommand(user, actuator),
         eventHandler = onEvent(user)
       )
         .snapshotWhen { case (state, event, sequenceNumber) =>
-          event.message.payload match {
+          event.isSnapshotAfterReplay || (event.message.payload match {
             case Left(value) =>
               value match {
                 case SystemPayload.Leave => true
                 case _                   => false
               }
             case Right(_) => false
-          }
+          })
         }
         .withRetention(RetentionCriteria.snapshotEvery(100, 2))
         // see jdbc-snapshot-store-replay-on-error in application.conf
         .withSnapshotPluginId("jdbc-snapshot-store-replay-on-error")
+        // a snapshot that did not decode was skipped and the whole journal replayed: write a
+        // snapshot now, or the same replay happens at every start until the user acts again
+        .receiveSignal { case (_, RecoveryCompleted) =>
+          if (ReplayOnErrorSnapshotStore.wasSnapshotSkipped(persistenceId.id))
+            ctx.self ! Command.Sense(Event.snapshotAfterReplay(user, userScenario.engine).message)
+        }
     }
 
   def createUserScenario(
