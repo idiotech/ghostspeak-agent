@@ -8,6 +8,7 @@ import io.circe.syntax.*
 import org.apache.pekko.Done
 import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem, Behavior }
 import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors }
+import org.apache.pekko.pattern.StatusReply
 import org.apache.pekko.persistence.typed.PersistenceId
 import org.apache.pekko.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
 
@@ -87,6 +88,11 @@ class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPa
             Effect.none
           case _ => Effect.none
         }
+      // the staff page asks every engine; spots keep no variables, and the asker must not wait for a timeout
+      case Command.Inspect(_, _, replyTo) =>
+        Effect.reply(replyTo)(
+          StatusReply.success(UserVariables(Map.empty, Map.empty).asJson.noSpaces)
+        )
       case _ => Effect.none
     }
 
