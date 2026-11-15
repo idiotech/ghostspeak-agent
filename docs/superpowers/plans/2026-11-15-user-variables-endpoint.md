@@ -13,13 +13,13 @@
 ## Global Constraints
 
 - Response JSON is exactly `{"variables": {name: int}, "strings": {name: string}}`; both keys always present, empty maps allowed.
-- 404 when the scenario or the player is unknown; 500 for any other failure.
+- 200 with the empty object for an unknown player in a known scenario (a 404 would read as a missing route on the phone); 404 for an unknown scenario; 500 for any other failure. (Amended after review: the spec first said 404 for an unknown player.)
 - `sbt scalafmtAll` before every commit; `sbt test` green (GoldenJsonTest included).
 
 ## Review Focus
 
 - A player who has joined but never triggered a variable update: `{"variables":{},"strings":{}}`, status 200. (Task 2 test.)
-- An unknown player in a known scenario: 404, not a hang until the ask timeout. (Task 1 test: scenario-level sensor replies `Error("no such user")`; Task 3 maps it.)
+- An unknown player in a known scenario: 200 with the empty object, not a hang until the ask timeout. (Task 1 test: scenario-level sensor replies `Error("no such user")`; Task 3 maps it.)
 - An unknown scenario: 404. (Task 1 test: top-level sensor replies `Error("no such scenario")`.)
 - A blank user id segment is impossible in the route (`Segment` never matches empty), so `/user//variables` falls through to 404 rather than matching anything else.
 - `getCommandName` must handle `Inspect`: today its `match` is not exhaustive, and an unhandled command would throw `MatchError` inside the player's actor. (Task 2 test exercises the command through `onCommand`, which calls `getCommandName` first.)

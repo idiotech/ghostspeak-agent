@@ -63,7 +63,7 @@ class EventRoutesTest extends ScalaTestWithActorTestKit with AnyWordSpecLike {
     "answer no variables for a player the scenario has not seen yet" in {
       // a 404 would read as "no such route" on the phone, and a player who has not joined yet is routine
       val f = get("/v1/scenario/graphscript/s1/user/u1/variables")
-      sensor.expectMessageType[Inspect[EventPayload]].replyTo ! StatusReply.Error("no such user")
+      sensor.expectMessageType[Inspect[EventPayload]].replyTo ! StatusReply.Error(Sensor.NoSuchUser)
       finish(f) shouldBe (
         StatusCodes.OK,
         Some(ContentTypes.`application/json`),
@@ -74,12 +74,12 @@ class EventRoutesTest extends ScalaTestWithActorTestKit with AnyWordSpecLike {
     "answer 404 for an unknown scenario" in {
       val f = get("/v1/scenario/graphscript/s1/user/u1/variables")
       sensor.expectMessageType[Inspect[EventPayload]].replyTo ! StatusReply.Error(
-        "no such scenario"
+        Sensor.NoSuchScenario
       )
       val (status, _, body) = finish(f)
       status shouldBe StatusCodes.NotFound
       // the reason, as a JSON string: the routes' marshaller encodes every String reply so
-      body shouldBe "\"no such scenario\""
+      body shouldBe s"\"${Sensor.NoSuchScenario}\""
     }
 
     "answer 500 for any other failure" in {

@@ -36,7 +36,7 @@ sees and the player's current story variables, so staff can tell where a player'
 - New sensor command `Inspect`, routed to the player's scenario actor the way `Sense` is, answered from the
   actor's state with its integer variables and its string variables (text replies saved as variables).
 - New route `GET /v1/scenario/{engine}/{scenarioId}/user/{userId}/variables` returning
-  `{"variables": {name: int}, "strings": {name: string}}`; 404 when the player has no actor in that scenario.
+  `{"variables": {name: int}, "strings": {name: string}}`; the empty object for a player the scenario has not seen yet (a 404 would read as a missing route on the phone, and a player whose Join is still on its way is routine); 404 only for an unknown scenario.
 - Tests with the existing actor test harness: join, apply an update, inspect.
 
 ### Phone (`ghostspeak-client`, own PR)
