@@ -10,7 +10,7 @@ import org.apache.pekko.persistence.testkit.scaladsl.EventSourcedBehaviorTestKit
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.wordspec.AnyWordSpecLike
 
-import tw.idv.idiotech.ghostspeak.agent.Sensor.Command.{ Create, Destroy, Replace }
+import tw.idv.idiotech.ghostspeak.agent.Sensor.Command.{ Create, Destroy, Inspect, Replace }
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Event.{ Created, Destroyed }
 
 import java.util.UUID
@@ -195,6 +195,35 @@ class SensorTest
       io.circe.parser.parse("""{"a":["s1"],"b":["s1"],"c":["s1"]}""").toOption.get
       // the scenario itself appears once: map key + scenario.id (+ one id per category)
       "\"s1\"".r.findAllMatchIn(json.noSpaces).size shouldBe 5
+    }
+  }
+  "Sensor" should {
+    "fail an inspect of an unknown scenario" in {
+      val result = esTestKit.runCommand[StatusReply[String]](r => Inspect[String]("nope", "u1", r))
+      result.reply.isError shouldBe true
+      result.reply.getError.getMessage shouldBe "no such scenario"
+      result.hasNoEvents shouldBe true
+    }
+
+    "fail an inspect of an unknown user without creating one" in {
+      val perUser = EventSourcedBehaviorTestKit[Sensor.Command[String], Sensor.Event, Sensor.State](
+        system,
+        sensor(
+          "per-user-inspect",
+          (ctx, created) => {
+            spawned.add(created.scenario.id)
+            Right(ctx.spawn(Behaviors.ignore[Sensor.Command[String]], UUID.randomUUID().toString))
+          },
+          sensor.onCommandPerUser
+        ),
+        SerializationSettings.disabled
+      )
+      val result =
+        perUser.runCommand[StatusReply[String]](r => Inspect[String]("scn", "ghost-user", r))
+      result.reply.isError shouldBe true
+      result.reply.getError.getMessage shouldBe "no such user"
+      result.hasNoEvents shouldBe true
+      spawned.asScala.toList shouldBe Nil
     }
   }
 }
