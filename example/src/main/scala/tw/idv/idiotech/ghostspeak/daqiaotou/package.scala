@@ -127,6 +127,12 @@ object Operation extends JsonEnum[Operation] {
 case class VariableUpdate(name: String, operation: Operation, value: Int) extends Task
     derives ConfiguredCodec
 
+/** A player's variables as a client reads them: the integers the story counts with, and the strings
+  * kept from text replies.
+  */
+case class UserVariables(variables: Map[String, Int], strings: Map[String, String])
+    derives ConfiguredCodec
+
 sealed trait Task derives ConfiguredCodec
 
 object Task {

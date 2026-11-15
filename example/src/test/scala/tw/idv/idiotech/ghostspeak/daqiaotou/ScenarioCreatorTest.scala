@@ -169,6 +169,63 @@ class ScenarioCreatorTest
     }
   }
 
+  // a performance that adds 3 to the variable "score" instead of reaching the player
+  def scoring(id: String) = Performance(
+    BaseAction[Content](
+      id,
+      "?u",
+      "ghost",
+      Content(
+        Task.VariableUpdates(List(VariableUpdate("score", Operation.Plus, 3))),
+        Condition.Always
+      ),
+      Session("scn", None)
+    )
+  )
+
+  // the initial node scores the text reply "yes"
+  val scoringScript: Map[String, Node] = Map(
+    "initial" -> Node(
+      "initial",
+      List(message(Right(EventPayload.Text("yes")), Some("ask"))),
+      List(scoring("score-up")),
+      Nil,
+      Set.empty,
+      Nil
+    )
+  )
+
+  def userKit(script: Map[String, Node]) =
+    EventSourcedBehaviorTestKit[Sensor.Command[EventPayload], creator.Event, creator.State](
+      system,
+      creator.ub(
+        Scenario("u1", "graphscript", ""),
+        createTestProbe[Actuator.Command[Content]]().ref
+      )(using
+        script
+      ),
+      SerializationSettings.disabled
+    )
+
+  "a user scenario's variables" should {
+    "be empty before any update" in {
+      val user = userKit(scoringScript)
+      val result = user.runCommand[StatusReply[String]](r => Sensor.Command.Inspect("scn", "u1", r))
+      result.reply shouldBe StatusReply.success("""{"variables":{},"strings":{}}""")
+    }
+
+    "reflect an update once it ran" in {
+      val user = userKit(scoringScript)
+      user.runCommand(
+        Sensor.Command.Sense(
+          message(Right(EventPayload.Text("yes")), Some("ask")).copy(sender = "u1", id = "m1")
+        )
+      )
+      val result = user.runCommand[StatusReply[String]](r => Sensor.Command.Inspect("scn", "u1", r))
+      result.reply shouldBe StatusReply.success("""{"variables":{"score":3},"strings":{}}""")
+    }
+  }
+
   "creating a scenario" should {
     "refuse a template that is not a valid script, persisting nothing" in {
       val root =

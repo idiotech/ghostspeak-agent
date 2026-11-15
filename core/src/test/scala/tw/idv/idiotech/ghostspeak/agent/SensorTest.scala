@@ -3,6 +3,7 @@ package tw.idv.idiotech.ghostspeak.agent
 import io.circe.parser.decode
 import io.circe.syntax.*
 import org.apache.pekko.actor.testkit.typed.scaladsl.ScalaTestWithActorTestKit
+import org.apache.pekko.actor.typed.Behavior
 import org.apache.pekko.actor.typed.scaladsl.Behaviors
 import org.apache.pekko.pattern.StatusReply
 import org.apache.pekko.persistence.testkit.scaladsl.EventSourcedBehaviorTestKit
@@ -10,7 +11,7 @@ import org.apache.pekko.persistence.testkit.scaladsl.EventSourcedBehaviorTestKit
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.wordspec.AnyWordSpecLike
 
-import tw.idv.idiotech.ghostspeak.agent.Sensor.Command.{ Create, Destroy, Replace }
+import tw.idv.idiotech.ghostspeak.agent.Sensor.Command.{ Create, Destroy, Inspect, Replace, Sense }
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Event.{ Created, Destroyed }
 
 import java.util.UUID
@@ -195,6 +196,88 @@ class SensorTest
       io.circe.parser.parse("""{"a":["s1"],"b":["s1"],"c":["s1"]}""").toOption.get
       // the scenario itself appears once: map key + scenario.id (+ one id per category)
       "\"s1\"".r.findAllMatchIn(json.noSpaces).size shouldBe 5
+    }
+  }
+  "Sensor" should {
+    "fail an inspect of an unknown scenario" in {
+      val result = esTestKit.runCommand[StatusReply[String]](r => Inspect[String]("nope", "u1", r))
+      result.reply.isError shouldBe true
+      result.reply.getError.getMessage shouldBe Sensor.NoSuchScenario
+      result.hasNoEvents shouldBe true
+    }
+
+    "fail an inspect of an unknown user without creating one" in {
+      val perUser = EventSourcedBehaviorTestKit[Sensor.Command[String], Sensor.Event, Sensor.State](
+        system,
+        sensor(
+          "per-user-inspect",
+          (ctx, created) => {
+            spawned.add(created.scenario.id)
+            Right(ctx.spawn(Behaviors.ignore[Sensor.Command[String]], UUID.randomUUID().toString))
+          },
+          sensor.onCommandPerUser
+        ),
+        SerializationSettings.disabled
+      )
+      val result =
+        perUser.runCommand[StatusReply[String]](r => Inspect[String]("scn", "ghost-user", r))
+      result.reply.isError shouldBe true
+      result.reply.getError.getMessage shouldBe Sensor.NoSuchUser
+      result.hasNoEvents shouldBe true
+      spawned.asScala.toList shouldBe Nil
+    }
+  }
+
+  // a child that answers an inspect itself, as a player's actor does
+  val answering: Behavior[Sensor.Command[String]] = Behaviors.receiveMessage {
+    case Inspect(_, _, replyTo) =>
+      replyTo ! StatusReply.success("{}")
+      Behaviors.same
+    case _ => Behaviors.same
+  }
+
+  "Sensor" should {
+    "forward an inspect to the scenario's actor, which answers the asker itself" in {
+      val forwarding =
+        EventSourcedBehaviorTestKit[Sensor.Command[String], Sensor.Event, Sensor.State](
+          system,
+          sensor(
+            "forwarding",
+            (ctx, created) =>
+              Right(
+                ctx.spawn(
+                  answering,
+                  if (created.uniqueId.nonEmpty) created.uniqueId else UUID.randomUUID().toString
+                )
+              )
+          ),
+          SerializationSettings.disabled
+        )
+      forwarding
+        .runCommand[StatusReply[String]](r => Create[String](scenario("s1"), r))
+        .reply shouldBe StatusReply.Success("created")
+      val result = forwarding.runCommand[StatusReply[String]](r => Inspect[String]("s1", "u1", r))
+      result.reply shouldBe StatusReply.success("{}")
+      result.hasNoEvents shouldBe true
+    }
+
+    "forward an inspect to the player's actor under a per-user sensor" in {
+      val perUser = EventSourcedBehaviorTestKit[Sensor.Command[String], Sensor.Event, Sensor.State](
+        system,
+        sensor(
+          "per-user-forwarding",
+          (ctx, created) => Right(ctx.spawn(answering, created.scenario.id)),
+          sensor.onCommandPerUser
+        ),
+        SerializationSettings.disabled
+      )
+      // the player's actor exists once the player has sent something
+      perUser.runCommand(
+        Sense[String](Message[String]("m1", None, "ghost", "u1", Right("hi"), "s1"))
+      )
+      val result = perUser.runCommand[StatusReply[String]](r => Inspect[String]("s1", "u1", r))
+      result.reply shouldBe StatusReply.success("{}")
+      result.hasNoEvents shouldBe true
     }
   }
 }

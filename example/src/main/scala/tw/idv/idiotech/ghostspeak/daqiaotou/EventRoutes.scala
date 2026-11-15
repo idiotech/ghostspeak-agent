@@ -6,7 +6,7 @@ import io.circe.parser.{ decode, parse }
 import io.circe.syntax.*
 import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem }
 import org.apache.pekko.actor.typed.scaladsl.AskPattern.{ schedulerFromActorSystem, Askable }
-import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.model.{ ContentTypes, HttpEntity, StatusCodes }
 import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.apache.pekko.http.scaladsl.server.Route
 import org.apache.pekko.pattern.StatusReply
@@ -74,6 +74,34 @@ class EventRoutes[T: Decoder](
             }
           }
         ret
+    },
+    // a player's story variables, for the staff page; answered by the player's actor
+    pathPrefix("v1" / "scenario" / Segment / Segment / "user" / Segment / "variables") {
+      (_, scenarioId, userId) =>
+        get {
+          onComplete(
+            sensor.askWithStatus[String](x => Sensor.Command.Inspect[T](scenarioId, userId, x))
+          ) {
+            case Success(json) =>
+              complete(StatusCodes.OK, HttpEntity(ContentTypes.`application/json`, json))
+            // a player the scenario has not seen yet has no variables; a 404 would read as a
+            // missing route on the phone
+            case Failure(StatusReply.ErrorMessage(Sensor.NoSuchUser)) =>
+              complete(
+                StatusCodes.OK,
+                HttpEntity(
+                  ContentTypes.`application/json`,
+                  UserVariables(Map.empty, Map.empty).asJson.noSpaces
+                )
+              )
+            case Failure(StatusReply.ErrorMessage(reason @ Sensor.NoSuchScenario)) =>
+              complete(StatusCodes.NotFound -> reason)
+            case Failure(StatusReply.ErrorMessage(reason)) =>
+              complete(StatusCodes.InternalServerError -> reason)
+            case Failure(e) =>
+              complete(StatusCodes.InternalServerError -> e.getMessage)
+          }
+        }
     },
     pathPrefix("v1" / "scenario" / Segment / Segment / "resources") { (engine, scenarioId) =>
       get {

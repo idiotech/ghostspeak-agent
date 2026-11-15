@@ -53,7 +53,7 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
               s"no such scenario: ${message.scenarioId} $id in children ${ctx.children
                   .map(_.path)} at ${state.scenarios.map(p => p._1 + p._2.uniqueId)} for message $message"
             )
-            StatusReply.Error("no such scenario")
+            StatusReply.Error(Sensor.NoSuchScenario)
           } { actor =>
             actor ! Sense(message)
             StatusReply.success("OK")
@@ -68,7 +68,7 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
       val reply: StatusReply[String] =
         getChild(ctx, id)
           .fold[StatusReply[String]](
-            StatusReply.Error("no such scenario")
+            StatusReply.Error(Sensor.NoSuchScenario)
           ) { actor =>
             actor ! Broadcast(message)
             StatusReply.success("OK")
@@ -77,6 +77,14 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
         Effect.noReply
       } { r =>
         Effect.reply[StatusReply[String], Event, State](r)(reply)
+      }
+    case inspect @ Inspect(scenarioId, _, replyTo) =>
+      val id = state.scenarios.get(scenarioId).map(_.uniqueId).getOrElse("invalid")
+      getChild(ctx, id).fold[Reff](
+        Effect.reply(replyTo)(StatusReply.Error(Sensor.NoSuchScenario))
+      ) { actor =>
+        actor ! inspect
+        Effect.noReply
       }
     case Create(scenario, replyTo) =>
       if (scenario.id.isBlank)
@@ -189,7 +197,7 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
       case Sense(message, _) =>
         val scenario = Scenario(message.sender, message.scenarioId, "")
         val existingActor = if (message.sender.isBlank) None else getChild(ctx, message.sender)
-        val maybeActor = existingActor.toRight("no such user").orElse {
+        val maybeActor = existingActor.toRight(Sensor.NoSuchUser).orElse {
           create(ctx, Created(scenario, ""))
         }
         maybeActor.foreach(_ ! Sense(message))
@@ -209,12 +217,22 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
           )
         )
         Effect.noReply
+      case inspect @ Inspect(_, userId, replyTo) =>
+        val existing = if (userId.isBlank) None else getChild(ctx, userId)
+        existing.fold[Reff](Effect.reply(replyTo)(StatusReply.Error(Sensor.NoSuchUser))) { actor =>
+          actor ! inspect
+          Effect.noReply
+        }
       case _ => general(state, cmd)
     }
   }
 }
 
 object Sensor {
+
+  /** Why a command could not reach its actor; the routes match these to answer the client. */
+  val NoSuchScenario = "no such scenario"
+  val NoSuchUser = "no such user"
 
   sealed trait Event extends EventBase
 
@@ -320,6 +338,16 @@ object Sensor {
 
     case class Destroy[P](scenarioId: String, replyTo: ActorRef[StatusReply[String]])
         extends Command[P]
+
+    /** Read a player's state in a scenario, as JSON; routed to the player's actor like [[Sense]],
+      * which answers [[replyTo]] itself. The sensors on the way reply with an error when the
+      * scenario or the player is unknown; unlike Sense, it never creates a player.
+      */
+    case class Inspect[P](
+      scenarioId: String,
+      userId: String,
+      replyTo: ActorRef[StatusReply[String]]
+    ) extends Command[P]
 
     /** Create the scenario, or replace the one with the same id. The replacement is accepted before
       * the old one goes, so a refused definition changes nothing.
