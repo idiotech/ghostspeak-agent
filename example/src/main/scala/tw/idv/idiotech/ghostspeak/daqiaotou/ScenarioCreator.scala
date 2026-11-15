@@ -10,6 +10,7 @@ import io.circe.syntax.*
 import org.apache.pekko.Done
 import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem, Behavior }
 import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors }
+import org.apache.pekko.pattern.StatusReply
 import org.apache.pekko.persistence.typed.{ PersistenceId, RecoveryCompleted }
 import org.apache.pekko.persistence.typed.scaladsl.{
   Effect,
@@ -410,7 +411,11 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
         }
       case Sensor.Command.Create(scenario, replyTo)    => Effect.none
       case Sensor.Command.Destroy(scenarioId, replyTo) => Effect.none
-      case _                                           => Effect.none
+      case Sensor.Command.Inspect(_, _, replyTo)       =>
+        Effect.reply(replyTo)(
+          StatusReply.success(UserVariables(state.variables, state.strings).asJson.noSpaces)
+        )
+      case _ => Effect.none
     }
     val elapsedTime = System.nanoTime() - time
     commandTime += elapsedTime
@@ -431,6 +436,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
       case Command.Create(scenario, replyTo)   => "create"
       case Command.Query(isPublic, isFeatured, category, scenarioId, passode, replyTo) => "query"
       case Command.Destroy(scenarioId, replyTo)                                        => "destroy"
+      case Command.Inspect(_, _, _)                                                    => "inspect"
       case Command.Replace(scenario, replyTo)                                          => "replace"
     }
 
