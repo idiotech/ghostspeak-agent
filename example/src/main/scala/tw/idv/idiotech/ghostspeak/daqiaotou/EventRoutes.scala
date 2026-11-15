@@ -84,9 +84,17 @@ class EventRoutes[T: Decoder](
           ) {
             case Success(json) =>
               complete(StatusCodes.OK, HttpEntity(ContentTypes.`application/json`, json))
-            case Failure(
-                  StatusReply.ErrorMessage(reason @ ("no such scenario" | "no such user"))
-                ) =>
+            // a player the scenario has not seen yet has no variables; a 404 would read as a
+            // missing route on the phone
+            case Failure(StatusReply.ErrorMessage("no such user")) =>
+              complete(
+                StatusCodes.OK,
+                HttpEntity(
+                  ContentTypes.`application/json`,
+                  UserVariables(Map.empty, Map.empty).asJson.noSpaces
+                )
+              )
+            case Failure(StatusReply.ErrorMessage(reason @ "no such scenario")) =>
               complete(StatusCodes.NotFound -> reason)
             case Failure(StatusReply.ErrorMessage(reason)) =>
               complete(StatusCodes.InternalServerError -> reason)
