@@ -85,18 +85,22 @@ class ActuatorTest
       esTestKit.persistenceTestKit.expectNothingPersisted(persistenceId)
     }
 
-    "perform due actions on Timeout and persist them as done" in {
+    "perform due actions when it has recovered and persist them as done" in {
       // a pending action whose start time passed while the server was down
       val due = Performance(action("due"), System.currentTimeMillis() - 1000)
       val later = Performance(action("later"), inOneHour())
       esTestKit.persistenceTestKit.persistForRecovery(persistenceId, Seq(due, later))
-      esTestKit.restart().state.pendingActions shouldBe Set(due, later)
+      // recovery ends with a Timeout the actuator sends itself
+      esTestKit.restart()
 
-      val result = esTestKit.runCommand(Timeout[String]())
-      result.event shouldBe ActionDone(Set(due))
-      result.state.pendingActions shouldBe Set(later)
       sensor.expectMessageType[Sense[String]].message.actionId shouldBe Some("due") // Doing
       sensor.expectMessageType[Sense[String]].message.actionId shouldBe Some("due") // Done
+      esTestKit.persistenceTestKit.persistedInStorage(persistenceId).last shouldBe
+      ActionDone(Set(due))
+      esTestKit.getState().pendingActions shouldBe Set(later)
+
+      // nothing left for an explicit one
+      esTestKit.runCommand(Timeout[String]()).hasNoEvents shouldBe true
     }
 
     "snapshot every 100 events and recover pending actions from it" in {

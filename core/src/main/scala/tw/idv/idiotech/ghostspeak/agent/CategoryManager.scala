@@ -53,11 +53,13 @@ object CategoryManager {
   }
 
   def apply(): Behavior[Command] = Behaviors.setup { (context: ActorContext[Command]) =>
-    EventSourcedBehavior.withEnforcedReplies[Command, Event, State](
-      persistenceId = PersistenceId.ofUniqueId("category-manager"),
-      emptyState = State(Nil),
-      commandHandler = onCommand,
-      eventHandler = onEvent
-    )
+    EventSourcedBehavior
+      .withEnforcedReplies[Command, Event, State](
+        persistenceId = PersistenceId.ofUniqueId("category-manager"),
+        emptyState = State(Nil),
+        commandHandler = onCommand,
+        eventHandler = onEvent
+      )
+      .onPersistFailure(PersistFailure.restart)
   }
 }

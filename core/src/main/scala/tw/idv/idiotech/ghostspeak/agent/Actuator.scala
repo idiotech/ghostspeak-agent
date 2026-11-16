@@ -5,7 +5,7 @@ import io.circe.{ Codec, Decoder, Encoder }
 import io.circe.derivation.ConfiguredCodec
 import org.apache.pekko.actor.typed.{ ActorRef, Behavior }
 import org.apache.pekko.actor.typed.scaladsl.{ ActorContext, Behaviors, TimerScheduler }
-import org.apache.pekko.persistence.typed.PersistenceId
+import org.apache.pekko.persistence.typed.{ PersistenceId, RecoveryCompleted }
 import org.apache.pekko.persistence.typed.scaladsl.{
   Effect,
   EventSourcedBehavior,
@@ -88,7 +88,6 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
         )
         val toExecute = state.pendingActions.filter(_.startTime <= current)
         logger.info(s"ready to execute: ${toExecute.map(_.action.id)}")
-        toExecute.toList.sorted.foreach(p => sendAction(p.action))
         state.pendingActions.toList.sorted
           .find(_.startTime > current)
           .foreach { p =>
@@ -97,7 +96,14 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
             )
             timer.startSingleTimer(TimerKey, Timeout(), (p.startTime - current).millis)
           }
-        if (toExecute.isEmpty) Effect.none else Effect.persist(ActionDone(toExecute))
+        // Performed only once they are recorded as done. If that write fails this actor restarts
+        // and comes back here (see RecoveryCompleted below); performing first would then send
+        // the same actions again at every restart for as long as the journal refuses writes.
+        if (toExecute.isEmpty) Effect.none
+        else
+          Effect
+            .persist(ActionDone(toExecute))
+            .thenRun(_ => toExecute.toList.sorted.foreach(p => sendAction(p.action)))
       case Cancel(receiver, scenario) =>
         // a user who left a scenario must not get the actions still scheduled for it, e.g. after a restart
         val cancelled = state.pendingActions.filter(p =>
@@ -149,6 +155,11 @@ class Actuator[T: Encoder: Decoder, P: Encoder: Decoder] extends LazyLogging {
         commandHandler = commandHandler,
         eventHandler = eventHandler
       ).withRetention(RetentionCriteria.snapshotEvery(snapshotEvery, 2))
+        .onPersistFailure(PersistFailure.restart)
+        // perform what became due while this actor was away, and set the timer for the rest:
+        // at startup, and after a restart, when the actions of a Timeout whose ActionDone could
+        // not be written are still pending and not yet performed
+        .receiveSignal { case (_, RecoveryCompleted) => ctx.self ! Timeout() }
     }
   }
 

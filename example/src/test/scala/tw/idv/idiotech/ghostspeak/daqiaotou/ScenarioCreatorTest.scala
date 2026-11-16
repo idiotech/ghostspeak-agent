@@ -7,6 +7,7 @@ import org.apache.pekko.pattern.StatusReply
 import org.apache.pekko.persistence.testkit.PersistenceTestKitSnapshotPlugin
 import org.apache.pekko.persistence.testkit.scaladsl.{
   EventSourcedBehaviorTestKit,
+  PersistenceTestKit,
   SnapshotTestKit
 }
 import org.apache.pekko.persistence.testkit.scaladsl.EventSourcedBehaviorTestKit.SerializationSettings
@@ -23,6 +24,8 @@ import tw.idv.idiotech.ghostspeak.agent.{
   SystemPayload
 }
 import tw.idv.idiotech.ghostspeak.daqiaotou.GraphScript.{ Node, Performance }
+
+import scala.concurrent.duration.*
 
 class ScenarioCreatorTest
     extends ScalaTestWithActorTestKit(
@@ -231,7 +234,7 @@ class ScenarioCreatorTest
       val root =
         EventSourcedBehaviorTestKit[Sensor.Command[EventPayload], Sensor.Event, Sensor.State](
           system,
-          creator.scenarioBehavior,
+          creator.rootSensor(createTestProbe[Actuator.Command[Content]]().ref),
           SerializationSettings.disabled
         )
       val result = root.runCommand[StatusReply[String]](r =>
@@ -240,6 +243,35 @@ class ScenarioCreatorTest
       result.reply.isError shouldBe true
       result.reply.getError.getMessage should include("invalid template")
       result.hasNoEvents shouldBe true
+    }
+  }
+
+  "the root behavior" should {
+    // what stopped the server on 2026-11-15: the write of a Created for sensor-graphscript failed
+    "keep serving after a journal write of the root sensor fails" in {
+      // the persistence ids are fixed, so start from an empty journal whatever ran before
+      val persistence = PersistenceTestKit(system)
+      persistence.clearByPersistenceId("sensor-graphscript")
+      persistence.clearByPersistenceId("actuator-graphscript")
+      val root = spawn(creator.scenarioBehavior)
+      val reply = createTestProbe[StatusReply[String]]()
+      def scenario(id: String) = Scenario(id, "graphscript", "[]")
+
+      root ! Sensor.Command.Create[EventPayload](scenario("kept"), reply.ref)
+      reply.expectMessage(StatusReply.Success("created"))
+
+      persistence.failNextPersisted("sensor-graphscript")
+      root ! Sensor.Command.Create[EventPayload](scenario("lost"), reply.ref)
+      reply.expectNoMessage(500.millis)
+
+      // the readiness and liveness probes' request
+      root ! Sensor.Command.Query[EventPayload](None, None, None, None, None, reply.ref)
+      val listed = reply.receiveMessage(10.seconds).getValue
+      listed should include("kept")
+      listed should not include "lost"
+
+      root ! Sensor.Command.Create[EventPayload](scenario("lost"), reply.ref)
+      reply.expectMessage(StatusReply.Success("created"))
     }
   }
 
