@@ -23,6 +23,8 @@ import tw.idv.idiotech.ghostspeak.agent.{
   Actuator,
   EventBase,
   FcmSender,
+  Forward,
+  PersistFailure,
   ReplayOnErrorSnapshotStore,
   Scenario,
   Sensor,
@@ -478,6 +480,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
         .withRetention(RetentionCriteria.snapshotEvery(100, 2))
         // see jdbc-snapshot-store-replay-on-error in application.conf
         .withSnapshotPluginId("jdbc-snapshot-store-replay-on-error")
+        .onPersistFailure(PersistFailure.restart)
         // a snapshot that did not decode was skipped and the whole journal replayed: write a
         // snapshot now, or the same replay happens at every start until the user acts again
         .receiveSignal { case (_, RecoveryCompleted) =>
@@ -512,6 +515,43 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
 
   var spawnTime = 0L;
 
+  /** The sensor holding the scenarios, each a per-user sensor that is its child. */
+  def rootSensor(actuatorRef: ActorRef[Actuator.Command[Content]]): Behavior[Command] =
+    // TODO check engine before deciding actor
+    sensor.apply(
+      "graphscript",
+      (ctx, created) =>
+        if (created.scenario.engine == "graphscript")
+          Try {
+            val scn = created.scenario
+            // a val, not a given: givens are lazy, and the template must be decoded here,
+            // inside the Try, so an invalid one is refused before the scenario is persisted
+            val script: Map[String, Node] = createScript(scn)
+            val actor: Behavior[Sensor.Command[EventPayload]] =
+              sensor.apply(
+                scn.id,
+                (ctx, created) => createUserScenario(actuatorRef)(ctx, created)(using script),
+                sensor.onCommandPerUser,
+                Sensor.PerUserSnapshotEvery
+              )
+            ctx.spawn(
+              actor,
+              if (created.uniqueId.nonEmpty) created.uniqueId else UUID.randomUUID().toString
+            )
+          }
+            .fold(
+              e => {
+                e.printStackTrace()
+                Left(s"invalid template: ${e.getMessage}")
+              },
+              Right(_)
+            )
+        else Left("not a graphscript scenario")
+    )
+
+  // The actuator and the root sensor are siblings under this actor, which forwards to the
+  // sensor: a sensor restarting after a journal failure stops its own children, and the
+  // actuator must not be one of them.
   val scenarioBehavior: Behavior[Command] =
     Behaviors.setup[Command] { ctx =>
       val sensorRef = ctx.self
@@ -521,37 +561,8 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
       }
       val actuatorRef: ActorRef[Actuator.Command[Content]] =
         ctx.spawn(actuatorBehavior, UUID.randomUUID().toString)
-      actuatorRef ! Actuator.Command.Timeout() // for recovery
-      // TODO check engine before deciding actor
-      sensor.apply(
-        "graphscript",
-        (ctx, created) =>
-          if (created.scenario.engine == "graphscript")
-            Try {
-              val scn = created.scenario
-              // a val, not a given: givens are lazy, and the template must be decoded here,
-              // inside the Try, so an invalid one is refused before the scenario is persisted
-              val script: Map[String, Node] = createScript(scn)
-              val actor: Behavior[Sensor.Command[EventPayload]] =
-                sensor.apply(
-                  scn.id,
-                  (ctx, created) => createUserScenario(actuatorRef)(ctx, created)(using script),
-                  sensor.onCommandPerUser,
-                  Sensor.PerUserSnapshotEvery
-                )
-              ctx.spawn(
-                actor,
-                if (created.uniqueId.nonEmpty) created.uniqueId else UUID.randomUUID().toString
-              )
-            }
-              .fold(
-                e => {
-                  e.printStackTrace()
-                  Left(s"invalid template: ${e.getMessage}")
-                },
-                Right(_)
-              )
-          else Left("not a graphscript scenario")
-      )
+      // nothing reaches the players without it: if it stops, so does this actor (and the server)
+      ctx.watch(actuatorRef)
+      Forward.toChild(ctx, rootSensor(actuatorRef), "sensor")
     }
 }

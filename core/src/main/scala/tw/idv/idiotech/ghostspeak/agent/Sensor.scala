@@ -181,6 +181,8 @@ class Sensor[P: Encoder: Decoder] extends LazyLogging {
           eventHandler = onEvent
         )
         .withRetention(RetentionCriteria.snapshotEvery(snapshotEvery, 2))
+        // the restart stops every scenario actor, and recovery below spawns them again
+        .onPersistFailure(PersistFailure.restart)
         .receiveSignal { case (state, RecoveryCompleted) =>
           val scns = state.scenarios.values.map(s => createScenario(context, s))
           logger.info(s"====== recovery complete for $name")

@@ -36,6 +36,11 @@ object Server {
       val dummySensor: ActorRef[Sensor.Command[P]] = ctx.spawn(behavior, "RootSensor")
       val categoryManager: ActorRef[CategoryManager.Command] =
         ctx.spawn(CategoryManager(), "CategoryManager")
+      // Neither is expected to stop: journal failures restart them (PersistFailure). If one
+      // does, its Terminated signal is unhandled here, which stops this guardian and with it the
+      // actor system, rather than leaving an HTTP server whose every request goes nowhere.
+      ctx.watch(dummySensor)
+      ctx.watch(categoryManager)
       val routes = routing(dummySensor, categoryManager, system)
 
       val serverBinding: Future[Http.ServerBinding] =

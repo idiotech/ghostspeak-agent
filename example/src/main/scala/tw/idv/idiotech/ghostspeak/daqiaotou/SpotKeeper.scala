@@ -17,7 +17,9 @@ import tw.idv.idiotech.ghostspeak.agent.{
   Actuator,
   EventBase,
   FcmSender,
+  Forward,
   Message,
+  PersistFailure,
   Scenario,
   Sensor,
   Session,
@@ -109,7 +111,7 @@ class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPa
         emptyState = State(Nil),
         commandHandler = onCommand(user, scenarioId, sensorRef, actuator),
         eventHandler = onEvent
-      )
+      ).onPersistFailure(PersistFailure.restart)
     }
 
   def createUserScenario(
@@ -138,6 +140,42 @@ class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPa
       .flatMap(_ => FcmSender.send(action))(using actorSystem.executionContext)
   }
 
+  /** The sensor holding the scenarios, each a per-user sensor that is its child. */
+  def rootSensor(
+    sensorRef: ActorRef[Command],
+    actuatorRef: ActorRef[Actuator.Command[Content]]
+  ): Behavior[Command] =
+    sensor.apply(
+      "spotkeeper",
+      (ctx, created) =>
+        if (created.scenario.engine == "spotkeeper")
+          Try {
+            val scn = created.scenario
+            val actor: Behavior[Sensor.Command[SpotPayload]] =
+              sensor.apply(
+                scn.id,
+                createUserScenario(created.scenario.id, sensorRef, actuatorRef),
+                sensor.onCommandPerUser,
+                Sensor.PerUserSnapshotEvery
+              )
+            ctx.spawn(
+              actor,
+              if (created.uniqueId.nonEmpty) created.uniqueId else UUID.randomUUID().toString
+            )
+          }
+            .fold(
+              e => {
+                e.printStackTrace()
+                Left(s"invalid template: ${e.getMessage}")
+              },
+              Right(_)
+            )
+        else Left("not a graphscript scenario")
+    )
+
+  // The actuator and the root sensor are siblings under this actor, which forwards to the
+  // sensor: a sensor restarting after a journal failure stops its own children, and the
+  // actuator must not be one of them.
   val spotKeeperBehavior: Behavior[Command] =
     Behaviors.setup[Command] { ctx =>
       val sensorRef: ActorRef[Command] = ctx.self
@@ -147,34 +185,9 @@ class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPa
       }
       val actuatorRef: ActorRef[Actuator.Command[Content]] =
         ctx.spawn(actuatorBehavior, s"actuator-${UUID.randomUUID().toString}")
-      actuatorRef ! Actuator.Command.Timeout() // for recovery
-      sensor.apply(
-        "spotkeeper",
-        (ctx, created) =>
-          if (created.scenario.engine == "spotkeeper")
-            Try {
-              val scn = created.scenario
-              val actor: Behavior[Sensor.Command[SpotPayload]] =
-                sensor.apply(
-                  scn.id,
-                  createUserScenario(created.scenario.id, sensorRef, actuatorRef),
-                  sensor.onCommandPerUser,
-                  Sensor.PerUserSnapshotEvery
-                )
-              ctx.spawn(
-                actor,
-                if (created.uniqueId.nonEmpty) created.uniqueId else UUID.randomUUID().toString
-              )
-            }
-              .fold(
-                e => {
-                  e.printStackTrace()
-                  Left(s"invalid template: ${e.getMessage}")
-                },
-                Right(_)
-              )
-          else Left("not a graphscript scenario")
-      )
+      // nothing reaches the players without it: if it stops, so does this actor (and the server)
+      ctx.watch(actuatorRef)
+      Forward.toChild(ctx, rootSensor(sensorRef, actuatorRef), "sensor")
     }
 }
 

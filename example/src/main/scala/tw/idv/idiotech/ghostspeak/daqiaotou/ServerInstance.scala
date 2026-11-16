@@ -5,12 +5,14 @@ import org.apache.pekko.actor.typed.ActorSystem
 import tw.idv.idiotech.ghostspeak.agent.{ Actuator, PersistenceSettings, Sensor, Server }
 import tw.idv.idiotech.ghostspeak.daqiaotou.SpotKeeper.SpotPayload
 
+import scala.concurrent.ExecutionContext
+
 object ServerInstance extends App {
   val sensor = new Sensor[EventPayload]
   val actuator = new Actuator[Content, EventPayload]
   val scenarioCreator = new ScenarioCreator(sensor, actuator)
 
-  def startGraphScript(): Unit =
+  def startGraphScript(): ActorSystem[Server.Msg] =
     ActorSystem(
       Server[EventPayload](
         scenarioCreator.scenarioBehavior,
@@ -26,7 +28,7 @@ object ServerInstance extends App {
   val spotKeeperActuator = new Actuator[Content, SpotPayload]
   val spotKeeper = new SpotKeeper(spotKeeperSensor, spotKeeperActuator)
 
-  def startSpotKeeper(): Unit =
+  def startSpotKeeper(): ActorSystem[Server.Msg] =
     ActorSystem(
       Server[SpotPayload](
         spotKeeper.spotKeeperBehavior,
@@ -38,10 +40,16 @@ object ServerInstance extends App {
       PersistenceSettings.load()
     )
 
+  // The actor system ends when the server's guardian stops, which it does when the root sensor
+  // or the category manager is gone for good (see Server). Exit then, so that whatever runs
+  // this process starts a fresh one, rather than staying up with nothing serving.
+  private def exitWhenTerminated(system: ActorSystem[?]): Unit =
+    system.whenTerminated.onComplete(_ => sys.exit(1))(using ExecutionContext.global)
+
   if (config.engine == "graphscript") {
-    startGraphScript()
+    exitWhenTerminated(startGraphScript())
   } else if (config.engine == "spotkeeper") {
-    startSpotKeeper()
+    exitWhenTerminated(startSpotKeeper())
   } else {
     println("not a known engine")
   }
