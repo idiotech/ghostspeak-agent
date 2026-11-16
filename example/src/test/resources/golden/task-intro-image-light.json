@@ -1,0 +1,12 @@
+{
+  "backgroundUrl" : "bg.png",
+  "logoUrl" : null,
+  "logoMarginTop" : null,
+  "logoWidth" : null,
+  "logoHeight" : null,
+  "mapLogoUrl" : null,
+  "textColor" : "#1E3A2E",
+  "theme" : "light",
+  "accentColor" : "#42928D",
+  "type" : "INTRO_IMAGE"
+}

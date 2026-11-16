@@ -5,5 +5,8 @@
   "logoWidth" : null,
   "logoHeight" : 20.0,
   "mapLogoUrl" : null,
+  "textColor" : null,
+  "theme" : null,
+  "accentColor" : null,
   "type" : "INTRO_IMAGE"
 }

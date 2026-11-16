@@ -211,14 +211,18 @@ object Task {
   ) extends Task
 
   // Intro image
-  // The background image to show
+  // The background image to show; textColor, theme ("light" or "dark") and accentColor skin the
+  // intro screen, passed through to the client untouched
   case class IntroImage(
     backgroundUrl: Option[String],
     logoUrl: Option[String],
     logoMarginTop: Option[Float] = None,
     logoWidth: Option[Float] = None,
     logoHeight: Option[Float] = None,
-    mapLogoUrl: Option[String]
+    mapLogoUrl: Option[String],
+    textColor: Option[String] = None,
+    theme: Option[String] = None,
+    accentColor: Option[String] = None
   ) extends Task
 
   // Button style
