@@ -108,6 +108,17 @@ class GoldenJsonTest extends AnyFlatSpec with Matchers {
     "map-style"      -> Task.MapStyle(Some("https://example.com/style"), true),
     "intro-image"    -> Task
       .IntroImage(Some("bg.png"), Some("logo.png"), Some(1.5f), None, Some(20f), None),
+    "intro-image-light" -> Task.IntroImage(
+      Some("bg.png"),
+      None,
+      None,
+      None,
+      None,
+      None,
+      textColor = Some("#1E3A2E"),
+      theme = Some("light"),
+      accentColor = Some("#42928D")
+    ),
     "button-style"     -> Task.ButtonStyle("#000000", "#ffffff"),
     "popup-style"      -> Task.PopupStyle("#ff0000"),
     "variable-updates" -> Task.VariableUpdates(
