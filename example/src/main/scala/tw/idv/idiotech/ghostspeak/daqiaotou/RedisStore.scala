@@ -6,9 +6,9 @@ import _root_.redis.clients.jedis.{ Jedis, JedisPool, JedisPoolConfig }
 import scala.jdk.CollectionConverters.*
 import scala.util.Using
 
-/** The Redis operations the server uses: one hash per user and scenario
-  * ("action-<scenario>-<user>"), mapping action IDs to the action JSON not yet fetched by the
-  * client.
+/** The Redis operations the server uses: one list per user and scenario, holding the action JSON
+  * not yet fetched by the client in the order it was stored (see [[PendingActions]]). The hash
+  * operations read what servers before the list left behind.
   */
 class RedisStore(host: String, port: Int, timeoutMs: Int = RedisStore.DefaultTimeoutMs) {
 
@@ -35,8 +35,25 @@ class RedisStore(host: String, port: Int, timeoutMs: Int = RedisStore.DefaultTim
   def hdel(key: String, fields: String*): Unit =
     if (fields.nonEmpty) withClient(_.hdel(key, fields*))
 
-  def del(key: String): Unit =
-    withClient(_.del(key))
+  /** Adds the value at the end of the list. */
+  def rpush(key: String, value: String): Unit =
+    withClient(_.rpush(key, value))
+
+  /** The whole list, first stored first, deleting it in the same transaction: a value pushed
+    * meanwhile is either in the answer or still in Redis for the next call, never lost. Empty if
+    * the key does not exist.
+    */
+  def takeList(key: String): List[String] =
+    withClient { client =>
+      val transaction = client.multi()
+      val values = transaction.lrange(key, 0, -1)
+      transaction.del(key)
+      transaction.exec()
+      values.get().asScala.toList
+    }
+
+  def del(keys: String*): Unit =
+    if (keys.nonEmpty) withClient(_.del(keys*))
 
   def close(): Unit = pool.close()
 }

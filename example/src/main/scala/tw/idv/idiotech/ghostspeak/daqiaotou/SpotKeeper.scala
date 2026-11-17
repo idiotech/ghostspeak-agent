@@ -132,12 +132,9 @@ class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPa
   def sendMessage(
     action: Action[Content]
   )(using actorSystem: ActorSystem[?], encoder: Encoder[Action[Content]]): Future[Done] = {
-    val actionJson =
-      PendingActions.stamp(action.asJson, PendingActions.nextOrder()).printWith(Printer.spaces2)
-    val redisKey = s"action-${action.session.scenario}-${action.receiver}"
-    val hashKey = action.id
-    logger.debug(s"saving action to redis: $redisKey $hashKey")
-    onRedis(_.hset(redisKey, hashKey, actionJson))
+    logger.debug(s"saving action to redis: ${action.receiver} ${action.id}")
+    PendingActions
+      .store(action.session.scenario, action.receiver, action.asJson.printWith(Printer.spaces2))
       .flatMap(_ => FcmSender.send(action))(using actorSystem.executionContext)
   }
 

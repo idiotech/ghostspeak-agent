@@ -305,6 +305,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
         def getEffect(nodes: List[Node], strings: List[StringVariable]): Effect[Event, State] = {
           logger.debug(s"triggered nodes: ${nodes.map(_.name)}")
           val effectStart = System.nanoTime()
+          val startTimes = new DistinctStartTimes
           val variableUpdates: List[VariableUpdate] =
             nodes.filter(n => state.check(n.preconditions)).flatMap { n =>
 //              logger.info(s"effects: ${n.performances}")
@@ -322,8 +323,10 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
                   state.strings ++ strings.map(v => v.name -> v.value)
                 )
                 val startTime = p.time.fold(
-                  System.currentTimeMillis() + p.delay
-                )(_.time())
+                  // an action without a delay is performed as it arrives, in this order
+                  if (p.delay <= 0) System.currentTimeMillis()
+                  else startTimes.next(System.currentTimeMillis() + p.delay)
+                )(t => startTimes.next(t.time()))
                 logger.debug(
                   s"carrying out ${Perform(action, startTime)} ${p.time} ${p.time.map(_.time())}"
                 )
@@ -357,11 +360,10 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
         message.payload match {
           case Left(SystemPayload.Leave) =>
             logger.info(s"user $user left")
-            val redisKey = s"action-${message.scenarioId}-$user"
-            logger.debug(s"deleting user from redis: $redisKey")
+            logger.debug(s"deleting user from redis: ${message.scenarioId} $user")
             // blocking on purpose: the delete must finish before this user's next actions are
             // written, or it could remove them
-            redis.del(redisKey)
+            redis.del(PendingActions.keys(message.scenarioId, user)*)
             // delayed actions of the left run would otherwise reach the user's next run
             actuator ! Cancel(user, message.scenarioId)
             Effect.persist(Event(List(Node.leave), message, Nil))
@@ -503,16 +505,13 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
   def sendMessage(
     action: Action
   )(using actorSystem: ActorSystem[?]): Future[Done] = {
-    // numbered here, in the order the actuator performs the actions; the writes below may land
-    // in any order
-    val actionJson = PendingActions.stamp(action.asJson, PendingActions.nextOrder()).toString()
-    val redisKey = s"action-${action.session.scenario}-${action.receiver}"
-    val hashKey = action.id
-    logger.debug(s"saving action to redis: $redisKey $hashKey")
-    onRedis(_.hset(redisKey, hashKey, actionJson)).flatMap { _ =>
-      logPerf(action, "fcm_sending")
-      FcmSender.send(action, logPerf)
-    }(using actorSystem.executionContext)
+    logger.debug(s"saving action to redis: ${action.receiver} ${action.id}")
+    PendingActions
+      .store(action.session.scenario, action.receiver, action.asJson.toString())
+      .flatMap { _ =>
+        logPerf(action, "fcm_sending")
+        FcmSender.send(action, logPerf)
+      }(using actorSystem.executionContext)
   }
 
   var spawnTime = 0L;
@@ -567,4 +566,19 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
       ctx.watch(actuatorRef)
       Forward.toChild(ctx, rootSensor(actuatorRef), "sensor")
     }
+}
+
+/** Start times for the delayed actions of one step, no two the same. The actuator keeps delayed
+  * actions in a set and performs the due ones by start time, so two lines of a step given the same
+  * delay, which get the same millisecond, would be performed in either order. A time already given
+  * out is moved to the next free millisecond, keeping the order of the calls.
+  */
+final private[daqiaotou] class DistinctStartTimes {
+  private val taken = scala.collection.mutable.Set.empty[Long]
+
+  def next(wanted: Long): Long = {
+    var time = wanted
+    while (!taken.add(time)) time += 1
+    time
+  }
 }

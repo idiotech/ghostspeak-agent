@@ -181,4 +181,59 @@ class RedisStoreTest extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
     store.hgetAll(k) mustBe empty
     raw("EXISTS", k) mustBe ":0"
   }
+
+  it must "keep a list in the order it was written, and take it out whole" in {
+    requireRedis()
+    val k = key("list")
+    val values = (1 to 50).map(i => s"第$i") // non-ASCII as well
+    values.foreach(store.rpush(k, _))
+    raw("LLEN", k) mustBe ":50"
+    store.takeList(k) mustBe values
+    raw("EXISTS", k) mustBe ":0"
+    store.takeList(k) mustBe empty
+  }
+
+  it must "lose or repeat nothing when a list is taken while it is written" in {
+    requireRedis()
+    import scala.concurrent.{ Await, Future }
+    import scala.concurrent.duration.*
+    given ec: scala.concurrent.ExecutionContext =
+      scala.concurrent.ExecutionContext.fromExecutor(
+        java.util.concurrent.Executors.newFixedThreadPool(8)
+      )
+    val k = key("take-while-writing")
+    val writing = Future((1 to 2000).foreach(i => store.rpush(k, i.toString)))
+    val taken = List.newBuilder[String]
+    while (!writing.isCompleted) taken ++= store.takeList(k)
+    Await.result(writing, 10.seconds)
+    taken ++= store.takeList(k)
+    taken.result() mustBe (1 to 2000).map(_.toString)
+  }
+
+  it must "delete several keys of different types at once" in {
+    requireRedis()
+    val (list, hash) = (key("del-list"), key("del-hash"))
+    store.rpush(list, "x")
+    store.hset(hash, "a1", "y")
+    store.del(list, hash)
+    raw("EXISTS", list) mustBe ":0"
+    raw("EXISTS", hash) mustBe ":0"
+    store.del()
+  }
+
+  "PendingActions" must "take what an older server left in the hash first, then the list" in {
+    requireRedis()
+    val (scenario, user) = (s"it-${UUID.randomUUID()}", "u")
+    val (hash, list) =
+      (PendingActions.legacyHashKey(scenario, user), PendingActions.listKey(scenario, user))
+    store.hset(hash, "old-1", "old-1")
+    store.hset(hash, "old-2", "old-2")
+    List("new-1", "new-2", "new-3").foreach(store.rpush(list, _))
+    val taken = PendingActions.take(store, scenario, user)
+    taken.take(2).toSet mustBe Set("old-1", "old-2")
+    taken.drop(2) mustBe List("new-1", "new-2", "new-3")
+    raw("EXISTS", hash) mustBe ":0"
+    raw("EXISTS", list) mustBe ":0"
+    PendingActions.take(store, scenario, user) mustBe empty
+  }
 }
