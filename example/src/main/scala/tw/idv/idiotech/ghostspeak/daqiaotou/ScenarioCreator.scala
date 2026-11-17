@@ -265,7 +265,7 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
 
   private def updateAction(action: Action, strings: Map[String, String]) =
     action.content.task match {
-      case popup @ Task.Popup(text, choices, _, _, _, _, _) =>
+      case popup @ Task.Popup(text, choices, _, _, _, _, _, _) =>
         val updatedText = text.map(t => replaceString(t, strings))
         val updatedChoices = choices.map(t => replaceString(t, strings))
         action
@@ -503,7 +503,9 @@ class ScenarioCreator(sensor: Sensor[EventPayload], actuator: Actuator[Content, 
   def sendMessage(
     action: Action
   )(using actorSystem: ActorSystem[?]): Future[Done] = {
-    val actionJson = action.asJson.toString()
+    // numbered here, in the order the actuator performs the actions; the writes below may land
+    // in any order
+    val actionJson = PendingActions.stamp(action.asJson, PendingActions.nextOrder()).toString()
     val redisKey = s"action-${action.session.scenario}-${action.receiver}"
     val hashKey = action.id
     logger.debug(s"saving action to redis: $redisKey $hashKey")

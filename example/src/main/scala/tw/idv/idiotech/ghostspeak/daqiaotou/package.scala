@@ -153,7 +153,9 @@ object Task {
     // Close alert popup after reply
     closeAlertAfterReply: Boolean = true,
     // Clear dialog
-    clearDialog: Boolean = false
+    clearDialog: Boolean = false,
+    // The line is the player's own, shown on the player's side of the chat
+    self: Boolean = false
   ) extends Task
 
   // Close popup message

@@ -132,7 +132,8 @@ class SpotKeeper(sensor: Sensor[SpotPayload], actuator: Actuator[Content, SpotPa
   def sendMessage(
     action: Action[Content]
   )(using actorSystem: ActorSystem[?], encoder: Encoder[Action[Content]]): Future[Done] = {
-    val actionJson = action.asJson.printWith(Printer.spaces2)
+    val actionJson =
+      PendingActions.stamp(action.asJson, PendingActions.nextOrder()).printWith(Printer.spaces2)
     val redisKey = s"action-${action.session.scenario}-${action.receiver}"
     val hashKey = action.id
     logger.debug(s"saving action to redis: $redisKey $hashKey")

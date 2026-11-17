@@ -49,6 +49,7 @@
                 ],
                 "closeAlertAfterReply" : false,
                 "clearDialog" : true,
+                "self" : false,
                 "type" : "POPUP"
               },
               "condition" : {

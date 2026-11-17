@@ -56,8 +56,9 @@ class EventRoutes[T: Decoder](
 //              logger.info(
 //                s"############ Finished HTTP DELETE: /v1/scenario/$engine/$scenarioId/user/$userId/actions"
 //              )
+                // in the order they were performed: a step's chat lines are shown as they come
                 val parseResults: Either[ParsingFailure, Json] =
-                  all.values.map(parse).toList.sequence.map(_.asJson)
+                  PendingActions.inOrder(all.values).map(_.asJson)
                 parseResults.fold(
                   e => complete(StatusCodes.InternalServerError -> e.getMessage()),
                   actions =>
@@ -188,7 +189,8 @@ object EventRoutes {
                 pictures,
                 destinations,
                 closeAlertAfterReply,
-                clearDialog
+                clearDialog,
+                self
               ) =>
             r.copy(images = pictures ++ r.images)
           case Task.Sound(url, volumeSetting, mode)         => r.copy(sounds = url :: r.sounds)
