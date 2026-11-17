@@ -1,7 +1,6 @@
 package tw.idv.idiotech.ghostspeak.daqiaotou
 
-import cats.implicits.*
-import io.circe.{ Codec, Decoder, Json, ParsingFailure }
+import io.circe.{ Codec, Decoder, Json }
 import io.circe.parser.{ decode, parse }
 import io.circe.syntax.*
 import org.apache.pekko.actor.typed.{ ActorRef, ActorSystem }
@@ -29,44 +28,24 @@ class EventRoutes[T: Decoder](
   override lazy val routes: List[Route] = List(
     pathPrefix("v1" / "scenario" / Segment / Segment / "user" / Segment / "actions") {
       (engine, scenarioId, userId) =>
-        val key = s"action-$scenarioId-$userId"
         val ret: Route =
           delete {
-//          logger.info(
-//            s"############ HTTP DELETE: /v1/scenario/$engine/$scenarioId/user/$userId/actions"
-//          )
-            val fetch: Future[Map[String, String]] =
-              for {
-                res <- onRedis(_.hgetAll(key))
-                all <- {
-//                logger.info(s"getting action from redis: ${res.getOrElse(Map.empty)}")
-                  res.values.foreach { s =>
-                    decode[Action](s).fold(
-                      error => logger.error(s"failed to parse action $s", error),
+            val fetch: Future[List[Json]] =
+              onRedis(PendingActions.take(_, scenarioId, userId)).map { stored =>
+                val actions = PendingActions.readable(stored)
+                actions.foreach { json =>
+                  json
+                    .as[Action]
+                    .fold(
+                      error => logger.error(s"failed to parse action ${json.noSpaces}", error),
                       a => PerformanceLogger.insert(userId, a.id, "redis")
                     )
-                  }
-                  Future.successful(res)
                 }
-                // one HDEL for all the fetched actions
-                _ <- onRedis(_.hdel(key, all.keys.toSeq*))
-              } yield all
+                actions
+              }
             onComplete(fetch) {
-              case Success(all) =>
-//              logger.info(
-//                s"############ Finished HTTP DELETE: /v1/scenario/$engine/$scenarioId/user/$userId/actions"
-//              )
-                val parseResults: Either[ParsingFailure, Json] =
-                  all.values.map(parse).toList.sequence.map(_.asJson)
-                parseResults.fold(
-                  e => complete(StatusCodes.InternalServerError -> e.getMessage()),
-                  actions =>
-                    complete(
-                      StatusCodes.OK,
-                      List(),
-                      actions
-                    )
-                )
+              // in the order they were performed: a step's chat lines are shown as they come
+              case Success(actions) => complete(StatusCodes.OK, List(), actions.asJson)
               case Failure(StatusReply.ErrorMessage(reason)) =>
                 complete(StatusCodes.InternalServerError -> reason)
               case Failure(e) =>
@@ -188,7 +167,8 @@ object EventRoutes {
                 pictures,
                 destinations,
                 closeAlertAfterReply,
-                clearDialog
+                clearDialog,
+                self
               ) =>
             r.copy(images = pictures ++ r.images)
           case Task.Sound(url, volumeSetting, mode)         => r.copy(sounds = url :: r.sounds)

@@ -93,6 +93,33 @@ class ScenarioCreatorTest
     }
   }
 
+  "a step's delayed actions" should {
+    "get start times in the order of the script, even with the same delay" in {
+      val lines = List("line-1", "line-2", "question")
+      val delayed: Map[String, Node] = Map(
+        "initial" -> script("initial").copy(performances = lines.map(popup(_).copy(delay = 60000)))
+      )
+      val actuator = createTestProbe[Actuator.Command[Content]]()
+      val user = EventSourcedBehaviorTestKit[
+        Sensor.Command[EventPayload],
+        creator.Event,
+        creator.State
+      ](
+        system,
+        creator.ub(Scenario("u7", "graphscript", ""), actuator.ref)(using delayed),
+        SerializationSettings.disabled
+      )
+      val reply =
+        message(Right(EventPayload.Text("yes")), Some("ask")).copy(sender = "u7", id = "m1")
+      user.runCommand(Sensor.Command.Sense(reply))
+      val performs = lines.map(_ => actuator.expectMessageType[Actuator.Command.Perform[Content]])
+      performs.map(_.action.id) shouldBe lines
+      // the actuator performs due actions by start time, and has nothing else to order them by
+      performs.sorted.map(_.action.id) shouldBe lines
+      performs.map(_.startTime).distinct should have size 3
+    }
+  }
+
   "a user scenario recovered without its snapshot" should {
     val snapshots = SnapshotTestKit(system)
 
