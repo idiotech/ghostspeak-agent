@@ -20,6 +20,7 @@ import org.apache.pekko.util.Timeout
 import tw.idv.idiotech.ghostspeak.agent.EventRoutes.ScenarioPayload
 import tw.idv.idiotech.ghostspeak.agent.Sensor.Identifier
 
+import java.util.concurrent.TimeoutException
 import scala.concurrent.{ ExecutionContextExecutor, Future }
 import scala.concurrent.duration.*
 import scala.util.{ Failure, Success }
@@ -172,19 +173,30 @@ class EventRoutes[T: Decoder](
       pathEnd {
         delete {
           logger.debug(s"############ HTTP DELETE: /v1/scenario/$engine/$scenarioId")
-          val ret: Route = onComplete {
-            sensor.askWithStatus[String](x => Destroy[T](scenarioId, x)).recover { case e =>
-              logger.error("failed to delete scenario", e)
+          // a refused Destroy ("doesn't exist") or a timed-out ask is the client's to see; it used
+          // to be swallowed here and answered with DELETED. Each failure is also logged here, since
+          // the sensor's log is no longer the only record of it.
+          val ret: Route =
+            onComplete(sensor.askWithStatus[String](x => Destroy[T](scenarioId, x))) {
+              case Success(_) =>
+                logger.debug(s"############ Finished HTTP DELETE: /v1/scenario/$engine/$scenarioId")
+                complete("DELETED")
+              case Failure(StatusReply.ErrorMessage(reason))
+                  if reason == EventRoutes.NoSuchScenario =>
+                // nothing to delete: not a server fault, and a repeated unpublish can tell it apart
+                logger.warn(s"DELETE /v1/scenario/$engine/$scenarioId: $reason")
+                complete(StatusCodes.NotFound -> reason)
+              case Failure(StatusReply.ErrorMessage(reason)) =>
+                logger.error(s"DELETE /v1/scenario/$engine/$scenarioId refused: $reason")
+                complete(StatusCodes.InternalServerError -> reason)
+              case Failure(e: TimeoutException) =>
+                // the Destroy may still be processed after the ask gave up: not a refusal
+                logger.error(s"DELETE /v1/scenario/$engine/$scenarioId not confirmed in time", e)
+                complete(StatusCodes.ServiceUnavailable -> EventRoutes.DeleteNotConfirmed)
+              case Failure(e) =>
+                logger.error(s"DELETE /v1/scenario/$engine/$scenarioId failed", e)
+                complete(StatusCodes.InternalServerError -> e.getMessage)
             }
-          } {
-            case Success(msg) =>
-              logger.debug(s"############ Finished HTTP DELETE: /v1/scenario/$engine/$scenarioId")
-              complete("DELETED")
-            case Failure(StatusReply.ErrorMessage(reason)) =>
-              complete(StatusCodes.InternalServerError -> reason)
-            case Failure(e) =>
-              complete(StatusCodes.InternalServerError -> e.getMessage)
-          }
           ret
         }
       }
@@ -284,4 +296,10 @@ class EventRoutes[T: Decoder](
 object EventRoutes {
 
   case class ScenarioPayload(template: Json, metadata: Metadata) derives ConfiguredCodec
+
+  /** What the sensor answers a Destroy of a scenario it does not have. */
+  val NoSuchScenario = "doesn't exist"
+
+  /** The body of a DELETE whose Destroy was not confirmed before the ask timed out. */
+  val DeleteNotConfirmed = "the delete was not confirmed in time; it may still complete"
 }
