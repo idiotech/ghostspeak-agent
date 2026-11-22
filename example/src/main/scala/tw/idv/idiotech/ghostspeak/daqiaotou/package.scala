@@ -70,6 +70,15 @@ enum GeofenceMode {
 
 object GeofenceMode extends JsonEnum[GeofenceMode]
 
+// the look a story gives the app's intro screen; "light" or "dark" in JSON
+enum IntroTheme {
+  case Light, Dark
+}
+
+object IntroTheme extends JsonEnum[IntroTheme] {
+  override def jsonName(e: IntroTheme): String = e.toString.toLowerCase
+}
+
 enum IncomingCallType {
   case Connecting, Connected, Disconnected
 }
@@ -213,14 +222,18 @@ object Task {
   ) extends Task
 
   // Intro image
-  // The background image to show
+  // The background image to show; textColor, theme ("light" or "dark") and accentColor skin the
+  // intro screen, passed through to the client untouched
   case class IntroImage(
     backgroundUrl: Option[String],
     logoUrl: Option[String],
     logoMarginTop: Option[Float] = None,
     logoWidth: Option[Float] = None,
     logoHeight: Option[Float] = None,
-    mapLogoUrl: Option[String]
+    mapLogoUrl: Option[String],
+    textColor: Option[String] = None,
+    theme: Option[IntroTheme] = None,
+    accentColor: Option[String] = None
   ) extends Task
 
   // Button style

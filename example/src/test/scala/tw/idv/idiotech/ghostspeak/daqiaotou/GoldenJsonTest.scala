@@ -108,6 +108,14 @@ class GoldenJsonTest extends AnyFlatSpec with Matchers {
     "map-style"      -> Task.MapStyle(Some("https://example.com/style"), true),
     "intro-image"    -> Task
       .IntroImage(Some("bg.png"), Some("logo.png"), Some(1.5f), None, Some(20f), None),
+    "intro-image-light" -> Task.IntroImage(
+      backgroundUrl = Some("bg.png"),
+      logoUrl = None,
+      mapLogoUrl = None,
+      textColor = Some("#1E3A2E"),
+      theme = Some(IntroTheme.Light),
+      accentColor = Some("#42928D")
+    ),
     "button-style"     -> Task.ButtonStyle("#000000", "#ffffff"),
     "popup-style"      -> Task.PopupStyle("#ff0000"),
     "variable-updates" -> Task.VariableUpdates(
@@ -437,6 +445,14 @@ class GoldenJsonTest extends AnyFlatSpec with Matchers {
   // the actuator's events use plain (not configured) derivation, which ignores default values:
   // a missing field is an error, not the default. Every stored ActionDone has "actions".
   rejected[actuator.Event]("actuator-event-action-done-empty", """{"type":"ACTION_DONE"}""")
+  // an intro image as stories stored it before textColor, theme and accentColor
+  legacy[Task](
+    "task-intro-image-before-theme",
+    """{"type":"INTRO_IMAGE","backgroundUrl":"bg.png","logoUrl":"logo.png","mapLogoUrl":"map.png"}""",
+    Task.IntroImage(Some("bg.png"), Some("logo.png"), mapLogoUrl = Some("map.png"))
+  )
+  rejected[Task]("task-intro-image-unknown-theme", """{"type":"INTRO_IMAGE","theme":"sepia"}""")
+  rejected[Task]("task-intro-image-uppercase-theme", """{"type":"INTRO_IMAGE","theme":"LIGHT"}""")
   legacy[CategoryManager.Category](
     "category-minimal",
     """{"id":"c","name":"n","order":1,"hidden":false}""",
